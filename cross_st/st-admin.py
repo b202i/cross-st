@@ -55,7 +55,7 @@ from mmd_util import (seed_user_templates, _USER_TEMPLATES_DIR, _BUNDLED_TEMPLAT
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 _CROSSENV    = os.path.expanduser("~/.crossenv")
-_models_path = os.path.join(_PROJECT_ROOT, ".ai_models")  # repo root, not cross_ai/
+_models_path = os.path.join(_PROJECT_ROOT, ".ai_models")  # repo root, not cross_st/
 
 load_cross_env()
 

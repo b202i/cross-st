@@ -14,7 +14,7 @@ import pytest
 
 # ── Load st-verdict as a module (hyphen in filename) ─────────────────────────
 _spec = importlib.util.spec_from_file_location(
-    "st_verdict", Path(__file__).parent.parent / "cross_ai" / "st-verdict.py"
+    "st_verdict", Path(__file__).parent.parent / "cross_st" / "st-verdict.py"
 )
 st_verdict = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(st_verdict)

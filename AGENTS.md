@@ -5,47 +5,47 @@ Cross generates research reports using 5 AI providers simultaneously, then cross
 
 ## Architecture
 
-**All runtime code lives in `cross_ai/` (C1 complete).** The repo root contains only `pyproject.toml`, `requirements*.txt`, `docs/`, `tests/`, `script/`, and config files. All `st-*.py` scripts, support modules, and data directories are inside `cross_ai/`.
+**All runtime code lives in `cross_st/` renamed to cross_st/ (C1 complete).** The repo root contains only `pyproject.toml`, `requirements*.txt`, `docs/`, `tests/`, `script/`, and config files. All `st-*.py` scripts, support modules, and data directories are inside `cross_st/`.
 
 
 ```
-cross_ai/                ← Python package; all runtime code lives here (C1)
-cross_ai/st.py           ← Menu/command builder ONLY — no business logic
-cross_ai/st-*.py         ← 28 individual CLI tools (each owns its own logic)
-cross_ai/st-admin.py     ← Settings manager: DEFAULT_AI, model overrides, TTS voice, editor, --init-templates
-cross_ai/st-domain.py    ← Interactive wizard: create a new Cross-Stones domain prompt (Phases 2–4)
-cross_ai/st-fetch.py     ← Import external content into a container (tweet_id / --file / --url / --clipboard)
-cross_ai/st-find.py      ← Keyword search across .json containers and .prompt files; boolean operators (+required, ^excluded) + wildcards
-cross_ai/st-fix.py       ← Improve a story via fact-check feedback (modes: iterate [default] / patch / best-source / synthesize)
-cross_ai/st-merge.py     ← Synthesize multiple AI stories (auto: simple mode or quality mode using fact scores)
-cross_ai/st-man.py       ← Man-page viewer: local help from docstrings + --web opens GitHub Wiki
-cross_ai/st-new.py       ← Create a new prompt from template/; opens editor; optionally launches st-bang
-cross_ai/st-print.py     ← Convert a story to PDF; print to system printer or --save-pdf / --output file
-cross_ai/st-heatmap.py   ← Cross-product fact-check score heatmap (evaluator vs target)
-cross_ai/st-verdict.py   ← Verdict category bar chart (stacked per author AI)
-cross_ai/st-speed.py     ← AI performance/speed analysis and timing comparison
-cross_ai/st-stones.py    ← Cross-Stones benchmark leaderboard aggregator
-cross_ai/ai_handler.py      ← Compatibility shim → cross_ai_core.ai_handler (see cross-ai-core repo)
-cross_ai/ai_error_handler.py ← Compatibility shim → cross_ai_core.ai_error_handler
-cross_ai/base_handler.py    ← Compatibility shim → cross_ai_core.ai_base
-cross_ai/ai_url.py          ← X/Twitter + web URL fetch handler for st-fetch (AI_MAKE="url"; NOT in AI_HANDLER_REGISTRY)
-cross_ai/mmd_*.py           ← Support modules: util, process_report, branding, plot, voice, for_speaking, single_key
-cross_ai/mmd_data_analysis.py ← Flattened fact-check data helpers used by heatmap/verdict/analyze
-cross_ai/mmd_startup.py     ← First-run detection: `require_config()` called near the top of every `st-*.py` (except `st-admin`, `st-man`)
-cross_ai/mmd_web_server.py  ← Candidate Markdown preview server (currently unused; candidate to replace grip)
-cross_ai/discourse.py       ← Discourse API client (MmdDiscourseClient wraps pydiscourse)
-cross_ai/commands.py        ← Entry-point dispatch for pyproject.toml; maps `st_*` functions → `st-*.py` via runpy; also inserts `cross_ai/` onto sys.path
-cross_ai/cross_stones/                    ← Cross-Stones benchmark suite
-cross_ai/cross_stones/cross-stones-10.json  ← Named benchmark set: locked params (n_claims, max_fact_score)
-cross_ai/cross_stones/domains/            ← 10 standard domain prompts + result containers
-cross_ai/template/         ← Prompt templates for st-new; template/*.prompt files; default.prompt is the baseline
+cross_st/                ← Python package; all runtime code lives here (C1)
+cross_st/st.py           ← Menu/command builder ONLY — no business logic
+cross_st/st-*.py         ← 28 individual CLI tools (each owns its own logic)
+cross_st/st-admin.py     ← Settings manager: DEFAULT_AI, model overrides, TTS voice, editor, --init-templates
+cross_st/st-domain.py    ← Interactive wizard: create a new Cross-Stones domain prompt (Phases 2–4)
+cross_st/st-fetch.py     ← Import external content into a container (tweet_id / --file / --url / --clipboard)
+cross_st/st-find.py      ← Keyword search across .json containers and .prompt files; boolean operators (+required, ^excluded) + wildcards
+cross_st/st-fix.py       ← Improve a story via fact-check feedback (modes: iterate [default] / patch / best-source / synthesize)
+cross_st/st-merge.py     ← Synthesize multiple AI stories (auto: simple mode or quality mode using fact scores)
+cross_st/st-man.py       ← Man-page viewer: local help from docstrings + --web opens GitHub Wiki
+cross_st/st-new.py       ← Create a new prompt from template/; opens editor; optionally launches st-bang
+cross_st/st-print.py     ← Convert a story to PDF; print to system printer or --save-pdf / --output file
+cross_st/st-heatmap.py   ← Cross-product fact-check score heatmap (evaluator vs target)
+cross_st/st-verdict.py   ← Verdict category bar chart (stacked per author AI)
+cross_st/st-speed.py     ← AI performance/speed analysis and timing comparison
+cross_st/st-stones.py    ← Cross-Stones benchmark leaderboard aggregator
+cross_st/ai_handler.py      ← Compatibility shim → cross_ai_core.ai_handler (see cross-ai-core repo)
+cross_st/ai_error_handler.py ← Compatibility shim → cross_ai_core.ai_error_handler
+cross_st/base_handler.py    ← Compatibility shim → cross_ai_core.ai_base
+cross_st/ai_url.py          ← X/Twitter + web URL fetch handler for st-fetch (AI_MAKE="url"; NOT in AI_HANDLER_REGISTRY)
+cross_st/mmd_*.py           ← Support modules: util, process_report, branding, plot, voice, for_speaking, single_key
+cross_st/mmd_data_analysis.py ← Flattened fact-check data helpers used by heatmap/verdict/analyze
+cross_st/mmd_startup.py     ← First-run detection: `require_config()` called near the top of every `st-*.py` (except `st-admin`, `st-man`)
+cross_st/mmd_web_server.py  ← Candidate Markdown preview server (currently unused; candidate to replace grip)
+cross_st/discourse.py       ← Discourse API client (MmdDiscourseClient wraps pydiscourse)
+cross_st/commands.py        ← Entry-point dispatch for pyproject.toml; maps `st_*` functions → `st-*.py` via runpy; also inserts `cross_st/` onto sys.path
+cross_st/cross_stones/                    ← Cross-Stones benchmark suite
+cross_st/cross_stones/cross-stones-10.json  ← Named benchmark set: locked params (n_claims, max_fact_score)
+cross_st/cross_stones/domains/            ← 10 standard domain prompts + result containers
+cross_st/template/         ← Prompt templates for st-new; template/*.prompt files; default.prompt is the baseline
 api_cache/         ← MD5-keyed cached API responses (legacy local path; ~/.cross_api_cache/ for installed use)
 tmp/               ← Transient parallel coordination files
 docs/wiki/         ← GitHub Wiki source files (version-controlled); auto-built by script/build_wiki.py
 ../cross-ai-core/  ← Sibling repo: the extracted AI provider stack (published to PyPI as cross-ai-core)
 ```
 
-**AI stack lives in `cross-ai-core`.** The files `cross_ai/ai_handler.py`, `cross_ai/ai_error_handler.py`, and `cross_ai/base_handler.py` are thin compatibility shims. The actual provider implementations (`ai_anthropic.py`, `ai_xai.py`, etc.) live in `~/github/cross-ai-core/cross_ai_core/`. All `st-*.py` imports continue to work unchanged through the shims.
+**AI stack lives in `cross-ai-core`.** The files `cross_st/ai_handler.py`, `cross_st/ai_error_handler.py`, and `cross_st/base_handler.py` are thin compatibility shims. The actual provider implementations (`ai_anthropic.py`, `ai_xai.py`, etc.) live in `~/github/cross-ai-core/cross_ai_core/`. All `st-*.py` imports continue to work unchanged through the shims.
 
 **Never hardcode AI provider names or model strings in code.** Always call `get_default_ai()` from `ai_handler` when a default provider is needed, and `get_ai_model(make)` / `settings_get_ai_model(make)` when a model string is needed. Use `--ai` CLI flags to let callers override. Hardcoded names like `"xai"` or `"anthropic"` in code are a bug.
 
@@ -79,9 +79,9 @@ All AI calls are cached by default. Cache key = MD5 of the serialized payload �
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e .              # installs cross_ai package + creates st-* entry points in .venv/bin
+pip install -e .              # installs cross_st package + creates st-* entry points in .venv/bin
 ```
-The old `bash script/symbolic_links.bash` step is obsolete — `pip install -e .` generates all entry points via `[project.scripts]` in `pyproject.toml`. The script still exists but references root-level `st-*.py` files that moved to `cross_ai/` (C1) and will not work.
+The old `bash script/symbolic_links.bash` step is obsolete — `pip install -e .` generates all entry points via `[project.scripts]` in `pyproject.toml`. The script still exists but references root-level `st-*.py` files that moved to `cross_st/` (C1) and will not work.
 
 For pipx installs (recommended for end users):
 ```bash
@@ -136,7 +136,7 @@ Tests live in `tests/` with fixtures in `tests/fixtures/` (e.g. `pizza_dough.jso
 Current test files: `test_mmd_process_report.py`, `test_container_loading.py`, `test_st_admin.py`, `test_st_plot.py`, `test_st_speed.py`, `test_st_stones.py`, `test_dotenv_resolution.py`, `test_tts_stack.py`, `test_cache_timing_preservation.py`, `test_cli_help.py`, `test_imports.py`, `test_st_bang.py`, `test_st_verdict.py`.
 
 ## Cross-Stones Benchmark (`st-stones`)
-`cross_ai/cross_stones/domains/` contains 10 benchmark domain prompts + result containers. `cross_ai/cross_stones/cross-stones-10.json` is the **named benchmark set config** — it locks the domain list, `n_claims`, and `max_fact_score` so scores are directly comparable across runs over time. Do not add or remove domains from that file; create a new named set for variants.
+`cross_st/cross_stones/domains/` contains 10 benchmark domain prompts + result containers. `cross_st/cross_stones/cross-stones-10.json` is the **named benchmark set config** — it locks the domain list, `n_claims`, and `max_fact_score` so scores are directly comparable across runs over time. Do not add or remove domains from that file; create a new named set for variants.
 
 Each domain prompt asks every AI to generate exactly 10 fact-checkable claims. After running `st-cross` on each domain, `st-stones` computes a composite `cross_stone_score`:
 
@@ -148,10 +148,10 @@ Default weights: accuracy `w1=0.7`, speed `w2=0.3`. Speed score is `1 / (avg_gen
 
 ```bash
 # Named set (uses locked n_claims=10, max_fact_score=200 from the config)
-st-stones cross_ai/cross_stones/cross-stones-10.json
+st-stones cross_st/cross_stones/cross-stones-10.json
 
 # Directory (auto-discovers domains/ subdirectory)
-st-stones cross_ai/cross_stones/
+st-stones cross_st/cross_stones/
 
 # No argument — auto-detects ./cross_stones/ then ~/cross-stones/
 st-stones
@@ -161,9 +161,9 @@ st-stones --init
 st-stones --init --dir my_domains/    # custom destination
 
 # With options
-st-stones --no-speed cross_ai/cross_stones/cross-stones-10.json      # accuracy-only
-st-stones --domain --ai-caption cross_ai/cross_stones/cross-stones-10.json  # breakdown + caption
-st-stones --run cross_ai/cross_stones/cross-stones-10.json           # run missing domains then score
+st-stones --no-speed cross_st/cross_stones/cross-stones-10.json      # accuracy-only
+st-stones --domain --ai-caption cross_st/cross_stones/cross-stones-10.json  # breakdown + caption
+st-stones --run cross_st/cross_stones/cross-stones-10.json           # run missing domains then score
 ```
 
 When a benchmark set config is passed, `st-stones` prints the set id and uses its `n_claims` value (overridable with `--n-claims`). When a plain directory is passed, it looks for `.prompt` files directly, then falls back to a `domains/` subdirectory.
@@ -174,7 +174,7 @@ When a benchmark set config is passed, `st-stones` prints the set id and uses it
 st-domain                                        # fully interactive wizard
 st-domain --name supply_chain                    # pre-fill slug
 st-domain --dir my_domains/                      # custom output directory
-st-domain --set cross_ai/cross_stones/cross-stones-10.json  # register in a benchmark set
+st-domain --set cross_st/cross_stones/cross-stones-10.json  # register in a benchmark set
 ```
 
 `st-domain` follows `DOMAIN_PROMPT_PROCESS.md` Phases 2–4:
@@ -182,10 +182,10 @@ st-domain --set cross_ai/cross_stones/cross-stones-10.json  # register in a benc
 - **Phase 3** — calls AI to suggest 5 aspects; assembles the prompt from template; shows preview
 - **Phase 4** — smoke-tests by sending the prompt to one AI; user validates 10 claims returned
 
-Prompts are saved to `cross_ai/cross_stones/domains/` by default. After saving, run:
+Prompts are saved to `cross_st/cross_stones/domains/` by default. After saving, run:
 ```bash
-st-cross cross_ai/cross_stones/domains/<slug>.json   # run the N×N benchmark
-st-stones cross_ai/cross_stones/domains/             # score all domains in that dir
+st-cross cross_st/cross_stones/domains/<slug>.json   # run the N×N benchmark
+st-stones cross_st/cross_stones/domains/             # score all domains in that dir
 ```
 
 Benchmark domains (standard set): `software_development`, `customer_service`, `marketing_content`, `education_learning`, `data_analytics`, `healthcare_medical`, `finance_business`, `writing_editing`, `research_qa`, `creative_media`.
@@ -200,24 +200,24 @@ Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–
 ## Key Files for Context
 | File | Why It Matters |
 |------|----------------|
-| `cross_ai/st.py` | Menu structure and `POST_CMD_REFRESH` set |
-| `cross_ai/st-admin.py` | Settings manager — `DEFAULT_AI`, model overrides, TTS voice, editor, `--init-templates`; `--overwrite-templates` replaces existing template files |
-| `cross_ai/st-domain.py` | Interactive wizard: create a new Cross-Stones domain prompt (Phases 2–4) |
-| `cross_ai/st-find.py` | Keyword search: `parse_boolean_pattern()` handles `+required ^excluded` operators; `wildcard_to_regex()` expands `*`/`?`; searches titles, prompts, and story text |
-| `cross_ai/ai_handler.py` | Compatibility shim → `cross_ai_core.ai_handler`; exposes `process_prompt`, `get_default_ai`, etc. |
-| `cross_ai/base_handler.py` | Compatibility shim → `cross_ai_core.ai_base.BaseAIHandler` |
-| `cross_ai/ai_url.py` | X/Twitter fetch handler for `st-fetch`; uses `AI_MAKE="url"`, not registered in `AI_HANDLER_REGISTRY` |
-| `cross_ai/mmd_startup.py` | `require_config()` — first-run guard; called near top of every `st-*.py` except `st-admin` and `st-man` |
-| `cross_ai/mmd_util.py` | `tmp/` path helpers, block file protocol, `build_segments()` for fact-check units |
-| `cross_ai/mmd_process_report.py` | Text pipeline helpers: `remove_markdown`, `extract_title`, `get_hashtags`, `clean_for_platform` |
-| `cross_ai/mmd_data_analysis.py` | `get_flattened_fc_data()` — flattens fact[] into a DataFrame used by heatmap/verdict/analyze |
-| `cross_ai/commands.py` | Entry-point dispatch: `runpy.run_path()` wrappers for every `st-*.py`; inserts `cross_ai/` onto `sys.path`; target of `pyproject.toml [project.scripts]` |
-| `pyproject.toml` | Package metadata, `[project.scripts]` entry points (`cross_ai.commands:*`), optional `[tts]` extras, package data declarations |
-| `cross_ai/st-stones.py` | Cross-Stones scoring: `compute_domain_scores()`, `compute_cross_stone_scores()` |
-| `cross_ai/st-print.py` | PDF export: Markdown → HTML → PDF via WeasyPrint; `--save-pdf` / `--output` / `--preview` / `--printer` |
+| `cross_st/st.py` | Menu structure and `POST_CMD_REFRESH` set |
+| `cross_st/st-admin.py` | Settings manager — `DEFAULT_AI`, model overrides, TTS voice, editor, `--init-templates`; `--overwrite-templates` replaces existing template files |
+| `cross_st/st-domain.py` | Interactive wizard: create a new Cross-Stones domain prompt (Phases 2–4) |
+| `cross_st/st-find.py` | Keyword search: `parse_boolean_pattern()` handles `+required ^excluded` operators; `wildcard_to_regex()` expands `*`/`?`; searches titles, prompts, and story text |
+| `cross_st/ai_handler.py` | Compatibility shim → `cross_ai_core.ai_handler`; exposes `process_prompt`, `get_default_ai`, etc. |
+| `cross_st/base_handler.py` | Compatibility shim → `cross_ai_core.ai_base.BaseAIHandler` |
+| `cross_st/ai_url.py` | X/Twitter fetch handler for `st-fetch`; uses `AI_MAKE="url"`, not registered in `AI_HANDLER_REGISTRY` |
+| `cross_st/mmd_startup.py` | `require_config()` — first-run guard; called near top of every `st-*.py` except `st-admin` and `st-man` |
+| `cross_st/mmd_util.py` | `tmp/` path helpers, block file protocol, `build_segments()` for fact-check units |
+| `cross_st/mmd_process_report.py` | Text pipeline helpers: `remove_markdown`, `extract_title`, `get_hashtags`, `clean_for_platform` |
+| `cross_st/mmd_data_analysis.py` | `get_flattened_fc_data()` — flattens fact[] into a DataFrame used by heatmap/verdict/analyze |
+| `cross_st/commands.py` | Entry-point dispatch: `runpy.run_path()` wrappers for every `st-*.py`; inserts `cross_st/` onto `sys.path`; target of `pyproject.toml [project.scripts]` |
+| `pyproject.toml` | Package metadata, `[project.scripts]` entry points (`cross_st.commands:*`), optional `[tts]` extras, package data declarations |
+| `cross_st/st-stones.py` | Cross-Stones scoring: `compute_domain_scores()`, `compute_cross_stone_scores()` |
+| `cross_st/st-print.py` | PDF export: Markdown → HTML → PDF via WeasyPrint; `--save-pdf` / `--output` / `--preview` / `--printer` |
 | `README_stones.md` | Cross-Stones benchmark documentation: scoring formula, historical tracking, domain table |
-| `cross_ai/cross_stones/cross-stones-10.json` | Named benchmark set: locked `n_claims`, `max_fact_score`, domain list |
-| `cross_ai/template/default.prompt` | Baseline prompt template (1200–1500 word Markdown report); add files here for `st-new --template` |
+| `cross_st/cross_stones/cross-stones-10.json` | Named benchmark set: locked `n_claims`, `max_fact_score`, domain list |
+| `cross_st/template/default.prompt` | Baseline prompt template (1200–1500 word Markdown report); add files here for `st-new --template` |
 | `tests/fixtures/pizza_dough.json` | Canonical example of a populated container |
 | `docs/wiki/` | GitHub Wiki source files; `script/build_wiki.py` auto-generates per-command pages from docstrings; `script/push_wiki.sh` publishes |
 

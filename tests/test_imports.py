@@ -44,8 +44,8 @@ _FALSE_POSITIVES.discard("re")
 
 
 def _collect_st_scripts():
-    """Return sorted list of (filename, Path) for every st-*.py in cross_ai/."""
-    scripts = sorted((_REPO_ROOT / "cross_ai").glob("st-*.py"))
+    """Return sorted list of (filename, Path) for every st-*.py in cross_st/."""
+    scripts = sorted((_REPO_ROOT / "cross_st").glob("st-*.py"))
     return [(p.name, p) for p in scripts]
 
 

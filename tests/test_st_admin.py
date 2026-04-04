@@ -29,7 +29,7 @@ import pytest
 
 # ── Load st-admin.py as a module (hyphen in filename) ─────────────────────────
 _spec = importlib.util.spec_from_file_location(
-    "st_admin", Path(__file__).parent.parent / "cross_ai" / "st-admin.py"
+    "st_admin", Path(__file__).parent.parent / "cross_st" / "st-admin.py"
 )
 st_admin = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(st_admin)

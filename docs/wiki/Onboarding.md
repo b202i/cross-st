@@ -7,18 +7,32 @@ Cross generates research reports using up to 5 AI providers simultaneously, then
 ## 1. Install Cross
 
 ```bash
-pipx install cross-st
-```
-
-With text-to-speech support:
-
-```bash
 pipx install "cross-st[tts]"
 ```
 
+If pipx says it's already installed, add `--force`:
+
+```bash
+pipx install --force "cross-st[tts]"
+```
+
+To install without TTS (`st-speak` / `st-voice` unavailable):
+
+```bash
+pipx install cross-st
+```
+
+## 2. Reload your shell
+
+```bash
+pipx ensurepath && exec zsh
+```
+
+If `st` or any `st-*` command is not found after install, this is the fix. It adds `~/.local/bin` to your PATH and reloads the shell.
+
 ---
 
-## 2. Get an API key
+## 3. Get an API key
 
 You need at least one API key. **Start with Gemini — it's free.**
 
@@ -84,7 +98,7 @@ Perplexity Sonar models include **live web search with citations** — useful fo
 
 ---
 
-## 3. Configure Cross
+## 4. Configure Cross
 
 Run the setup wizard:
 
@@ -105,7 +119,7 @@ Settings are stored in `~/.crossenv`. You can also create a local `.env` in any 
 
 ---
 
-## 4. Run your first report
+## 5. Run your first report
 
 ```bash
 mkdir my_reports && cd my_reports
@@ -127,7 +141,7 @@ st-fact --ai anthropic report.json -s 1   # fact-check story 1 with Claude
 
 ---
 
-## 5. Useful configuration commands
+## 6. Useful configuration commands
 
 ```bash
 st-admin                        # show current settings
@@ -138,7 +152,7 @@ st-admin --list-models          # show all configured model overrides
 
 ---
 
-## 6. Learn more
+## 7. Learn more
 
 ```bash
 st-man                          # list all commands

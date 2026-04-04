@@ -29,7 +29,7 @@ _REPO = Path(__file__).resolve().parent.parent
 
 def _load(name: str):
     """Load a st-*.py file as a module by path."""
-    path = _REPO / "cross_ai" / f"{name}.py"
+    path = _REPO / "cross_st" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

@@ -19,7 +19,7 @@ For each command (two subprocess calls per command):
       takes.  Bugs like a missing sys.path insert in _run() only show up here.
 
   test_help_via_script  — invokes the .py file directly
-      (``python cross_ai/st-verdict.py --help``).  Python automatically adds
+      (``python cross_st/st-verdict.py --help``).  Python automatically adds
       the script directory to sys.path[0], so module imports resolve even if
       commands.py is broken.  Kept as a quick sanity check.
 
@@ -48,7 +48,7 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).parent.parent
-_SCRIPTS = _ROOT / "cross_ai"        # st-*.py scripts live in cross_ai/
+_SCRIPTS = _ROOT / "cross_st"        # st-*.py scripts live in cross_st/
 _VENV_BIN = Path(sys.executable).parent  # .venv/bin — entry-point wrappers
 
 # Every command that exposes a --help flag (argparse or manual).
@@ -136,7 +136,7 @@ def test_help_via_entry_point(cmd, fake_home):
 def test_help_via_script(cmd, fake_home):
     """Direct script execution must handle --help.
 
-    ``python cross_ai/st-verdict.py --help`` — Python adds cross_ai/ to
+    ``python cross_st/st-verdict.py --help`` — Python adds cross_st/ to
     sys.path[0] automatically, so this passes even when commands.py is broken.
     Kept as a quick sanity check that the script itself is well-formed.
     """

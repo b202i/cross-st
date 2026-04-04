@@ -10,7 +10,7 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Ensure the cross_ai/ directory is on sys.path so that st-*.py scripts can
+# Ensure the cross_st/ directory is on sys.path so that st-*.py scripts can
 # use bare module imports (e.g. `from mmd_startup import require_config`).
 # When scripts are run directly as files, Python adds their directory to
 # sys.path[0] automatically — runpy.run_path() does not, so we do it here.

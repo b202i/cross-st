@@ -22,7 +22,7 @@ from unittest.mock import patch, MagicMock
 
 # ── Load st-stones as a module (hyphen in filename) ───────────────────────────
 _spec = importlib.util.spec_from_file_location(
-    "st_stones", Path(__file__).parent.parent / "cross_ai" / "st-stones.py"
+    "st_stones", Path(__file__).parent.parent / "cross_st" / "st-stones.py"
 )
 st_stones = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(st_stones)
@@ -1027,7 +1027,7 @@ class TestMainCLI:
         # We can't call main() without a real path, so inspect the parser directly
         # by loading a fresh invocation and checking the default
         spec2 = importlib.util.spec_from_file_location(
-            "st_stones2", Path(__file__).parent.parent / "cross_ai" / "st-stones.py"
+            "st_stones2", Path(__file__).parent.parent / "cross_st" / "st-stones.py"
         )
         mod2 = importlib.util.module_from_spec(spec2)
         # Patch sys.argv to avoid main() running; just check parser default via module attr

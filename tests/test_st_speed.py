@@ -12,7 +12,7 @@ import importlib.util
 
 # Load st-speed.py as a module (handles hyphen in filename)
 spec = importlib.util.spec_from_file_location("st_speed", 
-    Path(__file__).parent.parent / "cross_ai" / "st-speed.py")
+    Path(__file__).parent.parent / "cross_st" / "st-speed.py")
 st_speed = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(st_speed)
 

@@ -39,7 +39,7 @@ import pytest
 
 _REPO = Path(__file__).parent.parent   # cross/ repo root
 
-_spec = importlib.util.spec_from_file_location("ai_handler", _REPO / "cross_ai" / "ai_handler.py")
+_spec = importlib.util.spec_from_file_location("ai_handler", _REPO / "cross_st" / "ai_handler.py")
 ai_handler = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ai_handler)
 

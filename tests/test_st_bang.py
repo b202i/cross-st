@@ -16,7 +16,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Load st-bang.py as a module (filename contains a hyphen)
 # ---------------------------------------------------------------------------
-_BANG_PATH = Path(__file__).resolve().parent.parent / "cross_ai" / "st-bang.py"
+_BANG_PATH = Path(__file__).resolve().parent.parent / "cross_st" / "st-bang.py"
 
 
 def _load_st_bang():

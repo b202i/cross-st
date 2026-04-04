@@ -243,7 +243,7 @@ All steps are also accessible through the `st` interactive menu.
 
 ```
 cross/
-├── cross_ai/               # Python package — all runtime code lives here
+├── cross_st/               # Python package — all runtime code lives here
 │   ├── st.py               # Interactive menu (command builder)
 │   ├── st-*.py             # Individual CLI commands (28 tools)
 │   ├── ai_handler.py       # AI dispatcher (shim → cross-ai-core)

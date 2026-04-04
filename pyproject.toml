@@ -93,57 +93,57 @@ Repository     = "https://github.com/b202i/cross"
 Documentation  = "https://crossai.dev"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Entry points — thin wrappers in cross_ai/commands.py dispatch to st-*.py.
+# Entry points — thin wrappers in cross_st/commands.py dispatch to st-*.py.
 # ─────────────────────────────────────────────────────────────────────────────
 [project.scripts]
-st          = "cross_ai.commands:st"
-st-admin    = "cross_ai.commands:st_admin"
-st-analyze  = "cross_ai.commands:st_analyze"
-st-bang     = "cross_ai.commands:st_bang"
-st-cat      = "cross_ai.commands:st_cat"
-st-cross    = "cross_ai.commands:st_cross"
-st-domain   = "cross_ai.commands:st_domain"
-st-edit     = "cross_ai.commands:st_edit"
-st-fact     = "cross_ai.commands:st_fact"
-st-fetch    = "cross_ai.commands:st_fetch"
-st-find     = "cross_ai.commands:st_find"
-st-fix      = "cross_ai.commands:st_fix"
-st-gen      = "cross_ai.commands:st_gen"
-st-heatmap  = "cross_ai.commands:st_heatmap"
-st-ls       = "cross_ai.commands:st_ls"
-st-man      = "cross_ai.commands:st_man"
-st-merge    = "cross_ai.commands:st_merge"
-st-new      = "cross_ai.commands:st_new"
-st-plot     = "cross_ai.commands:st_plot"
-st-post     = "cross_ai.commands:st_post"
-st-prep     = "cross_ai.commands:st_prep"
-st-print    = "cross_ai.commands:st_print"
-st-read     = "cross_ai.commands:st_read"
-st-rm       = "cross_ai.commands:st_rm"
-st-speak    = "cross_ai.commands:st_speak"
-st-speed    = "cross_ai.commands:st_speed"
-st-stones   = "cross_ai.commands:st_stones"
-st-verdict  = "cross_ai.commands:st_verdict"
-st-voice    = "cross_ai.commands:st_voice"
+st          = "cross_st.commands:st"
+st-admin    = "cross_st.commands:st_admin"
+st-analyze  = "cross_st.commands:st_analyze"
+st-bang     = "cross_st.commands:st_bang"
+st-cat      = "cross_st.commands:st_cat"
+st-cross    = "cross_st.commands:st_cross"
+st-domain   = "cross_st.commands:st_domain"
+st-edit     = "cross_st.commands:st_edit"
+st-fact     = "cross_st.commands:st_fact"
+st-fetch    = "cross_st.commands:st_fetch"
+st-find     = "cross_st.commands:st_find"
+st-fix      = "cross_st.commands:st_fix"
+st-gen      = "cross_st.commands:st_gen"
+st-heatmap  = "cross_st.commands:st_heatmap"
+st-ls       = "cross_st.commands:st_ls"
+st-man      = "cross_st.commands:st_man"
+st-merge    = "cross_st.commands:st_merge"
+st-new      = "cross_st.commands:st_new"
+st-plot     = "cross_st.commands:st_plot"
+st-post     = "cross_st.commands:st_post"
+st-prep     = "cross_st.commands:st_prep"
+st-print    = "cross_st.commands:st_print"
+st-read     = "cross_st.commands:st_read"
+st-rm       = "cross_st.commands:st_rm"
+st-speak    = "cross_st.commands:st_speak"
+st-speed    = "cross_st.commands:st_speed"
+st-stones   = "cross_st.commands:st_stones"
+st-verdict  = "cross_st.commands:st_verdict"
+st-voice    = "cross_st.commands:st_voice"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Setuptools packaging
 #
-# All runtime code lives in the cross_ai/ package.  st-*.py scripts are
+# All runtime code lives in the cross_st/ package.  st-*.py scripts are
 # included as package data (hyphens make them invalid Python module names).
 # commands.py uses runpy.run_path(_HERE/<name>.py) where _HERE is the
-# cross_ai/ directory — correct whether installed or run in editable mode.
+# cross_st/ directory — correct whether installed or run in editable mode.
 # ─────────────────────────────────────────────────────────────────────────────
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cross_ai*"]
+include = ["cross_st*"]
 
 # Package data: st-*.py scripts + prompt templates + benchmark data
 [tool.setuptools.package-data]
-cross_ai = [
+cross_st = [
     "st-*.py",
     "st.py",
     "template/*.prompt",
