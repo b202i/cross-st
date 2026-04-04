@@ -544,7 +544,11 @@ def settings_show_all() -> None:
     print(f"  {'Default AI':<{W}}  {settings_get_default_ai()}")
     for make in ai_list:
         print(f"  {'AI model: ' + make:<{W}}  {settings_get_ai_model(make)}")
+    tts_host = _env_get("TTS_HOST", "(not set)")
+    tts_port = _env_get("TTS_PORT", "(not set)")
     print(f"  {'TTS voice':<{W}}  {settings_get_tts_voice()}")
+    print(f"  {'TTS host':<{W}}  {tts_host}")
+    print(f"  {'TTS port':<{W}}  {tts_port}")
     print(f"  {'Default template':<{W}}  {settings_get_default_template()}")
     print(f"  {'Editor':<{W}}  {settings_get_editor()}")
     print(f"  {'Stones dir':<{W}}  {get_default_stones_dir()}")
