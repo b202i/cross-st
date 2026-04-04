@@ -51,14 +51,15 @@ You can re-run it any time to add or change settings.
 
 ```bash
 st-new my-first-report                              # create a prompt file, opens in editor
-st-bang my-first-report.prompt                      # generate reports from all AI providers
+st-gen my-first-report.prompt                       # generate a report (runs prep automatically)
 st-ls my-first-report.json                          # see what was created
 st-print --preview --story 1 my-first-report.json   # read story 1 as a formatted preview
 ```
 
-`st-bang` submits your prompt to every configured AI provider and saves all the responses
-into a single JSON container. `st-ls` shows you what's inside. `st-print --preview` renders
-the story as formatted text so you can read it before doing anything else with it.
+`st-gen` submits your prompt to your default AI provider, saves the response, and
+runs `st-prep` on it automatically — so the story is ready to read straight away.
+`st-ls` shows you what's inside the container. `st-print --preview` renders the
+story as formatted text so you can read it before doing anything else with it.
 
 ---
 
