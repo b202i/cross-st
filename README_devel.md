@@ -11,27 +11,62 @@ venv example below, but any 3.10–3.13 works equally well.
 # 1. Install Python 3.11 if not already present
 brew install python@3.11
 
-# 2. Clone both repos independently
+# 2. Clone the repo
 git clone https://github.com/b202i/cross-st.git
-git clone https://github.com/b202i/cross-story.git
-ln -s ~/github/cross-story ~/github/cross/story
-cd cross
+cd cross-st
 
-# 3. Create the venv with Python 3.11
+# 3. Create the venv
 python3.11 -m venv .venv
 source .venv/bin/activate
 
-# 4. Install dependencies
-pip install -r requirements.txt
-
-# 5. Symlink st-* commands into the venv (run AFTER pip install)
-bash script/symbolic_links.bash
+# 4. Install in editable mode (creates st-* entry points in .venv/bin/)
+pip install -e .
 ```
 
-The symlinks land in `.venv/bin/` and are available on `PATH` whenever the venv
-is active. The script is safe to re-run (e.g. after adding a new `st-*.py` file).
+`pip install -e .` generates all `st-*` entry points via `[project.scripts]` in
+`pyproject.toml`. The old `script/symbolic_links.bash` step is obsolete.
 
 For full install instructions see [README_install.md](README_install.md).
+
+## Running dev commands alongside a pipx install
+
+If you also have `cross-st` installed via `pipx` (e.g. for end-user testing),
+pipx adds its own `st-*` binaries to `~/.local/bin/`. **zsh caches command
+locations** in a hash table, so `which st-admin` may still return the pipx
+path even after activating the dev venv.
+
+**Fix — run `rehash` after activation:**
+
+```zsh
+cd ~/github/cross-st
+source .venv/bin/activate
+rehash                     # clears zsh's command-location cache
+which st-admin             # → .../cross-st/.venv/bin/st-admin  ✓
+```
+
+**Verify the right version is active:**
+
+```zsh
+st-admin --version         # if implemented, shows dev version
+whence -p st-admin         # PATH-only lookup, always bypasses the hash
+```
+
+**Use explicit path if you need a quick one-off without rehashing:**
+
+```zsh
+.venv/bin/st-admin --show
+.venv/bin/st-cross my_story.json
+```
+
+**Optional — shell helper in `~/.zshrc`** to auto-rehash on venv activation:
+
+```zsh
+function venv() {
+    source "${1:-.venv}/bin/activate" && rehash
+}
+# Usage:  venv          (activates .venv in CWD)
+#         venv path/to/other/.venv
+```
 
 ## Development notes
 ### Aspirational goals
