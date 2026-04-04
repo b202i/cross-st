@@ -17,7 +17,7 @@ all kinds are welcome — bug fixes, new features, documentation, and tests.
 ### Clone and Set Up
 
 ```bash
-git clone https://github.com/b202i/cross.git
+git clone https://github.com/b202i/cross-st.git
 cd cross
 python3.11 -m venv .venv
 source .venv/bin/activate
@@ -43,7 +43,7 @@ st --help
 
 ### Reporting Bugs
 
-1. Check [existing issues](https://github.com/b202i/cross/issues) first
+1. Check [existing issues](https://github.com/b202i/cross-st/issues) first
 2. Open a new issue using the **Bug Report** template
 3. Include: Python version, OS, the exact command you ran, and the full
    traceback
@@ -157,6 +157,6 @@ pytest tests/ -m live
 
 ## Questions?
 
-Open a [Discussion](https://github.com/b202i/cross/discussions) for general
+Open a [Discussion](https://github.com/b202i/cross-st/discussions) for general
 questions, or an Issue for bugs and feature requests.
 

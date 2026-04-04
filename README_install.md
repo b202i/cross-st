@@ -178,7 +178,7 @@ pip install grip
 ### 3. Clone both repos
 
 ```bash
-git clone https://github.com/b202i/cross.git
+git clone https://github.com/b202i/cross-st.git
 git clone https://github.com/b202i/cross-story.git
 ln -s ~/github/cross-story ~/github/cross/story
 cd cross

@@ -74,5 +74,5 @@ st-fact --no-cache my_topic.json
 
 ---
 
-← [Wiki Home](https://github.com/b202i/cross/wiki)
+← [Wiki Home](https://github.com/b202i/cross-st/wiki)
 

@@ -88,8 +88,8 @@ tts = [
 
 [project.urls]
 Homepage       = "https://crossai.dev"
-Repository     = "https://github.com/b202i/cross"
-"Bug Tracker"  = "https://github.com/b202i/cross/issues"
+Repository     = "https://github.com/b202i/cross-st"
+"Bug Tracker"  = "https://github.com/b202i/cross-st/issues"
 Documentation  = "https://crossai.dev"
 
 # ─────────────────────────────────────────────────────────────────────────────

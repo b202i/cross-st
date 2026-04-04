@@ -36,7 +36,7 @@ and that you have a direct support path.
 To discuss a commercial license or consulting engagement:
 
 - **Email:** *(matt@makermattdesign.com)*
-- **GitHub:** *(https://github.com/b202i/crossai)*
+- **GitHub:** *(https://github.com/b202i/cross-st)*
 - **Web:** https://crossai.dev *(once live)*
 
 ---

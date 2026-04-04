@@ -20,7 +20,7 @@ import re
 
 REPO_ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WIKI_DIR   = os.path.join(REPO_ROOT, "docs", "wiki")
-DOCS_BASE  = "https://github.com/b202i/cross/blob/main/docs/wiki"
+DOCS_BASE  = "https://github.com/b202i/cross-st/blob/main/docs/wiki"
 
 os.makedirs(WIKI_DIR, exist_ok=True)
 

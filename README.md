@@ -158,7 +158,7 @@ pip install grip
 ### 3. Clone both repos
 
 ```bash
-git clone https://github.com/b202i/cross.git
+git clone https://github.com/b202i/cross-st.git
 git clone https://github.com/b202i/cross-story.git
 ln -s ~/github/cross-story ~/github/cross/story
 cd cross
@@ -294,5 +294,5 @@ For the full licensing strategy and roadmap see [README_license.md](README_licen
 ---
 
 *AI reports. Cross-examined.*  
-*GitHub: [github.com/b202i/cross](https://github.com/b202i/cross)*
+*GitHub: [github.com/b202i/cross-st](https://github.com/b202i/cross-st)*
 

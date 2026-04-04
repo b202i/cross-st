@@ -371,5 +371,5 @@ echo "AUDIO_PLAYER=mpv" >> ~/.crossenv
 - `st-admin --help` — settings management
 - [Wyoming Piper](https://github.com/rhasspy/wyoming-piper) — TTS server
 - [Piper voices](https://github.com/rhasspy/piper/blob/master/VOICES.md) — full voice list
-- `README-TTS-audio.md` is the companion doc; the [Cross Wiki tts-audio page](https://github.com/b202i/cross/wiki/tts-audio) covers the same material in a browsable format
+- `README-TTS-audio.md` is the companion doc; the [Cross Wiki tts-audio page](https://github.com/b202i/cross-st/wiki/tts-audio) covers the same material in a browsable format
 

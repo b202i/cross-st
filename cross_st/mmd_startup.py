@@ -43,7 +43,7 @@ def require_config() -> None:
         print(
             "\n  Cross is not configured.\n"
             "  Run 'st-admin --setup' to get started, or create ~/.crossenv with your API keys.\n"
-            "  See: https://github.com/b202i/cross/blob/main/docs/wiki/Onboarding.md\n"
+            "  See: https://github.com/b202i/cross-st/blob/main/docs/wiki/Onboarding.md\n"
         )
         sys.exit(1)
 

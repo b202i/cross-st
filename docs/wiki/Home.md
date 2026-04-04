@@ -64,5 +64,5 @@ pipx install "cross-st[tts]"   # with text-to-speech
 st-admin --setup              # configure API keys → ~/.crossenv
 ```
 
-Source: [github.com/b202i/cross](https://github.com/b202i/cross)
+Source: [github.com/b202i/cross-st](https://github.com/b202i/cross-st)
 

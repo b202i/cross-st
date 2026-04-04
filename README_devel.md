@@ -12,7 +12,7 @@ venv example below, but any 3.10–3.13 works equally well.
 brew install python@3.11
 
 # 2. Clone both repos independently
-git clone https://github.com/b202i/cross.git
+git clone https://github.com/b202i/cross-st.git
 git clone https://github.com/b202i/cross-story.git
 ln -s ~/github/cross-story ~/github/cross/story
 cd cross

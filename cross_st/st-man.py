@@ -21,7 +21,7 @@ import webbrowser
 
 # Documentation lives in docs/wiki/ in the main repo — no separate wiki repo needed.
 # GitHub renders Markdown files at blob/main URLs for free on any plan.
-_DOCS_BASE  = "https://github.com/b202i/cross/blob/main/docs/wiki"
+_DOCS_BASE  = "https://github.com/b202i/cross-st/blob/main/docs/wiki"
 _DOCS_HOME  = f"{_DOCS_BASE}/Home.md"
 
 # Named non-command pages: slug → filename in docs/wiki/
