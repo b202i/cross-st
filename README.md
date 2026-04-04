@@ -285,11 +285,11 @@ cross/
 
 Cross is built on two companion packages and one third-party library:
 
-| Package | PyPI | Purpose |
-|---------|------|---------|
-| **cross-ai-core** | [`cross-ai-core`](https://pypi.org/project/cross-ai-core/) | AI provider dispatch library — the engine that routes prompts to Anthropic, OpenAI, xAI, Perplexity, and Gemini. Install separately if you want the AI layer without the full CLI: `pip install cross-ai-core` |
-| **cross-st** | [`cross-st`](https://pypi.org/project/cross-st/) | This package — the full `st-*` CLI toolkit |
-| **yakyak** | [`yakyak`](https://pypi.org/project/yakyak/) | Third-party TTS client library used by `st-speak`, `st-voice`, and `st-prep --mp3` to communicate with a local [Piper](https://github.com/rhasspy/piper) TTS server. Installed automatically with `cross-st[tts]` |
+| Package | PyPI | Purpose                                                                                                                                                                                                                                                            |
+|---------|------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **cross-ai-core** | [`cross-ai-core`](https://pypi.org/project/cross-ai-core/) · [GitHub](https://github.com/b202i/cross-ai-core) | AI provider dispatch library — the engine that routes prompts to Anthropic, OpenAI, xAI, Perplexity, and Gemini. Install separately if you want the AI layer without the full CLI: `pip install cross-ai-core` |
+| **cross-st** | [`cross-st`](https://pypi.org/project/cross-st/) | This package — the full `st-*` CLI toolkit                                                                                                                                                                                                                         |
+| **yakyak** | [`yakyak`](https://pypi.org/project/yakyak/) | Third-party TTS client library used by `st-speak`, `st-voice`, and `st-prep --mp3` to communicate with a local [Piper](https://github.com/rhasspy/piper) TTS server. Installed automatically with `cross-st[tts]` and installed separately with pip install yakyak |
 
 > 📺 **Video tutorials** — coming soon on YouTube.
 

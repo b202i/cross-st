@@ -7,6 +7,41 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] — 2026-04-04
+
+### Added
+- **`st-admin --cache-info`** — print `~/.cross_api_cache/` path, file count, and
+  total disk usage (auto-scaled B / KB / MB)
+- **`st-admin --cache-clear`** — delete all cached AI responses
+- **`st-admin --cache-cull DAYS`** — delete cache entries older than *N* days
+  (uses `mtime`; rejects `DAYS ≤ 0`)
+- Interactive menu keys `C` (cache info), `X` (cache clear, with confirmation),
+  `K` (cache cull) added to `st-admin`
+- **`st-admin --upgrade`** — upgrade `cross-st` from PyPI (auto-detects pipx vs
+  pip, skips editable installs) and Homebrew platform tools (`ffmpeg`, `aspell`)
+  on macOS; prints equivalent `apt`/`dnf` commands on Linux
+- **Auto update-check** in `mmd_startup.py` (`check_for_updates()`): background
+  daemon thread polls PyPI once per 24 h, caches result to
+  `~/.cross_api_cache/update_check.json`, prints
+  `💡 cross-st X.Y.Z is available → st-admin --upgrade` to stderr on the next
+  interactive run (TTY-only, suppressed in pipes/CI)
+
+### Changed
+- Package directory renamed from `cross_ai/` to `cross_st/` — all imports,
+  entry points, `pyproject.toml`, `mmd_startup.py`, and tests updated;
+  `_CROSS_AI_DIR` kept as a legacy alias in `mmd_startup.py`
+- `[tts]` extra is the opt-in install path for TTS/audio (`pipx install
+  "cross-st[tts]"`); bare `pipx install cross-st` remains the fast
+  no-audio default
+
+### Security / Dependencies
+- `pillow>=12.1.1` — CVE-2025-48379, CVE-2026-25990
+- `requests>=2.32.4` — CVE-2024-47081
+- `setuptools>=78.1.1` — CVE-2025-47273
+- `urllib3>=2.6.3` — CVE-2025-50181, CVE-2025-50182
+
+---
+
 ## [0.1.0] — 2026-04-03 — First public release on PyPI (`cross-st`)
 
 > Published to https://pypi.org/project/cross-st/0.1.0/

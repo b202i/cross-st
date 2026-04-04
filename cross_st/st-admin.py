@@ -22,6 +22,9 @@ Non-interactive (scripting / shell):
   st-admin --set-editor NAME      # set editor (writes EDITOR to .env)
   st-admin --init-templates       # seed ~/.cross_templates/ from bundled defaults
   st-admin --upgrade              # upgrade cross-st from PyPI + macOS platform tools
+  st-admin --cache-info           # print cache path, file count, and total size
+  st-admin --cache-clear          # delete all cached AI responses
+  st-admin --cache-cull DAYS      # delete cache entries older than DAYS days
 
 Settings are persisted in:
   ~/.crossenv   — DEFAULT_AI, TTS_VOICE, DEFAULT_TEMPLATE, EDITOR, API keys
@@ -694,6 +697,80 @@ def upgrade_cross() -> None:
     print()
 
 
+# ── Cache management ───────────────────────────────────────────────────────────
+
+def _cache_files() -> list[Path]:
+    """Return all files in the AI response cache directory."""
+    cache_dir = Path(_get_cache_dir())
+    if not cache_dir.is_dir():
+        return []
+    return [p for p in cache_dir.iterdir() if p.is_file()]
+
+
+def cache_info() -> None:
+    """Print cache path, file count, and total size."""
+    cache_dir = Path(_get_cache_dir())
+    files = _cache_files()
+    total_bytes = sum(f.stat().st_size for f in files)
+
+    if total_bytes < 1024:
+        size_str = f"{total_bytes} B"
+    elif total_bytes < 1024 ** 2:
+        size_str = f"{total_bytes / 1024:.1f} KB"
+    else:
+        size_str = f"{total_bytes / 1024 ** 2:.1f} MB"
+
+    W = 18
+    print(f"\n  {'Cache path':<{W}}  {cache_dir}")
+    print(f"  {'Files':<{W}}  {len(files)}")
+    print(f"  {'Total size':<{W}}  {size_str}")
+    if not files:
+        print(f"  {'Status':<{W}}  (empty)")
+    print()
+
+
+def cache_clear() -> None:
+    """Delete all files in the AI response cache."""
+    files = _cache_files()
+    if not files:
+        print("\n  Cache is already empty.\n")
+        return
+    for f in files:
+        try:
+            f.unlink()
+        except OSError as e:
+            print(f"  ⚠️  Could not delete {f.name}: {e}")
+    print(f"\n  ✅  Deleted {len(files)} cached file(s).\n")
+
+
+def cache_cull(days: int) -> None:
+    """Delete cache files not accessed (mtime) in the last *days* days."""
+    import time
+    if days <= 0:
+        print("  ✗  DAYS must be a positive integer.", file=sys.stderr)
+        sys.exit(1)
+
+    files = _cache_files()
+    if not files:
+        print("\n  Cache is empty — nothing to cull.\n")
+        return
+
+    cutoff = time.time() - days * 86400
+    old = [f for f in files if f.stat().st_mtime < cutoff]
+
+    if not old:
+        print(f"\n  No cache files older than {days} day(s) found.\n")
+        return
+
+    for f in old:
+        try:
+            f.unlink()
+        except OSError as e:
+            print(f"  ⚠️  Could not delete {f.name}: {e}")
+    print(f"\n  ✅  Culled {len(old)} file(s) older than {days} day(s) "
+          f"({len(files) - len(old)} remaining).\n")
+
+
 # ── Interactive menu ───────────────────────────────────────────────────────────
 
 _MENU = {
@@ -708,6 +785,9 @@ _MENU = {
     "E": "Set editor",
     "I": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
     "U": "Upgrade cross-st from PyPI + platform tools",
+    "C": "Cache info  (path, file count, size)",
+    "X": "Cache clear  (delete all cached AI responses)",
+    "K": "Cache cull  (delete entries older than N days)",
     "s": "Show all settings",
     "q": "Quit",
     "?": "Show this menu",
@@ -814,6 +894,32 @@ def interactive_menu() -> None:
         elif key == "U":
             upgrade_cross()
 
+        elif key == "C":
+            cache_info()
+
+        elif key == "X":
+            try:
+                ans = input("  Delete ALL cached AI responses? [y/N]: ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                ans = "n"
+            if ans == "y":
+                cache_clear()
+            else:
+                print("  Cancelled.")
+
+        elif key == "K":
+            try:
+                raw = input("  Delete cache entries older than how many days? ").strip()
+            except (KeyboardInterrupt, EOFError):
+                raw = ""
+            if raw:
+                try:
+                    cache_cull(int(raw))
+                except ValueError:
+                    print(f"  ✗  Not a valid number: {raw!r}")
+            else:
+                print("  Cancelled.")
+
         elif key == "s":
             settings_show_all()
 
@@ -882,6 +988,18 @@ def main() -> None:
         "--upgrade", action="store_true",
         help="Upgrade cross-st from PyPI (pipx or pip) and macOS Homebrew platform tools",
     )
+    parser.add_argument(
+        "--cache-info", action="store_true",
+        help="Print cache path, file count, and total size",
+    )
+    parser.add_argument(
+        "--cache-clear", action="store_true",
+        help="Delete all cached AI responses",
+    )
+    parser.add_argument(
+        "--cache-cull", metavar="DAYS", type=int,
+        help="Delete cache entries not accessed in the last DAYS days",
+    )
 
     args = parser.parse_args()
 
@@ -937,6 +1055,18 @@ def main() -> None:
 
     if args.upgrade:
         upgrade_cross()
+        return
+
+    if args.cache_info:
+        cache_info()
+        return
+
+    if args.cache_clear:
+        cache_clear()
+        return
+
+    if args.cache_cull is not None:
+        cache_cull(args.cache_cull)
         return
 
     # ── Interactive mode ──────────────────────────────────────────────────────

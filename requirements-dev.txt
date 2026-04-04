@@ -19,3 +19,6 @@ freezegun==1.5.5
 # Subprocess mocking
 pytest-subprocess==1.5.3
 
+# Release tooling (used by script/release.sh)
+build>=1.2.0
+twine>=6.1.0
