@@ -540,10 +540,17 @@ def setup_wizard() -> None:
 
 def settings_show_all() -> None:
     """Print a formatted summary of all current settings."""
+    from importlib.metadata import version as _pkg_ver, PackageNotFoundError as _PNF
+    try:
+        _installed_ver = _pkg_ver("cross-st")
+    except _PNF:
+        _installed_ver = "unknown"
+
     ai_list = get_ai_list()
     W = 26
     print(f"\n  {'Setting':<{W}}  Value")
     print(f"  {'─' * W}  {'─' * 36}")
+    print(f"  {'cross-st version':<{W}}  {_installed_ver}")
     print(f"  {'Default AI':<{W}}  {settings_get_default_ai()}")
     for make in ai_list:
         print(f"  {'AI model: ' + make:<{W}}  {settings_get_ai_model(make)}")
@@ -942,6 +949,14 @@ def main() -> None:
             "caption / report generation whenever --ai is not explicitly passed."
         ),
     )
+
+    try:
+        from importlib.metadata import version as _v
+        _ver_str = f"cross-st {_v('cross-st')}"
+    except Exception:
+        _ver_str = "cross-st (version unknown)"
+    parser.add_argument("--version", action="version", version=_ver_str,
+                        help="Print the installed cross-st version and exit")
 
     parser.add_argument(
         "--setup", action="store_true",
