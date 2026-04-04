@@ -36,7 +36,15 @@ WIKI_SRC="${REPO_ROOT}/docs/wiki"
 MSG="${1:-sync wiki from docs/wiki/}"
 
 echo "→ Building auto-generated pages..."
-python "${REPO_ROOT}/script/build_wiki.py"
+_PYTHON="${PYTHON:-}"
+if [[ -z "$_PYTHON" ]]; then
+    if [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
+        _PYTHON="${REPO_ROOT}/.venv/bin/python"
+    else
+        _PYTHON="python3"
+    fi
+fi
+"$_PYTHON" "${REPO_ROOT}/script/build_wiki.py"
 
 if [ -d "${WIKI_TMP}/.git" ]; then
     echo "→ Pulling existing wiki clone..."
