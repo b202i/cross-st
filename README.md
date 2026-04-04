@@ -155,14 +155,18 @@ pip install grip
 > **Platform support:** macOS and Linux are fully supported.
 > Windows requires WSL2 — see [README_FAQ.md](README_FAQ.md).
 
-### 3. Clone both repos
+### 3. Clone the repo
 
 ```bash
 git clone https://github.com/b202i/cross-st.git
-git clone https://github.com/b202i/cross-story.git
-ln -s ~/github/cross-story ~/github/cross/story
-cd cross
+cd cross-st
 ```
+
+> **Story file location** — `.json` containers and `.prompt` files are created in
+> whatever directory you run `st-*` commands from. You decide the folder structure:
+> keep stories alongside the repo, in a separate project folder, or anywhere else
+> that suits your workflow. A common pattern is a dedicated `~/stories/` directory
+> that you `cd` into before running `st-new` or `st-gen`.
 
 ### 4. Create the virtual environment and install
 
