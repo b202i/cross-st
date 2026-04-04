@@ -21,6 +21,7 @@ Non-interactive (scripting / shell):
   st-admin --set-template NAME    # set default prompt template
   st-admin --set-editor NAME      # set editor (writes EDITOR to .env)
   st-admin --init-templates       # seed ~/.cross_templates/ from bundled defaults
+  st-admin --upgrade              # upgrade cross-st from PyPI + macOS platform tools
 
 Settings are persisted in:
   ~/.crossenv   — DEFAULT_AI, TTS_VOICE, DEFAULT_TEMPLATE, EDITOR, API keys
@@ -549,6 +550,134 @@ def settings_show_all() -> None:
     print()
 
 
+def upgrade_cross() -> None:
+    """Upgrade cross-st from PyPI and macOS platform tools.
+
+    - Detects pipx vs pip install and uses the right upgrade command.
+    - Skips the PyPI upgrade for editable (dev) installs.
+    - On macOS: runs ``brew upgrade`` for tracked Homebrew tools.
+    - On Linux: prints the equivalent apt/dnf commands.
+    """
+    import importlib.metadata as _im
+    import platform
+    import shutil
+
+    system = platform.system()
+    is_mac   = system == "Darwin"
+    is_linux = system == "Linux"
+
+    _W   = 58
+    _SEP = "─" * _W
+
+    def _section(title: str) -> None:
+        print(f"\n  {title}\n  {'·' * (_W - 2)}")
+
+    print(f"\n  Cross Upgrade")
+    print(f"  {_SEP}")
+
+    # ── Current version ───────────────────────────────────────────────────────
+    try:
+        current_ver = _im.version("cross-st")
+    except _im.PackageNotFoundError:
+        current_ver = "unknown"
+
+    # ── Detect editable (dev) install ─────────────────────────────────────────
+    is_editable = False
+    try:
+        dist = _im.Distribution.from_name("cross-st")
+        direct_url_text = dist.read_text("direct_url.json")
+        if direct_url_text and '"editable": true' in direct_url_text:
+            is_editable = True
+    except Exception:
+        pass
+
+    # ── Detect pipx install ───────────────────────────────────────────────────
+    pipx_bin   = shutil.which("pipx")
+    using_pipx = False
+    if pipx_bin and not is_editable:
+        try:
+            r = subprocess.run([pipx_bin, "list", "--short"],
+                               capture_output=True, text=True, timeout=10)
+            using_pipx = "cross-st" in r.stdout
+        except Exception:
+            pass
+
+    # ── Upgrade cross-st ──────────────────────────────────────────────────────
+    _section("cross-st")
+    print(f"  Installed : cross-st {current_ver}")
+
+    if is_editable:
+        print(f"\n  ⚠️  Editable (dev) install detected — skipping PyPI upgrade.")
+        print(f"      Use  git pull  in your cross-st checkout to update instead.")
+    else:
+        if using_pipx:
+            upgrade_cmd = [pipx_bin, "upgrade", "cross-st"]
+        else:
+            upgrade_cmd = [sys.executable, "-m", "pip", "install", "--upgrade",
+                           "cross-st"]
+
+        print(f"  $ {' '.join(upgrade_cmd)}\n")
+        result = subprocess.run(upgrade_cmd)
+
+        # Re-read version in a subprocess so importlib cache is bypassed
+        try:
+            r2 = subprocess.run(
+                [sys.executable, "-c",
+                 "from importlib.metadata import version; print(version('cross-st'))"],
+                capture_output=True, text=True, timeout=15,
+            )
+            new_ver = r2.stdout.strip() or current_ver
+        except Exception:
+            new_ver = current_ver
+
+        if result.returncode == 0:
+            if new_ver and new_ver != current_ver:
+                print(f"\n  ✅  cross-st upgraded: {current_ver} → {new_ver}")
+            else:
+                print(f"\n  ✅  cross-st {current_ver} is already up to date")
+        else:
+            print(f"\n  ❌  cross-st upgrade failed (exit code {result.returncode})")
+
+    # ── Platform tools ────────────────────────────────────────────────────────
+    _TRACKED_BREW = ["ffmpeg", "aspell"]   # tools cross-st setup can install
+
+    if is_mac:
+        brew_bin = shutil.which("brew")
+        if not brew_bin:
+            print(f"\n  ⚠️  Homebrew not found — skipping platform tool upgrade")
+        else:
+            _section("Homebrew platform tools")
+            installed_brew = []
+            for tool in _TRACKED_BREW:
+                r = subprocess.run([brew_bin, "list", "--formula", tool],
+                                   capture_output=True, text=True)
+                if r.returncode == 0:
+                    installed_brew.append(tool)
+
+            if installed_brew:
+                print(f"  Installed via Homebrew: {', '.join(installed_brew)}")
+                print(f"  $ brew upgrade {' '.join(installed_brew)}\n")
+                result = subprocess.run([brew_bin, "upgrade"] + installed_brew)
+                if result.returncode == 0:
+                    print(f"\n  ✅  Homebrew tools upgraded")
+                else:
+                    print(f"\n  ⚠️  brew upgrade exited {result.returncode} "
+                          "(already up-to-date is normal)")
+            else:
+                print(f"  No tracked Homebrew tools found — nothing to upgrade")
+
+    elif is_linux:
+        _section("Platform tools")
+        print(f"  Upgrade tracked platform tools via your package manager:")
+        print(f"    sudo apt upgrade {' '.join(_TRACKED_BREW)}     "
+              f"# Debian/Ubuntu")
+        print(f"    sudo dnf upgrade {' '.join(_TRACKED_BREW)}     "
+              f"# Fedora/RHEL")
+
+    print(f"\n  {_SEP}")
+    print()
+
+
 # ── Interactive menu ───────────────────────────────────────────────────────────
 
 _MENU = {
@@ -562,6 +691,7 @@ _MENU = {
     "e": "View editor",
     "E": "Set editor",
     "I": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
+    "U": "Upgrade cross-st from PyPI + platform tools",
     "s": "Show all settings",
     "q": "Quit",
     "?": "Show this menu",
@@ -665,6 +795,9 @@ def interactive_menu() -> None:
             ).strip().lower()
             init_user_templates(overwrite=(overwrite_ans == "y"))
 
+        elif key == "U":
+            upgrade_cross()
+
         elif key == "s":
             settings_show_all()
 
@@ -729,6 +862,10 @@ def main() -> None:
         "--overwrite-templates", action="store_true",
         help="With --init-templates: replace files that already exist",
     )
+    parser.add_argument(
+        "--upgrade", action="store_true",
+        help="Upgrade cross-st from PyPI (pipx or pip) and macOS Homebrew platform tools",
+    )
 
     args = parser.parse_args()
 
@@ -780,6 +917,10 @@ def main() -> None:
 
     if args.init_templates:
         init_user_templates(overwrite=args.overwrite_templates)
+        return
+
+    if args.upgrade:
+        upgrade_cross()
         return
 
     # ── Interactive mode ──────────────────────────────────────────────────────
