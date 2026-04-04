@@ -2,8 +2,8 @@
 """
 st-admin — Manage settings, API keys, and templates
 
-Manages persistent configuration: default AI provider, per-provider model
-overrides, TTS voice, default prompt template, and editor.
+Manages persistent configuration: default AI provider, AI models per provider,
+TTS voice, default prompt template, and editor.
 
 First-time setup:
   st-admin --setup                # interactive wizard: checks environment,
@@ -16,7 +16,7 @@ Non-interactive (scripting / shell):
   st-admin --show                 # print all settings and exit
   st-admin --get-default-ai       # print the current default AI name
   st-admin --set-default-ai NAME  # set default AI (writes DEFAULT_AI to .env)
-  st-admin --set-ai-model MAKE=MODEL  # set a per-provider model override
+  st-admin --set-ai-model MAKE=MODEL  # set the model for a provider
   st-admin --set-tts-voice VOICE  # set TTS voice (writes TTS_VOICE to .env)
   st-admin --set-template NAME    # set default prompt template
   st-admin --set-editor NAME      # set editor (writes EDITOR to .env)
@@ -553,7 +553,7 @@ def settings_show_all() -> None:
 
 _MENU = {
     "d": "View / set default AI provider",
-    "a": "View AI model overrides (all providers)",
+    "a": "View AI models  (all providers)",
     "m": "Set AI model for a provider",
     "v": "View TTS voice",
     "V": "Set TTS voice  (launches st-voice)",
