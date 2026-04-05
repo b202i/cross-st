@@ -69,9 +69,10 @@ METADATA: dict[str, dict] = {
         "dev": "Step 1 runs `st-gen --prep` per AI in parallel threads. Step 2 fact-checks all N×N pairs — each column (fact-checker AI) is a separate thread, serializing writes per story to avoid JSON corruption. The live ANSI display is updated every second. Ctrl+C preserves results collected so far.",
     },
     "st-domain": {
-        "desc": "Interactive wizard that creates a new Cross-Stones benchmark domain prompt. Guides you through naming the domain, describing the topic, and validating that the AI returns exactly 10 fact-checkable claims.",
-        "related": ["st-stones", "cross-stones"],
-        "dev": "Follows DOMAIN_PROMPT_PROCESS.md Phases 2–4. Calls an AI to suggest 5 topic aspects (Phase 3), then sends the assembled prompt to one AI as a smoke-test (Phase 4). Saves the prompt to `cross_stones/domains/` by default.",
+        # NOTE: docs/wiki/st-domain.md is hand-authored — build_wiki.py will not overwrite it.
+        "desc": "Interactive wizard that builds a Cross-Stones benchmark domain prompt. Guides you through naming the domain, describing the topic, and smoke-testing that the AI returns exactly the right number of fact-checkable claims.",
+        "related": ["st-stones", "st-cross", "cross-stones"],
+        "dev": "Follows DOMAIN_PROMPT_PROCESS.md Phases 2–4. Phase 2: collects slug, display name, topic description, year range, source types. Phase 3: calls AI for 5 aspect suggestions, assembles the `_DOMAIN_PROMPT_TEMPLATE`, previews and saves. Phase 4: smoke-test sends the finished prompt to one AI and checks claim count. `--set` registers the new domain in a benchmark set config via `_add_to_benchmark_set()`.",
     },
     "st-edit": {
         "desc": "Opens any field in a story container — story text, title, spoken version, or a fact-check — in your configured editor. Changes are saved back to the `.json` file.",
