@@ -25,7 +25,7 @@ import sys
 from mmd_startup import load_cross_env, require_config
 
 
-from ai_handler import get_data_content
+from ai_handler import get_data_content, get_ai_list
 from mmd_branding import get_speaking_tagline, get_tagline_for_reading
 from mmd_for_speaking import for_speaking
 from mmd_process_report import (
@@ -111,7 +111,12 @@ def main():
             select_data  = main_container["data"][args.data - 1]
             select_make  = select_data["make"]
             select_model = select_data["model"]
-            all_raw_story_text = get_data_content(select_make, select_data)
+            if select_make in get_ai_list():
+                all_raw_story_text = get_data_content(select_make, select_data)
+            else:
+                # st-fetch entries (make="url", model="file"/"clipboard"/etc.)
+                # already store their content in "markdown" or "text"
+                all_raw_story_text = select_data.get("markdown") or select_data.get("text") or ""
         else:
             print(f"Invalid index: {args.data}")
             sys.exit(1)

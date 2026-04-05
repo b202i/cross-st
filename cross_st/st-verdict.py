@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from ai_handler import get_content, get_default_ai, process_prompt
-from mmd_data_analysis import get_flattened_fc_data
+from mmd_data_analysis import get_flattened_fc_data_simple
 from mmd_plot import show_plot
 
 
@@ -418,16 +418,20 @@ def main():
         sys.exit(1)
 
     stories   = container.get("story", [])
-    has_facts = any(len(s.get("fact", [])) > 0 for s in stories)
+    has_facts = any(
+        isinstance(fact.get("counts"), list) and len(fact["counts"]) >= 5
+        for s in stories
+        for fact in s.get("fact", [])
+    )
     if not has_facts:
         print(f"No fact-check data found in {file_json}.")
         print(f"Run the cross-product fact-check first:  st-cross {args.json_file}")
         sys.exit(1)
 
-    flattened = get_flattened_fc_data(container)
-    if len(flattened) < 4:
-        print(f"Insufficient cross-product data ({len(flattened)} entries). "
-              f"A minimum 2×2 matrix is required.")
+    flattened = get_flattened_fc_data_simple(container)
+    if len(flattened) < 1:
+        print(f"No valid fact-check entries found in {file_json}.")
+        print(f"Run st-fact or st-cross to fact-check the stories first.")
         sys.exit(1)
 
     df = pd.DataFrame(flattened)

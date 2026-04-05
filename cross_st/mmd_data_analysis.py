@@ -161,6 +161,8 @@ def get_flattened_fc_data_simple(data):
         evaluator_make = story["make"]
         evaluator_model = story["model"][:model_max_chars]
         for fact in story["fact"]:
+            if not isinstance(fact.get("counts"), list) or len(fact["counts"]) < 5:
+                continue  # skip malformed / incomplete fact entries (e.g. st-fetch containers)
             flattened_data.append({
                 "evaluator_make": evaluator_make,
                 "evaluator_model": evaluator_model,
@@ -219,6 +221,8 @@ Efficient: Prioritizes targets with higher coverage to maximize the chance of fi
         story_facts = []
 
         for fact in story["fact"]:
+            if not isinstance(fact.get("counts"), list) or len(fact["counts"]) < 5:
+                continue  # skip malformed / incomplete fact entries
             target_key = f"{fact['make']}:{fact['model'][:model_max_chars]}"
             story_targets.add(target_key)
             all_targets.add(target_key)

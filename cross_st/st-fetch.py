@@ -2,10 +2,14 @@
 """
 ## st-fetch — Import external content into a container
 
-Brings existing stories into the Cross pipeline for fact-checking, improvement,
-and publishing.  Content is stored as a data entry; run st-prep to convert it
-to a story entry visible to all downstream tools (st-fact, st-fix, st-merge,
-st-post).
+Brings existing content into the Cross pipeline for fact-checking, improvement,
+and publishing.  Content is stored as a data entry and immediately converted to
+a story entry via st-prep (use --no-prep to store as raw data only).
+
+Each fetched entry records its origin in make/model:
+  make = "st-fetch"  (always)
+  model = source type: "file", "clipboard", "x.com", or the URL domain
+           e.g. "reddit.com", "bbc.co.uk", "en.wikipedia.org"
 
 Sources supported:
   tweet_id    Fetch a post from X (Twitter) by numeric tweet ID
@@ -18,24 +22,21 @@ st-fetch <tweet_id> file.json            # fetch X post by tweet ID
 st-fetch --file report.md file.json      # import a local .txt or .md file
 st-fetch --url https://... file.json     # fetch a web page
 st-fetch --clipboard file.json           # import text from clipboard
-st-fetch --clipboard file.json --prep    # clipboard → story entry in one step
-st-fetch <tweet_id> file.json --prep     # fetch and run st-prep automatically
-st-fetch <tweet_id> file.json --no-cache # bypass cache, always fetch live
+st-fetch --file report.md file.json --no-prep   # store raw data entry only
+st-fetch <tweet_id> file.json --no-cache        # bypass cache, always fetch live
 ```
 
 Full pipeline for refreshing an existing report:
-  st-fetch --file old_report.md old_report.json --prep
+  st-fetch --file old_report.md old_report.json
   st-bang old_report.json          # regenerate with all 5 AI
   st-cross old_report.json         # cross-product fact-check
   st-merge old_report.json         # synthesize best version
   st-post --site myblog old_report.json
 
-See README_fetch.md for full use cases and roadmap.
-
 Requirements:
   X_COM_BEARER_TOKEN=<bearer token>  in .env   (tweet_id source only)
 
-Options: --file  --url  --clipboard  --prep  --no-cache  -v  -q
+Options: --file  --url  --clipboard  --no-prep  --no-cache  -v  -q
 """
 
 import argparse
@@ -213,8 +214,10 @@ def main():
                         help='Enable API cache (default: on)')
     parser.add_argument('--no-cache', dest='cache', action='store_false',
                         help='Disable API cache — always fetch live')
-    parser.add_argument('--prep', action='store_true',
-                        help='Run st-prep on the container after fetching')
+    parser.add_argument('--prep', dest='prep', action='store_true', default=True,
+                        help='Run st-prep after fetching (default: on)')
+    parser.add_argument('--no-prep', dest='prep', action='store_false',
+                        help='Skip st-prep — store as raw data entry only')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Enable verbose output')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -247,7 +250,10 @@ def main():
         if not args.quiet:
             print(f"  Fetching URL…", end='', flush=True)
         title, text, response = _fetch_url(args.url, args.verbose)
-        source_model = "bs4"
+        # Use the domain as the model (e.g. "reddit.com", "bbc.co.uk")
+        from urllib.parse import urlparse
+        _netloc = urlparse(args.url).netloc.lower()
+        source_model = _netloc.lstrip("www.") or "web"
         if not args.quiet:
             print(" ✓")
 
@@ -274,7 +280,7 @@ def main():
         except Exception as e:
             print(f"\nError fetching tweet {args.tweet_id}: {e}")
             sys.exit(1)
-        source_model = "twitter-v2"
+        source_model = "x.com"
         if not args.quiet:
             print(" ✓")
 

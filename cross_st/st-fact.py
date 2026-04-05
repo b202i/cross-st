@@ -6,9 +6,16 @@ st-fact — Fact-check stories in a container
 st-fact subject.json                    # fact-check story 1 with default AI
 st-fact -s 2 --ai gemini subject.json  # fact-check story 2 with Gemini
 st-fact --no-cache subject.json        # bypass API cache
+st-fact --ai-review subject.json       # AI digest of existing fact-check results
+st-fact --ai-review -s 2 subject.json  # digest for story 2
+st-fact --ai-title subject.json        # generate title from existing fact-check data
+st-fact --ai-short subject.json        # short caption from existing fact-check data
+st-fact --ai-caption subject.json      # detailed caption from existing fact-check data
+st-fact --ai-summary subject.json      # concise summary from existing fact-check data
+st-fact --ai-story subject.json        # comprehensive story from existing fact-check data
 ```
 
-Options: -s story  --ai  --no-cache  -v  -q
+Options: -s story  --ai  --no-cache  --ai-review  --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story  -v  -q
 """
 
 import argparse
@@ -294,7 +301,8 @@ def main():
     require_config()
     parser = argparse.ArgumentParser(
         prog='st-fact',
-        description='Fact check stories')
+        description='Fact check stories',
+        epilog='AI content: --ai-review  --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story')
     parser.add_argument('json_file', type=str,
                         help='Path to the JSON file', metavar='file.json')
     parser.add_argument('--all', action='store_true',
@@ -308,6 +316,26 @@ def main():
                         help='Disable API cache')
     parser.add_argument('-s', '--story', type=int,
                         help='Fact check a single story (integer), default 1')
+
+    # ── AI content flags (read existing fact data, generate content, no new checks) ─
+    review_group = parser.add_argument_group('AI content generation (reads existing fact data, no new checks)')
+    review_group.add_argument('--ai-review', action='store_true',
+                              help='Generate an AI digest of existing fact-check results '
+                                   '(implies --ai-short unless another --ai-* flag is set)')
+    review_group.add_argument('--ai-title',   action='store_true',
+                              help='Generate a title (max 10 words) → stdout')
+    review_group.add_argument('--ai-short',   action='store_true', default=None,
+                              help='Generate a short caption (max 80 words) → stdout  '
+                                   '[default: on when in review mode and no other --ai-* flag is given]')
+    review_group.add_argument('--no-ai-short', dest='ai_short', action='store_false',
+                              help='Suppress the automatic short caption')
+    review_group.add_argument('--ai-caption', action='store_true',
+                              help='Generate a detailed caption (100–160 words) → stdout')
+    review_group.add_argument('--ai-summary', action='store_true',
+                              help='Generate a concise summary (120–200 words) → stdout')
+    review_group.add_argument('--ai-story',   action='store_true',
+                              help='Generate a comprehensive story (800–1200 words) → stdout')
+
     parser.add_argument('--file', action='store_true',
                         help='Write to a file, default is no-file')
     parser.add_argument('--paragraph', action='store_true',
@@ -332,6 +360,23 @@ def main():
     if args.ai != "all" and args.ai not in ai_list:
         parser.error(f"argument --ai: invalid choice: '{args.ai}' "
                      f"(choose from {', '.join(ai_list)}, all)")
+
+    # ── --ai-review / standalone --ai-* flags: generate content from existing data ─
+    if args.ai_review or args.ai_title or args.ai_short or args.ai_caption or args.ai_summary or args.ai_story:
+        file_prefix = args.json_file.rsplit('.', 1)[0]
+        file_json   = file_prefix + ".json"
+        load_cross_env()
+        try:
+            if not os.path.isfile(file_json):
+                print(f"Error: {args.json_file} does not exist.")
+                sys.exit(1)
+            with open(file_json, 'r') as f:
+                container = json.load(f)
+        except json.JSONDecodeError:
+            print(f"Error: {file_json} contains invalid JSON.")
+            sys.exit(1)
+        _run_ai_review(args, container)
+        return
 
     # ── --ai all: spawn one st-fact per AI in parallel, show live table ───────
     if args.ai == "all":
@@ -651,6 +696,208 @@ def main():
                 os.remove(progress_file)
             except OSError:
                 pass
+
+
+# ── AI Review ────────────────────────────────────────────────────────────────
+
+def _build_review_context(story, story_index):
+    """Build the shared data-context block for all review prompt types.
+    Returns (context_str, valid_facts) or (None, []) if no valid data."""
+    title      = story.get("title", f"Story {story_index}")
+    categories = ["True", "Partially_true", "Opinion", "Partially_false", "False"]
+    score_map  = {"True": 2, "Partially_true": 1, "Opinion": 0, "Partially_false": -1, "False": -2}
+
+    valid_facts = [
+        f for f in story.get("fact", [])
+        if isinstance(f.get("counts"), list) and len(f["counts"]) >= 5
+    ]
+    if not valid_facts:
+        return None, []
+
+    totals = {c: 0 for c in categories}
+    for f in valid_facts:
+        for i, cat in enumerate(categories):
+            totals[cat] += f["counts"][i]
+
+    total_claims  = sum(totals.values())
+    scored_claims = total_claims - totals["Opinion"]
+    avg_score     = (sum(score_map[c] * totals[c] for c in categories) / scored_claims
+                     if scored_claims > 0 else 0)
+
+    checker_rows = []
+    for f in valid_facts:
+        c = f["counts"]
+        checker_rows.append(
+            f"  {f['make']}/{f['model']:<30} score={f.get('score', 0) or 0:.2f}"
+            f"  T={c[0]}  ~T={c[1]}  Op={c[2]}  ~F={c[3]}  F={c[4]}"
+        )
+
+    problem_claims = []
+    for f in valid_facts:
+        checker = f"{f['make']}/{f['model']}"
+        for claim in f.get("claims", []):
+            v = claim.get("verdict", "")
+            if v in ("False", "Partially_false", "Partially_true"):
+                problem_claims.append(
+                    f"  [{checker} | {v}]\n  {claim.get('explanation', '').strip()}"
+                )
+    problem_block = "\n\n".join(problem_claims) if problem_claims else \
+                    "  None — all claims verified as True or Opinion."
+
+    context = f"""Article title: "{title}"
+Fact-checked by {len(valid_facts)} AI checker(s).
+
+AGGREGATE COUNTS (all checkers combined):
+  True={totals['True']}  Partially_True={totals['Partially_true']}  Opinion={totals['Opinion']}  Partially_False={totals['Partially_false']}  False={totals['False']}
+  Total claims: {total_claims}  |  Scored claims (excl. Opinion): {scored_claims}  |  Avg score: {avg_score:.2f}
+
+SCORE SCALE: +2.0 = all True  |  0.0 = neutral  |  -2.0 = all False
+Scoring: True=+2, Partially_true=+1, Opinion=0 (excluded), Partially_false=-1, False=-2.
+
+PER-CHECKER RESULTS:
+{chr(10).join(checker_rows)}
+
+CLAIMS FLAGGED AS FALSE, PARTIALLY FALSE, OR PARTIALLY TRUE:
+{problem_block}
+"""
+    return context, valid_facts
+
+
+def _build_review_prompt(context, content_type):
+    """Append the appropriate instruction block to the shared context."""
+    if content_type == "title":
+        return context + """
+---
+Write a TITLE for this fact-check review. Max 10 words.
+Capture the article's subject and its overall accuracy verdict.
+No markdown, no quotes. Plain text, single line."""
+
+    elif content_type == "short":
+        return context + """
+---
+Write a SHORT fact-check review (max 80 words, 1 paragraph).
+Lead with the overall accuracy: what % of scored claims were True or Partially True?
+Name the single most significant false or partially-false finding.
+Note if multiple checkers agreed on a key problem.
+Plain text, no markdown, no headers."""
+
+    elif content_type == "caption":
+        return context + """
+---
+Write a FACT-CHECK CAPTION (100–160 words, exactly 2 paragraphs).
+
+Paragraph 1 — Accuracy verdict:
+  State the overall accuracy picture. What percentage of scored claims were
+  True or Partially True vs False or Partially False? Give the average score.
+  How consistent were the checkers with each other?
+
+Paragraph 2 — Key findings:
+  Name the most significant false and partially-false claims.
+  Group findings that multiple checkers flagged.
+  Close with one sentence on the article's overall trustworthiness.
+
+Plain text, no markdown headers. Precise numbers from the data above."""
+
+    elif content_type == "summary":
+        return context + """
+---
+Write a FACT-CHECK DIGEST (120–200 words, 3 short paragraphs).
+
+Paragraph 1 — Accuracy verdict:
+  What percentage of scored claims were True or Partially True vs False or
+  Partially False? Give the average score and what it means in plain terms.
+  How consistent were the checkers?
+
+Paragraph 2 — Key problem claims:
+  Summarize the most significant false and partially-false findings.
+  Group similar findings if multiple checkers flagged the same issue.
+  Quote or paraphrase specific claims that were wrong; briefly explain what
+  was incorrect according to the checker's explanation.
+
+Paragraph 3 — Bottom line:
+  One clear sentence verdict on the article's overall factual accuracy.
+  Note any caveats (e.g. one checker had no data, checkers disagreed).
+
+Plain text, no markdown headers. Precise numbers from the data above."""
+
+    elif content_type == "story":
+        return context + """
+---
+Write a COMPREHENSIVE FACT-CHECK REPORT (800–1200 words).
+
+STRUCTURE:
+1. Title (≤10 words, punchy — capture subject and accuracy verdict)
+2. Overview (100–150 words) — what was checked, how many AIs reviewed it, overall score
+3. Accuracy breakdown (200–300 words) — detailed analysis of True/~True/~False/False
+   percentages; compare checker scores; note where checkers agreed or disagreed
+4. False and partially-false claims (300–400 words) — go through each significant
+   problem finding; quote the claim, explain what was wrong, note which checkers flagged it
+5. Bottom line (100–150 words) — overall verdict, how much to trust this article,
+   which specific sections need the most scrutiny
+
+NUMBER RULES: 12–18 whole numbers. Round everything. Each data point mentioned once.
+WRITING RULES: No repetition. No filler. Each paragraph adds new insight.
+FORMAT: Plain text, clear paragraph breaks. No markdown headers."""
+
+    else:
+        raise ValueError(f"Unknown content_type: {content_type}")
+
+
+def _run_ai_review(args, container):
+    """Read existing fact-check data and generate AI content. No new fact-checks run."""
+    stories = container.get("story", [])
+    if not stories:
+        print("No stories found in container.")
+        sys.exit(1)
+
+    story_index = args.story if args.story else 1
+    if story_index < 1 or story_index > len(stories):
+        print(f"Invalid story index {story_index}. Container has {len(stories)} story/stories.")
+        sys.exit(1)
+
+    story = stories[story_index - 1]
+    context, valid_facts = _build_review_context(story, story_index)
+    if not valid_facts:
+        print(f"No valid fact-check data found for story {story_index}.")
+        print(f"Run:  st-fact {args.json_file}")
+        sys.exit(1)
+
+    # Resolve ai_short default: on when no other --ai-* flag is explicitly given
+    if args.ai_short is None:
+        args.ai_short = not (args.ai_title or args.ai_caption or args.ai_summary or args.ai_story)
+
+    review_ai = args.ai if args.ai != "all" else get_default_ai()
+
+    if not args.quiet:
+        skipped   = len(story.get("fact", [])) - len(valid_facts)
+        skip_note = f"  ({skipped} checker(s) skipped — no counts data)" if skipped else ""
+        print(f"\nFact-Check Review — story {story_index}, "
+              f"{len(valid_facts)} checker(s){skip_note}  [{review_ai}]")
+
+    content_type_map = [
+        (args.ai_title,   "title",   "Title"),
+        (args.ai_short,   "short",   "Short Caption"),
+        (args.ai_caption, "caption", "Caption"),
+        (args.ai_summary, "summary", "Summary"),
+        (args.ai_story,   "story",   "Story"),
+    ]
+
+    for flag, ctype, label in content_type_map:
+        if not flag:
+            continue
+        if not args.quiet:
+            print(f"\n{label}:")
+            print("─" * 70)
+        prompt = _build_review_prompt(context, ctype)
+        try:
+            result  = process_prompt(review_ai, prompt, use_cache=args.cache)
+            _, _, response, _ = result
+            content = get_content(review_ai, response).strip()
+            print(content)
+        except Exception as e:
+            print(f"  Generation failed ({ctype}): {e}")
+        if not args.quiet:
+            print("─" * 70)
 
 
 if __name__ == "__main__":

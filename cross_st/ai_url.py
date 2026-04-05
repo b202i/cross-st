@@ -5,8 +5,8 @@ import hashlib
 import requests
 import sys
 
-AI_MAKE = "url"
-AI_MODEL = "bs4"
+AI_MAKE = "st-fetch"
+AI_MODEL = "web"
 
 
 def get_url_cached_response(tweet_id, verbose=False, use_cache=False):
