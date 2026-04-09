@@ -7,6 +7,39 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-04-08
+
+### Added
+- **`st-new -g` / `--gen`** — after editing the prompt, automatically runs
+  `st-gen` (all providers) then `st-prep`; combines prompt editing and report
+  generation into a single command
+- **`st-new --prep`** — after editing, runs `st-prep` only (re-processes an
+  existing generation without re-calling the APIs)
+- **`st-new --ai`** — override the provider used by the auto-gen step
+- **`st-gen`, `st-merge`, `st-analyze` AI narrative flags** — `--ai-title`,
+  `--ai-short`, `--ai-caption`, `--ai-summary`, `--ai-story`: generate
+  AI-written headlines, summaries, or full narrative from analysis results;
+  AI-caption expansion for richer chart annotations
+- **`st-admin --version`** — print the installed cross-st version; version line
+  also shown in `st-admin --show` output
+
+### Fixed
+- **`st-fix --mode synthesize` crash** (`KeyError: 'content'`) — `_save_result()`
+  now derives the rewriter AI from `gen_response["_make"]` (stamped by
+  `process_prompt()`) instead of always using `args.ai`; fixes the case where
+  the best-story author differs from the `--ai` flag
+
+### Dependencies
+- **`cross-ai-core>=0.5.0`** (was `>=0.4.2`) — adds `model=` per-call override
+  and `<MAKE>_MODEL` env-var model switching; set e.g. `XAI_MODEL=grok-3-latest`
+  in `~/.crossenv` to change models globally without touching code
+- **`openai==2.31.0`** (was `1.70.0`) — major SDK version; `openai 2.x` is now
+  the minimum required
+- **`anthropic==0.92.0`** (was `0.84.0`)
+- **`google-genai==1.71.0`** (was `1.65.0`)
+
+---
+
 ## [0.2.0] — 2026-04-04
 
 ### Added
