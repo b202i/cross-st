@@ -202,7 +202,47 @@ All API errors go through `ai_error_handler.handle_api_error()`. It distinguishe
 
 ## Active Sprint
 
-Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–A9, B1–B5, C1, C2, C3 are complete. `cross-st 0.1.0` is live at https://pypi.org/project/cross-st/0.1.0/.
+Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–A9, B1–B5, C1, C2, C3 are complete. `cross-st 0.2.0` is live at https://pypi.org/project/cross-st/0.2.0/.
+
+### ⏳ Next release: cross-st 0.3.0 — ready to ship
+
+Everything is green. **All that's needed is to update CHANGELOG and bump the version.**
+
+**What's accumulated since 0.2.0 (tag v0.2.0):**
+
+| Area | Change |
+|------|--------|
+| `st-fix` | `_save_result()` uses `put_content_auto` + `_gen_make` from `_make` stamp — fixes `KeyError: 'content'` crash in `--mode synthesize` when best-story author ≠ `--ai` |
+| `st-new` | `-g` / `--gen` flag: auto-runs `st-gen` + `st-prep` after editing the prompt |
+| `st-new` | `--prep` flag: auto-runs `st-prep` only after editing |
+| `st-gen`, `st-merge`, `st-analyze` | `--ai-title` / `--ai-short` / `--ai-caption` / `--ai-summary` / `--ai-story` flags; AI-caption expansion |
+| `st-admin` | `--version` flag; version line in `--show` output |
+| `ai_handler` shim | Exports `get_content_auto`, `put_content_auto` (required by `st-fix`) |
+| Dependencies | `cross-ai-core>=0.5.0` (model env vars, `model=` per-call arg, openai 2.x) |
+| Dependencies | `openai==2.31.0`, `anthropic==0.92.0`, `google-genai==1.71.0` |
+| Tests | 45 new tests in `test_ai_options.py`; CI fix (`require_config` patched in `TestMainCLI`) |
+| Docs/Wiki | `st-domain.md` rewrite + SVG flow diagram; `st-fix.md` user walkthrough |
+
+**Pre-publish checklist:**
+```bash
+# 1. Update CHANGELOG.md — add [0.3.0] section summarising the table above
+# 2. Bump version in pyproject.toml: 0.2.0 → 0.3.0
+# 3. Full test suite
+pytest                         # must be 0 failures
+bash script/smoke_test.sh      # optional but recommended
+# 4. Push any unpushed commits
+git push
+# 5. Build + check
+rm -rf dist/ && python -m build && twine check dist/*
+# 6. Publish
+twine upload dist/*
+# 7. Tag
+git tag v0.3.0 && git push --tags
+```
+
+**No blockers.** cross-ai-core 0.5.0 is live on PyPI; all 456 cross-st tests pass.
+
+---
 
 ### cross-ai-core 0.5.0 is live on PyPI
 
