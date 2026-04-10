@@ -630,6 +630,8 @@ def setup_wizard() -> None:
         f"\n"
         f"  ⭐  Gemini has a free tier — no credit card needed.\n"
         f"  You need at least one key.  Keys can be added or changed later with st-admin.\n"
+        f"  Your keys are stored only in:  {_CROSSENV}\n"
+        f"  They are never uploaded or shared — sent directly to each provider only.\n"
     )
     try:
         ans = input("  Continue to API key setup? [Y/n]: ").strip().lower()
@@ -661,9 +663,7 @@ def setup_wizard() -> None:
 
     # ── API keys ──────────────────────────────────────────────────────────────
     print(f"\n  API Keys\n  {_SEP}")
-    print(f"  Your keys are stored only in:  {_CROSSENV}")
-    print(  "  They are never uploaded or shared — sent directly to each provider only.\n")
-    print(  "  Press Enter to skip any provider.\n")
+    print("  Press Enter to skip any provider.\n")
 
     gemini_key     = _prompt_key("Gemini     ", "GEMINI_API_KEY",
                                  "⭐ Gemini is FREE — no credit card needed.\n"
