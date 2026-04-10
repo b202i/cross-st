@@ -751,7 +751,7 @@ def setup_wizard() -> None:
     print(
         "\n  Discourse (optional)\n"
         f"  {_SEP}\n"
-        "  Discourse lets you publish stories from st-post to a forum.\n"
+        "  Discourse lets you publish reports from st-post to a forum.\n"
         "  crossai.dev is a free community forum for Cross users — it provisions\n"
         "  a private category for you automatically.\n"
     )
