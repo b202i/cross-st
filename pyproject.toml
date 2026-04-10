@@ -149,5 +149,6 @@ cross_st = [
     "template/*.prompt",
     "cross_stones/domains/*.prompt",
     "cross_stones/*.json",
+    "data/*.txt",
 ]
 

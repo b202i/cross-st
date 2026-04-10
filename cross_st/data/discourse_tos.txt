@@ -1,0 +1,64 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║         crossai.dev — Community Terms of Service & Privacy Summary         ║
+║                          Effective: April 7, 2026                          ║
+║                     Operator: Maker Matt Design                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+By joining crossai.dev you agree to the full Terms of Service available at:
+  https://crossai.dev/tos
+
+KEY POINTS (plain-language summary):
+
+1. CONTENT LICENSE
+   You retain ownership of content you post. You grant crossai.dev a
+   non-exclusive license to display and distribute your content on the platform.
+
+2. ACCEPTABLE USE
+   - Do NOT post spam, unsolicited advertising, or affiliate/referral links.
+   - Do NOT post content that is illegal, defamatory, or harassing.
+   - Do NOT impersonate other users or staff.
+   - Commercial use of content requires a separate commercial license.
+
+3. AFFILIATE LINKS
+   Only the platform operator (Maker Matt Design) may insert affiliate links.
+   Users may not add affiliate or referral links to their posts.
+
+4. API KEY
+   Your per-user API key is for your personal use only. Do not share it.
+   It provides access to your private Discourse category and cross-st
+   publishing tools (st-post).
+
+5. PRIVATE CATEGORY
+   A private category is created for your account. Posts there are visible
+   only to you and staff. Do not share access credentials.
+
+6. ACCOUNT TERMINATION
+   Violation of these terms may result in immediate account suspension
+   and revocation of your API key.
+
+7. LIMITATION OF LIABILITY
+   The platform is provided "as is" without warranty. Maker Matt Design
+   is not liable for damages arising from use of the platform.
+
+8. GOVERNING LAW
+   These terms are governed by Florida law. Disputes shall be resolved
+   by binding arbitration in Orlando, Florida.
+
+9. PRIVACY
+   We collect account information, content you post, and usage analytics.
+   We do not sell personal data. See full Privacy Policy at:
+     https://crossai.dev/privacy
+
+10. CHANGES TO TERMS
+    We may update these terms. Continued use after notice of changes
+    constitutes acceptance.
+
+──────────────────────────────────────────────────────────────────────────────
+Full Terms:    https://crossai.dev/tos
+Privacy:       https://crossai.dev/privacy
+Contact:       cross@crossai.dev
+──────────────────────────────────────────────────────────────────────────────
+
+To accept, type "yes" at the prompt below.
+To decline, type anything else or press Ctrl-C.
+

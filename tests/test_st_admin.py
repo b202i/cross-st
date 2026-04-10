@@ -533,3 +533,191 @@ class TestCLI:
         capsys.readouterr()
         assert settings_get_editor() == "nano"
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# discourse_manage  (DIS-3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+import builtins
+import json as _json  # noqa: F401 — used in test helpers below
+
+_DISCOURSE_TEST_CAT_ID = st_admin._DISCOURSE_TEST_CATEGORY_ID  # 6
+
+
+def _discourse_env(monkeypatch, *, url="", user="", api_key="",
+                   cat_id="", priv_slug="", discourse_json=""):
+    """Helper: set all DISCOURSE_* and DISCOURSE env vars via monkeypatch."""
+    for var, val in [
+        ("DISCOURSE_URL",                    url),
+        ("DISCOURSE_USERNAME",               user),
+        ("DISCOURSE_API_KEY",               api_key),
+        ("DISCOURSE_CATEGORY_ID",           cat_id),
+        ("DISCOURSE_PRIVATE_CATEGORY_SLUG", priv_slug),
+        ("DISCOURSE",                        discourse_json),
+    ]:
+        if val:
+            monkeypatch.setenv(var, val)
+        else:
+            monkeypatch.delenv(var, raising=False)
+
+
+def _make_discourse_json(url="https://crossai.dev", user="alice",
+                          api_key="k", cat_id=42, slug="crossai.dev") -> str:
+    return _json.dumps({"sites": [{"slug": slug, "url": url,
+                                   "username": user, "api_key": api_key,
+                                   "category_id": cat_id}]})
+
+
+class TestDiscourseManage:
+
+    # ── No config ─────────────────────────────────────────────────────────────
+
+    def test_no_config_prints_friendly_message(self, tmp_settings, monkeypatch, capsys):
+        _discourse_env(monkeypatch)  # all blank
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "No Discourse configuration" in out
+
+    def test_no_config_suggests_discourse_setup(self, tmp_settings, monkeypatch, capsys):
+        _discourse_env(monkeypatch)
+        st_admin.discourse_manage()
+        assert "--discourse-setup" in capsys.readouterr().out
+
+    def test_no_config_does_not_crash(self, tmp_settings, monkeypatch):
+        _discourse_env(monkeypatch)
+        st_admin.discourse_manage()  # must not raise
+
+    # ── First-run migration ───────────────────────────────────────────────────
+
+    def test_migration_builds_discourse_json(self, tmp_settings, monkeypatch, capsys):
+        """Flat keys present, no DISCOURSE JSON → JSON built and written."""
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="testkey", cat_id="42", priv_slug="alice-private")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        discourse_val = os.environ.get("DISCOURSE", "")
+        assert discourse_val, "DISCOURSE JSON should have been written"
+        data = _json.loads(discourse_val)
+        sites = data.get("sites", [])
+        assert len(sites) == 1
+        assert sites[0]["url"] == "https://crossai.dev"
+        assert sites[0]["username"] == "alice"
+        assert sites[0]["category_id"] == 42
+
+    def test_migration_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="key", cat_id="42")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "initialised" in out
+
+    def test_migration_not_triggered_when_json_already_present(
+            self, tmp_settings, monkeypatch, capsys):
+        existing = _make_discourse_json(cat_id=99)
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="key", cat_id="42", discourse_json=existing)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "initialised" not in out
+
+    # ── Display ───────────────────────────────────────────────────────────────
+
+    def test_shows_site_url(self, tmp_settings, monkeypatch, capsys):
+        _discourse_env(monkeypatch, discourse_json=_make_discourse_json())
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        assert "crossai.dev" in capsys.readouterr().out
+
+    def test_shows_username(self, tmp_settings, monkeypatch, capsys):
+        _discourse_env(monkeypatch, discourse_json=_make_discourse_json(user="bob"))
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        assert "bob" in capsys.readouterr().out
+
+    def test_shows_test_category_name_when_active(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=_DISCOURSE_TEST_CAT_ID)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        assert st_admin._DISCOURSE_TEST_CATEGORY_NAME in capsys.readouterr().out
+
+    # ── Category switching ────────────────────────────────────────────────────
+
+    def test_choice_2_sets_test_category(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, cat_id="42", priv_slug="alice-private",
+                       discourse_json=j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == _DISCOURSE_TEST_CAT_ID
+
+    def test_choice_1_restores_private_category(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=_DISCOURSE_TEST_CAT_ID)
+        _discourse_env(monkeypatch, cat_id="42", priv_slug="alice-private",
+                       discourse_json=j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42
+
+    def test_choice_3_manual_id(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        responses = iter(["3", "99"])
+        monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 99
+
+    def test_choice_3_invalid_id_no_change(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        responses = iter(["3", "notanumber"])
+        monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42  # unchanged
+
+    def test_choice_q_no_change(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42  # unchanged
+
+    def test_switch_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "✓" in out
+
+    # ── CLI --discourse ───────────────────────────────────────────────────────
+
+    def test_cli_discourse_flag_no_config(self, tmp_settings, monkeypatch, capsys):
+        _discourse_env(monkeypatch)
+        monkeypatch.setattr(sys, "argv", ["st-admin", "--discourse"])
+        st_admin.main()
+        assert "No Discourse configuration" in capsys.readouterr().out
+
+    def test_cli_discourse_flag_switches_category(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(sys, "argv", ["st-admin", "--discourse"])
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        st_admin.main()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == _DISCOURSE_TEST_CAT_ID
+

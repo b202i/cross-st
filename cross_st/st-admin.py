@@ -64,6 +64,11 @@ _models_path = os.path.join(_PROJECT_ROOT, ".ai_models")  # repo root, not cross
 
 load_cross_env()
 
+# ── Discourse constants ────────────────────────────────────────────────────────
+_DISCOURSE_TEST_CATEGORY_ID   = 6
+_DISCOURSE_TEST_CATEGORY_SLUG = "test-cleared-daily"
+_DISCOURSE_TEST_CATEGORY_NAME = "Test (cleared daily)"
+
 
 # ── Low-level helpers ──────────────────────────────────────────────────────────
 
@@ -180,6 +185,227 @@ def _tool_check(cmd: str, flag: str = "--version") -> tuple[bool, str]:
         return True, line[:48] + "…" if len(line) > 48 else line
     except Exception:
         return True, "(installed)"
+
+
+def _run_discourse_setup() -> None:
+    """
+    Discourse community onboarding sub-wizard.
+    Called from setup_wizard() opt-in prompt, or directly via --discourse-setup.
+    """
+    from cross_st.discourse_provision import (
+        display_terms_and_conditions,
+        discourse_onboard,
+        write_discourse_env,
+    )
+    import webbrowser
+
+    print(f"\n  {'─' * 60}")
+    print("  crossai.dev Community Onboarding")
+    print(f"  {'─' * 60}\n")
+
+    # ── Step 1: Display and accept T&C ────────────────────────────────────
+    print("  Step 1/4 — Terms of Service\n")
+    accepted = display_terms_and_conditions()
+    if not accepted:
+        print("\n  ⚠️  You must accept the Terms of Service to join.")
+        print("  Run st-admin --discourse-setup at any time to try again.\n")
+        return
+
+    print("  ✅  Terms accepted.\n")
+
+    # ── Step 2: Open signup page ───────────────────────────────────────────
+    print("  Step 2/4 — Create your crossai.dev account")
+    signup_url = "https://crossai.dev/signup"
+    print(f"\n  Opening {signup_url} …")
+    try:
+        webbrowser.open(signup_url)
+    except Exception:
+        print(f"  (Could not open browser — visit {signup_url} manually)")
+
+    print(
+        "\n  Register, verify your email, and make sure you can log in.\n"
+        "  Then come back here.\n"
+    )
+    try:
+        input("  Press Enter once you have verified your email and can log in…")
+    except (KeyboardInterrupt, EOFError):
+        print("\n  Cancelled. Run st-admin --discourse-setup to resume.\n")
+        return
+
+    # ── Step 3: Collect username ───────────────────────────────────────────
+    print("\n  Step 3/4 — Enter your Discourse username\n")
+    try:
+        username = input("  Discourse username: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print("\n  Cancelled. Run st-admin --discourse-setup to resume.\n")
+        return
+
+    if not username:
+        print("  ✗  No username entered. Run st-admin --discourse-setup to try again.\n")
+        return
+
+    # ── Step 4: Provision account ──────────────────────────────────────────
+    print(f"\n  Step 4/4 — Provisioning your account…")
+    try:
+        creds = discourse_onboard(username)
+    except ValueError as exc:
+        print(f"\n  ✗  {exc}\n")
+        print("  Make sure your Discourse account exists and email is verified.")
+        print("  Then run st-admin --discourse-setup to try again.\n")
+        return
+    except PermissionError as exc:
+        print(f"\n  ✗  {exc}\n")
+        return
+    except Exception as exc:
+        print(f"\n  ✗  Could not reach the provisioning server: {exc}\n")
+        print("  Check your internet connection and try st-admin --discourse-setup later.\n")
+        return
+
+    write_discourse_env(creds)
+    print(
+        f"\n  ✅  Your Discourse account is configured. You're ready to use st-post.\n"
+        f"\n  Community:  {creds['discourse_url']}"
+        f"\n  Username:   {creds['discourse_username']}"
+        f"\n  Category:   {creds['discourse_private_category_slug']}"
+        f"\n"
+    )
+
+
+def discourse_manage() -> None:
+    """
+    Interactive Discourse site manager.
+
+    Shows the current Discourse configuration and lets the user switch the
+    default posting category between their private category, the shared
+    'Test (cleared daily)' sandbox, or a custom category ID.
+
+    On first run: if flat DISCOURSE_* keys (written by --discourse-setup) exist
+    but no DISCOURSE JSON is present, automatically builds and writes the JSON so
+    that st-post can work immediately.
+
+    Called by:  st-admin --discourse
+    """
+    import json
+
+    _SEP = "─" * 40
+
+    # ── Read current state ────────────────────────────────────────────────────
+    disc_url       = _env_get("DISCOURSE_URL", "")
+    disc_user      = _env_get("DISCOURSE_USERNAME", "")
+    disc_api_key   = _env_get("DISCOURSE_API_KEY", "")
+    disc_cat_id    = _env_get("DISCOURSE_CATEGORY_ID", "")      # private cat from onboarding
+    disc_priv_slug = _env_get("DISCOURSE_PRIVATE_CATEGORY_SLUG", "")
+    disc_json_str  = _env_get("DISCOURSE", "")
+
+    have_flat = bool(disc_url and disc_user)
+    have_json = bool(disc_json_str.strip())
+
+    # ── No config at all ─────────────────────────────────────────────────────
+    if not have_flat and not have_json:
+        print("\n  No Discourse configuration found.")
+        print("  Run:  st-admin --discourse-setup  to join crossai.dev.\n")
+        return
+
+    # ── First-run migration: flat keys → DISCOURSE JSON ──────────────────────
+    if have_flat and not have_json:
+        slug = disc_url.replace("https://", "").replace("http://", "").rstrip("/")
+        cat_id_int = int(disc_cat_id) if disc_cat_id.strip().isdigit() else 1
+        disc_json_str = json.dumps({"sites": [{
+            "slug":        slug,
+            "url":         disc_url,
+            "username":    disc_user,
+            "api_key":     disc_api_key,
+            "category_id": cat_id_int,
+        }]})
+        _env_set("DISCOURSE", disc_json_str)
+        print("\n  ✓  Discourse configuration initialised from onboarding keys.")
+        have_json = True
+
+    # ── Parse DISCOURSE JSON ──────────────────────────────────────────────────
+    try:
+        data  = json.loads(disc_json_str)
+        sites = data.get("sites", data) if isinstance(data, dict) else data
+        site  = sites[0] if sites else {}
+    except (ValueError, IndexError, AttributeError):
+        print("\n  ✗  DISCOURSE JSON in ~/.crossenv is malformed.")
+        print("  Run:  st-admin --discourse-setup  to reconfigure.\n")
+        return
+
+    active_cat_id = site.get("category_id")
+    site_url      = site.get("url",      disc_url  or "?")
+    username      = site.get("username", disc_user or "?")
+
+    private_id = int(disc_cat_id) if disc_cat_id.strip().isdigit() else None
+
+    def _cat_label(cat_id, priv_id, priv_slug) -> str:
+        if cat_id == _DISCOURSE_TEST_CATEGORY_ID:
+            return f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={cat_id}]"
+        if priv_id and cat_id == priv_id:
+            return f"{priv_slug or 'your-private'}  [id={cat_id}]"
+        return f"[id={cat_id}]"
+
+    active_label  = _cat_label(active_cat_id,  private_id, disc_priv_slug)
+    private_label = (f"{disc_priv_slug}  [id={private_id}]"
+                     if disc_priv_slug and private_id else "(not configured)")
+
+    # ── Display ───────────────────────────────────────────────────────────────
+    W = 28
+    print(f"\n  Discourse Site Management")
+    print(f"  {_SEP}")
+    print(f"  {'Site':<{W}}  {site_url}")
+    print(f"  {'Username':<{W}}  {username}")
+    print(f"  {'Default posting category':<{W}}  {active_label}")
+    print(f"  {'Private category':<{W}}  {private_label}")
+    print()
+
+    # ── Category picker ───────────────────────────────────────────────────────
+    print("  Change default posting category?")
+    if private_id:
+        print(f"    1.  {disc_priv_slug or 'your-private'}  (your private category)")
+    print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  — cleared daily, safe for testing")
+    print(f"    3.  Enter a category ID manually")
+    print(f"    q.  Keep current and exit")
+    print()
+
+    try:
+        choice = input("  Choice [q]: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return
+
+    new_cat_id    = None
+    new_cat_label = ""
+
+    if choice in ("q", ""):
+        return
+    elif choice == "1" and private_id:
+        new_cat_id    = private_id
+        new_cat_label = f"{disc_priv_slug or 'your-private'}  [id={new_cat_id}]"
+    elif choice == "2":
+        new_cat_id    = _DISCOURSE_TEST_CATEGORY_ID
+        new_cat_label = f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={new_cat_id}]"
+    elif choice == "3":
+        try:
+            raw = input("  Category ID: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return
+        if not raw.isdigit() or int(raw) <= 0:
+            print("  ✗  Invalid ID — must be a positive integer.\n")
+            return
+        new_cat_id    = int(raw)
+        new_cat_label = f"[id={new_cat_id}]"
+    else:
+        print("  ✗  Invalid choice.\n")
+        return
+
+    if new_cat_id is None:
+        return
+
+    # ── Mutate category_id in DISCOURSE JSON and persist ─────────────────────
+    site["category_id"] = new_cat_id
+    _env_set("DISCOURSE", json.dumps({"sites": sites}))
+    print(f"\n  ✓  Default category set to: {new_cat_label}\n")
 
 
 def setup_wizard() -> None:
@@ -536,6 +762,18 @@ def setup_wizard() -> None:
     print(f"\n  Setup complete!")
     print(f"  Create your first report:  st-new my_topic.prompt")
     print(f"  For help:                  st-man\n")
+
+    # ── Discourse community opt-in ────────────────────────────────────────────
+    try:
+        disc_ans = input(
+            "  Would you like to join the crossai.dev community\n"
+            "  for support, discussion, and article sharing? [y/N]: "
+        ).strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        disc_ans = "n"
+
+    if disc_ans == "y":
+        _run_discourse_setup()
 
 
 def settings_show_all() -> None:
@@ -964,6 +1202,14 @@ def main() -> None:
              "writes ~/.crossenv",
     )
     parser.add_argument(
+        "--discourse-setup", action="store_true",
+        help="(Re-)run the crossai.dev community onboarding wizard independently of --setup",
+    )
+    parser.add_argument(
+        "--discourse", action="store_true",
+        help="Manage Discourse site connection and default posting category",
+    )
+    parser.add_argument(
         "--show", action="store_true",
         help="Print all current settings and exit",
     )
@@ -1021,6 +1267,14 @@ def main() -> None:
     # ── Non-interactive operations (any flag → run and exit) ──────────────────
     if args.setup:
         setup_wizard()
+        return
+
+    if args.discourse_setup:
+        _run_discourse_setup()
+        return
+
+    if args.discourse:
+        discourse_manage()
         return
 
     if args.show:
