@@ -692,36 +692,6 @@ def setup_wizard() -> None:
             val = ""
         default_ai = val if val in entered else pre
 
-    # ── Discourse (optional) ──────────────────────────────────────────────────
-    print(f"\n  Discourse (optional)\n  {_SEP}")
-    print(
-        "  If you run your own self-hosted Discourse forum, you can configure\n"
-        "  st-post to publish to it here.  Enter your site URL, username, and API key.\n"
-        "\n"
-        "  (To set up crossai.dev community access, choose 'y' at the end of this wizard.)\n"
-    )
-    try:
-        disc_ans = input("  Configure a custom Discourse forum? [y/N]: ").strip().lower()
-    except (KeyboardInterrupt, EOFError):
-        disc_ans = "n"
-
-    discourse_json = existing.get("DISCOURSE", "")
-    if disc_ans == "y":
-        disc_url, disc_user, disc_key, disc_cat, disc_slug = "", "", "", "1", "MySite"
-        try:
-            disc_url  = input("  Site URL (e.g. https://forum.example.com): ").strip()
-            disc_user = input("  Username: ").strip()
-            disc_key  = input("  API key: ").strip()
-            disc_cat  = input("  Category ID [1]: ").strip() or "1"
-            disc_slug = input("  Site slug (short name) [MySite]: ").strip() or "MySite"
-        except (KeyboardInterrupt, EOFError):
-            disc_url = ""
-        if disc_url:
-            discourse_json = json.dumps({"sites": [{"slug": disc_slug,
-                                                     "url":  disc_url,
-                                                     "username": disc_user,
-                                                     "api_key":  disc_key,
-                                                     "category_id": int(disc_cat)}]})
 
     # ── Write ~/.crossenv ─────────────────────────────────────────────────────
     print(f"\n  {_SEP}")
@@ -737,8 +707,6 @@ def setup_wizard() -> None:
     _write("OPENAI_API_KEY",     openai_key)
     _write("PERPLEXITY_API_KEY", perplexity_key)
     _write("DEFAULT_AI",         default_ai)
-    if discourse_json:
-        _write("DISCOURSE", discourse_json)
 
     print(f"  ✅  Settings written to ~/.crossenv")
 
@@ -775,25 +743,56 @@ def setup_wizard() -> None:
                 print("  ⚠️  No bundled domain prompts found — skipping")
 
     # ── Done ──────────────────────────────────────────────────────────────────
-    print(f"\n  Setup complete!")
-    print(f"  Create your first report:  st-new my_topic.prompt")
-    print(f"  For help:                  st-man\n")
+    print(f"\n  {_SEP}")
 
-    # ── Discourse community opt-in ────────────────────────────────────────────
+    # ── Discourse (optional) ──────────────────────────────────────────────────
     print(
-        "  crossai.dev is a free community Discourse forum for Cross users.\n"
-        "  Setting it up gives you a private category to publish stories to\n"
-        "  with st-post, and access to the community for support and discussion.\n"
+        "\n  Discourse (optional)\n"
+        f"  {_SEP}\n"
+        "  Discourse lets you publish stories from st-post to a forum.\n"
+        "  crossai.dev is a free community forum for Cross users — it provisions\n"
+        "  a private category for you automatically.\n"
     )
     try:
         disc_ans = input(
-            "  Set up crossai.dev Discourse for posting and testing? [y/N]: "
+            "  Set up crossai.dev community access? [Y/n]: "
         ).strip().lower()
     except (KeyboardInterrupt, EOFError):
         disc_ans = "n"
 
-    if disc_ans == "y":
+    if disc_ans != "n":
         _run_discourse_setup()
+
+    # Power users: configure an additional self-hosted Discourse instance
+    try:
+        extra_ans = input(
+            "\n  Configure an additional custom Discourse forum? [y/N]: "
+        ).strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        extra_ans = "n"
+
+    if extra_ans == "y":
+        disc_url, disc_user, disc_key, disc_cat, disc_slug = "", "", "", "1", "MySite"
+        try:
+            disc_url  = input("  Site URL (e.g. https://forum.example.com): ").strip()
+            disc_user = input("  Username: ").strip()
+            disc_key  = input("  API key: ").strip()
+            disc_cat  = input("  Category ID [1]: ").strip() or "1"
+            disc_slug = input("  Site slug (short name) [MySite]: ").strip() or "MySite"
+        except (KeyboardInterrupt, EOFError):
+            disc_url = ""
+        if disc_url:
+            custom_discourse = json.dumps({"sites": [{"slug": disc_slug,
+                                                       "url":  disc_url,
+                                                       "username": disc_user,
+                                                       "api_key":  disc_key,
+                                                       "category_id": int(disc_cat)}]})
+            _write("DISCOURSE", custom_discourse)
+
+    # ── Setup complete ────────────────────────────────────────────────────────
+    print(f"\n  Setup complete!")
+    print(f"  Create your first report:  st-new my_topic.prompt")
+    print(f"  For help:                  st-man\n")
 
 
 def settings_show_all() -> None:
