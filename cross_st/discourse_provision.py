@@ -34,23 +34,20 @@ PROVISION_ENDPOINT = os.getenv(
 
 def display_terms_and_conditions() -> bool:
     """
-    Display the crossai.dev T&C to the user, paged if possible.
+    Display the crossai.dev T&C to the user, then ask for acceptance.
     Returns True if the user explicitly types "yes", False otherwise.
     """
     if not _TOS_PATH.exists():
         print("  ⚠️  Terms & Conditions file not found. Skipping display.")
     else:
         tos_text = _TOS_PATH.read_text(encoding="utf-8")
-        # pydoc.pager() correctly manages TTY setup/teardown so that
-        # input() works normally after the pager exits.  Using
-        # subprocess.run(["less"], input=...) pipes stdin from Python,
-        # which disconnects the terminal keyboard from less entirely.
-        try:
-            import pydoc
-            pydoc.pager(tos_text)
-        except (KeyboardInterrupt, EOFError):
-            print()
-            return False
+        print()
+        print("─" * 78)
+        print(tos_text)
+        print("─" * 78)
+        print("  Full Terms:  https://crossai.dev/tos")
+        print("  Privacy:     https://crossai.dev/privacy")
+        print("─" * 78)
 
     print()
     try:
@@ -59,6 +56,7 @@ def display_terms_and_conditions() -> bool:
             'Type "yes" to accept: '
         ).strip().lower()
     except (KeyboardInterrupt, EOFError):
+        print()
         return False
 
     return ans == "yes"
