@@ -205,4 +205,42 @@ Run `st-admin --setup` to enter your keys and set a default provider.
 
 ---
 
+## Uninstalling
+
+### How do I completely uninstall Cross?
+
+**Step 1 — Remove the package**
+
+```bash
+pipx uninstall cross-st        # if installed with pipx (recommended)
+pip uninstall cross-st         # if installed with pip
+```
+
+**Step 2 — Remove user data**
+
+Cross stores data in four locations under your home directory.  Remove whichever
+you want to clean up:
+
+```bash
+rm -f  ~/.crossenv                 # API keys, DEFAULT_AI, all preferences
+rm -rf ~/.cross_api_cache/         # cached AI responses (safe to delete any time)
+rm -rf ~/.cross_templates/         # prompt templates seeded by st-admin
+rm -rf ~/cross-stones/             # benchmark domain prompts (if you ran st-stones)
+```
+
+If you moved your benchmark directory with `CROSS_STONES_DIR`, remove that path
+instead of `~/cross-stones/`.
+
+One-liner to remove everything at once:
+
+```bash
+rm -f ~/.crossenv && rm -rf ~/.cross_api_cache/ ~/.cross_templates/ ~/cross-stones/
+```
+
+> **Your `.json` story files are not touched** — they live wherever you created
+> them (your working directory) and are never stored in the home-directory paths
+> above.  Keep or delete them as you choose.
+
+---
+
 ← [Wiki Home](Home)
