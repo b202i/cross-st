@@ -547,9 +547,9 @@ def setup_wizard() -> None:
         _row("⚠️", "TTS packages", "not installed", "optional: st-speak, st-voice")
 
     if crossenv_exists:
-        _row("✅", "~/.crossenv", "exists — will update")
+        _row("✅", _CROSSENV, "exists — will update")
     else:
-        _row("⚠️", "~/.crossenv", "will be created")
+        _row("⚠️", _CROSSENV, "will be created")
 
     # ── Install hints for missing items ───────────────────────────────────────
     critical = []
@@ -661,7 +661,9 @@ def setup_wizard() -> None:
 
     # ── API keys ──────────────────────────────────────────────────────────────
     print(f"\n  API Keys\n  {_SEP}")
-    print("  At least one key is required.  Press Enter to skip any provider.\n")
+    print(f"  Your keys are stored only in:  {_CROSSENV}")
+    print(  "  They are never uploaded or shared — sent directly to each provider only.\n")
+    print(  "  Press Enter to skip any provider.\n")
 
     gemini_key     = _prompt_key("Gemini     ", "GEMINI_API_KEY",
                                  "⭐ Gemini is FREE — no credit card needed.\n"
@@ -708,7 +710,7 @@ def setup_wizard() -> None:
     _write("PERPLEXITY_API_KEY", perplexity_key)
     _write("DEFAULT_AI",         default_ai)
 
-    print(f"  ✅  Settings written to ~/.crossenv")
+    print(f"  ✅  Settings written to {_CROSSENV}")
 
     # ── Create data directories ───────────────────────────────────────────────
     cache_dir = os.path.expanduser("~/.cross_api_cache")
