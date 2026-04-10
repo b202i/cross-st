@@ -621,8 +621,18 @@ def setup_wizard() -> None:
         sys.exit(1)
 
     # ── Prompt to continue ────────────────────────────────────────────────────
+    print(
+        f"\n  Next: set up your AI provider API keys.\n"
+        f"  Cross works with up to 5 providers — enter keys for the ones you have:\n"
+        f"\n"
+        f"    Gemini (Google)  ·  xAI (Grok)  ·  Anthropic (Claude)\n"
+        f"    OpenAI (GPT)     ·  Perplexity\n"
+        f"\n"
+        f"  ⭐  Gemini has a free tier — no credit card needed.\n"
+        f"  You need at least one key.  Keys can be added or changed later with st-admin.\n"
+    )
     try:
-        ans = input("\n  Continue with API key setup? [Y/n]: ").strip().lower()
+        ans = input("  Continue to API key setup? [Y/n]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print("\n  Cancelled.")
         sys.exit(0)
@@ -684,8 +694,14 @@ def setup_wizard() -> None:
 
     # ── Discourse (optional) ──────────────────────────────────────────────────
     print(f"\n  Discourse (optional)\n  {_SEP}")
+    print(
+        "  If you run your own self-hosted Discourse forum, you can configure\n"
+        "  st-post to publish to it here.  Enter your site URL, username, and API key.\n"
+        "\n"
+        "  (To set up crossai.dev community access, choose 'y' at the end of this wizard.)\n"
+    )
     try:
-        disc_ans = input("  Configure Discourse posting? [y/N]: ").strip().lower()
+        disc_ans = input("  Configure a custom Discourse forum? [y/N]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         disc_ans = "n"
 
@@ -764,10 +780,14 @@ def setup_wizard() -> None:
     print(f"  For help:                  st-man\n")
 
     # ── Discourse community opt-in ────────────────────────────────────────────
+    print(
+        "  crossai.dev is a free community Discourse forum for Cross users.\n"
+        "  Setting it up gives you a private category to publish stories to\n"
+        "  with st-post, and access to the community for support and discussion.\n"
+    )
     try:
         disc_ans = input(
-            "  Would you like to join the crossai.dev community\n"
-            "  for support, discussion, and article sharing? [y/N]: "
+            "  Set up crossai.dev Discourse for posting and testing? [y/N]: "
         ).strip().lower()
     except (KeyboardInterrupt, EOFError):
         disc_ans = "n"

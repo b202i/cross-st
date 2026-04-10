@@ -11,7 +11,6 @@ Exported:
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -42,22 +41,16 @@ def display_terms_and_conditions() -> bool:
         print("  ⚠️  Terms & Conditions file not found. Skipping display.")
     else:
         tos_text = _TOS_PATH.read_text(encoding="utf-8")
-        # Try paging with `less`; fall back to printing in blocks
+        # pydoc.pager() correctly manages TTY setup/teardown so that
+        # input() works normally after the pager exits.  Using
+        # subprocess.run(["less"], input=...) pipes stdin from Python,
+        # which disconnects the terminal keyboard from less entirely.
         try:
-            proc = subprocess.run(["less", "-R"], input=tos_text.encode(), check=False)
-            if proc.returncode != 0:
-                raise OSError
-        except (OSError, FileNotFoundError):
-            # No less — print in chunks
-            lines = tos_text.splitlines()
-            chunk = 40
-            for i in range(0, len(lines), chunk):
-                print("\n".join(lines[i:i + chunk]))
-                if i + chunk < len(lines):
-                    try:
-                        input("  [Press Enter for more…] ")
-                    except (KeyboardInterrupt, EOFError):
-                        return False
+            import pydoc
+            pydoc.pager(tos_text)
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return False
 
     print()
     try:
