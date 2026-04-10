@@ -40,7 +40,7 @@ TTS (text-to-speech) — optional, Python 3.10–3.13:
   TTS_VOICE in .env.  The interactive V key opens st-voice so you can browse
   and audition available voices before committing to one.
   See also: st-voice (browse / download Piper voices)
-            st-speak (render a story container to MP3)
+            st-speak (render a report container to MP3)
 """
 
 import argparse
