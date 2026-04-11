@@ -88,7 +88,11 @@ def main():
 
     try:
         if not os.path.isfile(file_json):
-            print(f"Error: The file {args.json_file} does not exist.")
+            if args.json_file.endswith('.prompt') and os.path.isfile(args.json_file):
+                print(f"Error: st-prep requires a .json file, not a .prompt file.")
+                print(f"  Run st-gen first:  st-gen {args.json_file}")
+            else:
+                print(f"Error: The file {file_json} does not exist.")
             sys.exit(1)
 
         with open(file_json, 'r') as file:
