@@ -387,8 +387,10 @@ def main():
             cmd = f"st-bang {file_prompt}".split()
         else:
             cmd = f"st-gen --ai {args.ai} {file_prompt}".split()
-        subprocess.run(cmd)
+        result = subprocess.run(cmd)
         cmd = ""
+        if result.returncode != 0:
+            sys.exit(result.returncode)  # st-gen already printed the error
 
     if not os.path.isfile(file_json):  # Something probably failed in the st-gen process
         print(f"Error: The file {file_json} does not exist.")
