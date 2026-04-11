@@ -26,6 +26,8 @@ from mmd_single_key import get_single_key, line_edit
 
 slugs, sites = get_discourse_slugs_sites()
 site_sel = slugs[0] if slugs else ""  # Currently selected Discourse site
+cat_categories = ["", "private", "test"]  # "" = use site's configured default
+cat_sel = ""                               # Session-level post category selection
 
 # Commands that mutate the .json container — state is re-read after these run.
 # st.py builds and fires the command; the st-* tool owns all the logic.
@@ -79,6 +81,7 @@ menus = {
         }),
         "p": ("Post", {
             "n": "Select site",
+            "c": "Select category",
             "p": "Post story",
             "a": "Post story with mp3 audio",
             "f": "Post fact-check",
@@ -96,6 +99,7 @@ menus = {
         }),
         "x": ("Settings", {
             "a": "Open admin settings panel  (st-admin)",
+            "D": "Manage Discourse sites and categories  (st-admin --discourse)",
             "s": "Show all current settings",
         }),
     }
@@ -172,15 +176,24 @@ def display_menu(menu, menu_name):
             print(f"{key}: {value[0]}")
         else:  # Command
             label = value
-            # Inject active site into Post menu items that target a specific site
+            # Inject active site/category into Post menu items
             if menu_name.endswith("Post"):
-                rotation = "[" + ", ".join(
+                _cat_labels = {"": "default", "private": "private", "test": "test"}
+                site_rotation = "[" + ", ".join(
                     f"*{s}*" if s == site_sel else s for s in slugs
                 ) + "]"
+                cat_rotation = "[" + ", ".join(
+                    f"*{_cat_labels[c]}*" if c == cat_sel else _cat_labels[c]
+                    for c in cat_categories
+                ) + "]"
                 if key == "n":
-                    label = f"Select site: {rotation}"
+                    label = f"Select site: {site_rotation}"
+                elif key == "c":
+                    label = f"Select category: {cat_rotation}"
                 elif key in ("p", "a", "f", "L"):
-                    label = f"{value}  → {site_sel}"
+                    cat_suffix = (f" [{_cat_labels[cat_sel]}]"
+                                  if cat_sel else "")
+                    label = f"{value}  → {site_sel}{cat_suffix}"
             print(f"{key}: {label}")
     print("\nesc: Escape back to the previous menu")
     print("?: Display this menu")
@@ -280,12 +293,17 @@ def execute_menu(menu_name, choice):
             match choice:
                 case "n":
                     post_rotate_next_social_media()
+                case "c":
+                    post_rotate_category()
                 case "p":
-                    cmd = f"st-post --site {site_sel} -s {story_sel} {file_json}"
+                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
+                    cmd = f"st-post --site {site_sel}{cat_arg} -s {story_sel} {file_json}"
                 case "a":
-                    cmd = f"st-post --site {site_sel} -s {story_sel} {file_prefix + '.mp3'} {file_json}"
+                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
+                    cmd = f"st-post --site {site_sel}{cat_arg} -s {story_sel} {file_prefix + '.mp3'} {file_json}"
                 case "f":
-                    cmd = f"st-post --site {site_sel} -f {fact_sel} -s {story_sel} {file_json}"
+                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
+                    cmd = f"st-post --site {site_sel}{cat_arg} -f {fact_sel} -s {story_sel} {file_json}"
                 case "v":
                     cmd = f"st-edit --view-only --markdown -s {story_sel} {file_json}"
                 case "d":
@@ -335,6 +353,8 @@ def execute_menu(menu_name, choice):
             match choice:
                 case "a":
                     cmd = "st-admin"
+                case "D":
+                    cmd = "st-admin --discourse"
                 case "s":
                     cmd = "st-admin --show"
                 case _:
@@ -357,6 +377,7 @@ def main():
     global file_prefix
     global slugs
     global site_sel
+    global cat_sel
 
     parser = argparse.ArgumentParser(
         prog='st',
@@ -499,6 +520,18 @@ def post_rotate_next_social_media():
         f"*{s}*" if s == site_sel else s for s in slugs
     ) + "]"
     print(f"\n  Site → {site_sel}   {rotation}")
+
+
+def post_rotate_category():
+    global cat_sel
+    _cat_labels = {"": "default", "private": "private", "test": "test"}
+    idx = cat_categories.index(cat_sel) if cat_sel in cat_categories else 0
+    cat_sel = cat_categories[(idx + 1) % len(cat_categories)]
+    rotation = "[" + ", ".join(
+        f"*{_cat_labels[c]}*" if c == cat_sel else _cat_labels[c]
+        for c in cat_categories
+    ) + "]"
+    print(f"\n  Category → {_cat_labels[cat_sel]}   {rotation}")
 
 
 if __name__ == "__main__":

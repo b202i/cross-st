@@ -47,6 +47,11 @@ def main():
                         help='Select story to publish: default 1')
     parser.add_argument('-f', '--fact', type=int,
                         help='Reply with fact-check to the post, default: no reply')
+    parser.add_argument('--category', type=str, choices=['private', 'test'], default=None,
+                        help=('Post to a specific category: '
+                              '"private" = your private area, '
+                              '"test" = Test (cleared daily, id=6). '
+                              'Default: use the site\'s configured default category.'))
     parser.add_argument('--check', action='store_true',
                         help='Validate Discourse credentials and connection without posting')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -152,6 +157,18 @@ def main():
 
     # get the site json structure based on user preference
     site = get_discourse_site(args.site, sites)
+
+    # Resolve the posting category for the story post.
+    # --category private → user's own private category (private_category_id or default)
+    # --category test    → Test (cleared daily) category, id=6
+    # default (None)     → whatever category_id is configured in the site JSON
+    _DISCOURSE_TEST_CATEGORY_ID = 6
+    if args.category == 'private':
+        post_category_id = site.get('private_category_id') or site['category_id']
+    elif args.category == 'test':
+        post_category_id = _DISCOURSE_TEST_CATEGORY_ID
+    else:
+        post_category_id = site['category_id']
 
     file_list = args.files
     if len(file_list) == 0:
@@ -291,7 +308,7 @@ def main():
             print(f"Uploading post to {args.site}")
             post_response = client.create_post(
                 sanitize_at_mentions(story_markdown),
-                site['category_id'],
+                post_category_id,
                 title=story_title,
             )
             topic_id = post_response['topic_id']
@@ -319,7 +336,7 @@ def main():
                 print(f"Uploading reply, length: {len(fact_report)}")
                 post_response = client.create_post(
                     sanitize_at_mentions(fact_report),
-                    10,
+                    post_category_id,
                     topic_id=topic_id,
                 )
                 response_topic_id = post_response['topic_id']
