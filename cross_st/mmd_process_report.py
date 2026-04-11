@@ -41,6 +41,35 @@ def add_mp3_player(markdown_content, mp3_filename, mp3_url):
     return "\n".join(new_lines)
 
 
+def sanitize_at_mentions(text):
+    """Escape @word patterns so Discourse does not treat them as user @mentions.
+
+    Inserts a zero-width space (U+200B) between the @ symbol and the following
+    word characters.  The post still *looks* like ``@OpenAI`` to a human reader
+    but Discourse no longer counts it as a mention attempt, avoiding the
+    "Sorry, you can only mention 10 users in a post" error on long reports
+    that reference many named entities (e.g. a Top-10 AI Providers article).
+
+    Code-fenced regions (``` … ```) are left untouched.
+
+    Args:
+        text (str): Raw markdown to sanitize.
+
+    Returns:
+        str: Markdown with @mentions escaped.
+    """
+    # Split on fenced code blocks so we never mangle code samples.
+    parts = re.split(r'(```.*?```)', text, flags=re.DOTALL)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:          # inside a code fence — leave as-is
+            result.append(part)
+        else:
+            # Insert zero-width space between @ and the following word
+            result.append(re.sub(r'@([A-Za-z]\w+)', '@\u200b\\1', part))
+    return ''.join(result)
+
+
 def clean_for_platform(markdown, mp3_url=None):
     """Remove Discourse-specific media syntax from story markdown before posting
     to non-Discourse platforms (GitHub Gist, Bluesky, Reddit, X, etc.).

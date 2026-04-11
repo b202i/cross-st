@@ -19,7 +19,7 @@ import sys
 from mmd_startup import load_cross_env, require_config
 
 from discourse import get_discourse_slugs_sites, get_discourse_site
-from mmd_process_report import add_mp3_player, add_mp3_player_top
+from mmd_process_report import add_mp3_player, add_mp3_player_top, sanitize_at_mentions
 from pathlib import Path
 from discourse import MmdDiscourseClient
 
@@ -290,7 +290,7 @@ def main():
         try:
             print(f"Uploading post to {args.site}")
             post_response = client.create_post(
-                story_markdown,
+                sanitize_at_mentions(story_markdown),
                 site['category_id'],
                 title=story_title,
             )
@@ -318,7 +318,7 @@ def main():
             try:
                 print(f"Uploading reply, length: {len(fact_report)}")
                 post_response = client.create_post(
-                    fact_report,
+                    sanitize_at_mentions(fact_report),
                     10,
                     topic_id=topic_id,
                 )
@@ -327,7 +327,10 @@ def main():
             except Exception as e:
                 print(f"An error occurred: {e}")
         else:
-            print("Error: Story not posted or fact check not complete")
+            if topic_id is None:
+                print("Error: Story has not been posted yet — run st-post without -f first to create the topic.")
+            else:
+                print("Error: Fact check not complete — no fact report found for the selected story/fact index.")
 
 
 if __name__ == "__main__":
