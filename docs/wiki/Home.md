@@ -35,7 +35,8 @@ New user? Start here: **[Onboarding](Onboarding)** — set up your API keys and 
 | [st-merge](st-merge) | Synthesize multiple AI stories into one |
 | [st-new](st-new) | Create a new prompt from a template |
 | [st-plot](st-plot) | Cross-product fact-check score plots |
-| [st-post](st-post) | Post a story to Discourse |
+ [st-post](st-post)  Post a story to Discourse 
+ [discourse-workflows](discourse-workflows)  Discourse posting workflow guide 
 | [st-prep](st-prep) | Prepare a raw AI response for posting |
 | [st-read](st-read) | Readability metrics for stories |
 | [st-rm](st-rm) | Remove items from a story container |

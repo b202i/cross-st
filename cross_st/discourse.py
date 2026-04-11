@@ -88,20 +88,42 @@ def get_discourse_slugs_sites():
         old = os.getenv("discourse")
         if old:
             print("Error: .env has 'discourse=' (lowercase) but the app now requires 'DISCOURSE='.")
-            print("  Fix: in .env, rename  discourse=...  →  DISCOURSE=...")
-            print("  Or re-run:  python3 discourse.py   (from the project root)")
-        else:
-            print("Error: DISCOURSE environment variable not set in .env.")
-            print("  Add your Discourse credentials by running:")
-            print("    python3 discourse.py")
-            print("  See README_opensource.md for the discourse.json format.")
+            print("  Fix: rename  discourse=...  →  DISCOURSE=  in ~/.crossenv")
+            print("  Or re-run:  st-admin --discourse-setup")
+            sys.exit(1)
+
+        # Try to assemble from flat DISCOURSE_* keys written by --discourse-setup.
+        # This handles users who provisioned before write_discourse_env() started
+        # writing the DISCOURSE JSON, or who hand-edited ~/.crossenv.
+        disc_url  = os.getenv("DISCOURSE_URL", "").strip()
+        disc_user = os.getenv("DISCOURSE_USERNAME", "").strip()
+        disc_key  = os.getenv("DISCOURSE_API_KEY", "").strip()
+        disc_cat  = os.getenv("DISCOURSE_CATEGORY_ID", "").strip()
+        disc_slug = os.getenv("DISCOURSE_PRIVATE_CATEGORY_SLUG", "").strip()
+
+        if disc_url and disc_user and disc_key:
+            url_slug = disc_url.replace("https://", "").replace("http://", "").rstrip("/")
+            try:
+                cat_id = int(disc_cat)
+            except (TypeError, ValueError):
+                cat_id = 1
+            data  = {"sites": [{"slug": url_slug, "url": disc_url, "username": disc_user,
+                                 "api_key": disc_key, "category_id": cat_id,
+                                 "private_category_id": cat_id,
+                                 "private_category_slug": disc_slug}]}
+            sites = data["sites"]
+            return [s["slug"] for s in sites], sites
+
+        print("Error: Discourse is not configured.")
+        print("  Run:  st-admin --discourse-setup   to join crossai.dev")
+        print("  or:   st-admin --discourse         to configure a custom forum")
         sys.exit(1)
 
     try:
         data = json.loads(string)
     except json.JSONDecodeError as e:
-        print(f"Error: DISCOURSE value in .env is not valid JSON: {e}")
-        print("  Re-run:  python3 discourse.py   to rebuild the entry.")
+        print(f"Error: DISCOURSE value in ~/.crossenv is not valid JSON: {e}")
+        print("  Re-run:  st-admin --discourse-setup   to reconfigure.")
         sys.exit(1)
 
     # Support both {"sites": [...]} and [...] (array directly)
@@ -122,6 +144,15 @@ def get_discourse_slugs_sites():
         print("Error: DISCOURSE 'sites' list is empty.")
         sys.exit(1)
 
+    # Order sites so DISCOURSE_SITE default is first — this is what st and
+    # st-post use to determine the startup default site.
+    default_slug = os.getenv("DISCOURSE_SITE", "").strip()
+    if default_slug and sites[0].get("slug") != default_slug:
+        head = [s for s in sites if s.get("slug") == default_slug]
+        tail = [s for s in sites if s.get("slug") != default_slug]
+        if head:
+            sites = head + tail
+
     # Validate required fields in each site entry
     required = ("slug", "url", "username", "api_key", "category_id")
     for i, site in enumerate(sites):
@@ -129,7 +160,7 @@ def get_discourse_slugs_sites():
         if missing:
             print(f"Error: site[{i}] (slug={site.get('slug','?')}) is missing "
                   f"required fields: {', '.join(missing)}")
-            print("  Check your discourse.json and re-run:  python3 discourse.py")
+            print("  Re-run:  st-admin --discourse-setup   to reconfigure.")
             sys.exit(1)
 
     slugs = [site["slug"] for site in sites]

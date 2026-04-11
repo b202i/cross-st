@@ -96,7 +96,8 @@ class TestDiscourseOnboard:
 
     def test_missing_secret_raises_value_error(self, monkeypatch):
         monkeypatch.delenv("PROVISION_SECRET", raising=False)
-        with pytest.raises(ValueError, match="PROVISION_SECRET not set"):
+        monkeypatch.setattr("cross_st.discourse_provision._PROVISION_SECRET_DEFAULT", "")
+        with pytest.raises(ValueError, match="provisioning secret"):
             discourse_onboard("alice")
 
     def test_default_endpoint_is_production(self):
@@ -117,11 +118,27 @@ class TestWriteDiscourseEnv:
         with patch("cross_st.discourse_provision.set_key", side_effect=fake_set_key):
             write_discourse_env(MOCK_CREDS)
 
-        assert written["DISCOURSE_URL"] == "https://crossai.dev"
-        assert written["DISCOURSE_USERNAME"] == "alice"
-        assert written["DISCOURSE_API_KEY"] == "fakekey123"
-        assert written["DISCOURSE_CATEGORY_ID"] == "42"
-        assert written["DISCOURSE_PRIVATE_CATEGORY_SLUG"] == "alice-private"
+        # Only two keys written — no legacy flat DISCOURSE_* keys
+        assert "DISCOURSE_URL"                   not in written
+        assert "DISCOURSE_USERNAME"              not in written
+        assert "DISCOURSE_API_KEY"               not in written
+        assert "DISCOURSE_CATEGORY_ID"           not in written
+        assert "DISCOURSE_PRIVATE_CATEGORY_SLUG" not in written
+
+        # DISCOURSE_SITE points to the slug
+        assert written["DISCOURSE_SITE"] == "crossai.dev"
+
+        # DISCOURSE JSON contains fully self-contained site entry
+        import json
+        disc = json.loads(written["DISCOURSE"])
+        site = disc["sites"][0]
+        assert site["slug"]                  == "crossai.dev"
+        assert site["url"]                   == "https://crossai.dev"
+        assert site["username"]              == "alice"
+        assert site["api_key"]               == "fakekey123"
+        assert site["category_id"]           == 42
+        assert site["private_category_id"]   == 42
+        assert site["private_category_slug"] == "alice-private"
 
     def test_also_updates_os_environ(self, monkeypatch, tmp_path):
         fake_crossenv = str(tmp_path / ".crossenv")
@@ -130,10 +147,11 @@ class TestWriteDiscourseEnv:
         with patch("cross_st.discourse_provision.set_key"):
             write_discourse_env(MOCK_CREDS)
 
-        assert os.environ.get("DISCOURSE_USERNAME") == "alice"
-        assert os.environ.get("DISCOURSE_API_KEY") == "fakekey123"
+        assert os.environ.get("DISCOURSE_SITE") == "crossai.dev"
+        assert os.environ.get("DISCOURSE") is not None
 
-    def test_skips_empty_values(self, monkeypatch, tmp_path):
+    def test_skips_incomplete_credentials(self, monkeypatch, tmp_path):
+        """If any of url/username/api_key is missing, nothing is written."""
         fake_crossenv = str(tmp_path / ".crossenv")
         monkeypatch.setattr("cross_st.discourse_provision._CROSSENV", fake_crossenv)
 
@@ -142,6 +160,43 @@ class TestWriteDiscourseEnv:
         with patch("cross_st.discourse_provision.set_key", side_effect=lambda p, k, v: written.update({k: v})):
             write_discourse_env(partial_creds)
 
-        assert "DISCOURSE_USERNAME" not in written
-        assert "DISCOURSE_URL" in written
+        assert written == {}, "No keys should be written when credentials are incomplete"
+
+    def test_upserts_existing_custom_site(self, monkeypatch, tmp_path):
+        """Re-provisioning crossai.dev must preserve any custom forum already in DISCOURSE JSON."""
+        import json
+        fake_crossenv = str(tmp_path / ".crossenv")
+        monkeypatch.setattr("cross_st.discourse_provision._CROSSENV", fake_crossenv)
+
+        # Pre-seed DISCOURSE with two sites: old crossai.dev + a custom forum
+        existing = {"sites": [
+            {"slug": "crossai.dev", "url": "https://crossai.dev",
+             "username": "alice-old", "api_key": "oldkey", "category_id": 10},
+            {"slug": "myforum", "url": "https://forum.example.com",
+             "username": "alice", "api_key": "customkey", "category_id": 5},
+        ]}
+        monkeypatch.setenv("DISCOURSE", json.dumps(existing))
+
+        written = {}
+        with patch("cross_st.discourse_provision.set_key", side_effect=lambda p, k, v: written.update({k: v})):
+            write_discourse_env(MOCK_CREDS)
+
+        disc = json.loads(written["DISCOURSE"])
+        sites = disc["sites"]
+        slugs = [s["slug"] for s in sites]
+
+        # crossai.dev updated, custom forum preserved
+        assert "crossai.dev" in slugs
+        assert "myforum" in slugs
+        assert len(sites) == 2
+
+        # crossai.dev entry has the NEW credentials
+        ca = next(s for s in sites if s["slug"] == "crossai.dev")
+        assert ca["username"] == "alice"
+        assert ca["api_key"] == "fakekey123"
+        assert ca["category_id"] == 42
+
+        # custom forum untouched
+        mf = next(s for s in sites if s["slug"] == "myforum")
+        assert mf["api_key"] == "customkey"
 

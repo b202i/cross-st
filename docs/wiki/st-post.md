@@ -16,7 +16,7 @@ st-post --check                        # verify credentials without posting
 
 **Options:** `-s`  `story`  `--site`  `--fact`  `--check`  `-v`  `-q`
 
-**Related:** [st-prep](st-prep.md) · [st-speak](st-speak.md) · [st-admin](st-admin.md)
+**Related:** [st-prep](st-prep.md)  [st-speak](st-speak.md)  [st-admin](st-admin.md)  [discourse-workflows](discourse-workflows.md)
 
 ---
 

@@ -49,6 +49,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    import readline  # noqa: F401 — enables arrow keys & backspace in input() prompts
+except ImportError:
+    pass  # Windows has no readline; input() still works
+
 from dotenv import load_dotenv, set_key
 
 from ai_handler import get_ai_list, AI_HANDLER_REGISTRY
@@ -195,6 +200,7 @@ def _run_discourse_setup() -> None:
     from cross_st.discourse_provision import (
         display_terms_and_conditions,
         discourse_onboard,
+        get_invite_link,
         write_discourse_env,
     )
     import webbrowser
@@ -213,21 +219,52 @@ def _run_discourse_setup() -> None:
 
     print("  ✅  Terms accepted.\n")
 
-    # ── Step 2: Open signup page ───────────────────────────────────────────
-    print("  Step 2/4 — Create your crossai.dev account")
+    # ── Step 2: Create account via invite link ────────────────────────────
+    print("  Step 2/4 — Create your crossai.dev account\n")
+
+    # Try to get a pre-approved invite link from the server.
+    # If the server is unreachable (e.g. dev/offline), fall back to /signup.
     signup_url = "https://crossai.dev/signup"
-    print(f"\n  Opening {signup_url} …")
+    invite_url = None
     try:
-        webbrowser.open(signup_url)
+        invite_url = get_invite_link()
+    except Exception as exc:
+        print(f"  ⚠️  Could not generate invite link: {exc}")
+        print(f"  Falling back to the public signup page.\n")
+
+    open_url = invite_url or signup_url
+
+    # ── Important: use a private/incognito window ─────────────────────────
+    print(
+        "  ⚠️  IMPORTANT: Open the link below in a private / incognito window.\n"
+        "  (Chrome/Edge: Ctrl+Shift+N  •  Firefox: Ctrl+Shift+P  •  Safari: ⌘+Shift+N)\n"
+        "  Using a private window prevents conflicts with any existing browser session.\n"
+    )
+
+    if invite_url:
+        print(
+            "  Your personal invite link (single-use, expires in 7 days):\n"
+            f"\n"
+            f"  {invite_url}\n"
+            f"\n"
+            "  Copy the link above and paste it into your private window.\n"
+        )
+    else:
+        print(f"  Opening signup page: {open_url}\n")
+
+    try:
+        webbrowser.open(open_url)
     except Exception:
-        print(f"  (Could not open browser — visit {signup_url} manually)")
+        print("  (Could not open browser — copy the link above and open it manually)")
 
     print(
-        "\n  Register, verify your email, and make sure you can log in.\n"
-        "  Then come back here.\n"
+        "  After registering you will receive an activation email.\n"
+        "  Open that email link in the same private window to activate your account.\n"
+        "  Once activated you can log in and come back here.\n"
     )
+
     try:
-        input("  Press Enter once you have verified your email and can log in…")
+        input("  Press Enter once you have registered AND activated your account…")
     except (KeyboardInterrupt, EOFError):
         print("\n  Cancelled. Run st-admin --discourse-setup to resume.\n")
         return
@@ -293,9 +330,10 @@ def discourse_manage() -> None:
     disc_url       = _env_get("DISCOURSE_URL", "")
     disc_user      = _env_get("DISCOURSE_USERNAME", "")
     disc_api_key   = _env_get("DISCOURSE_API_KEY", "")
-    disc_cat_id    = _env_get("DISCOURSE_CATEGORY_ID", "")      # private cat from onboarding
+    disc_cat_id    = _env_get("DISCOURSE_CATEGORY_ID", "")
     disc_priv_slug = _env_get("DISCOURSE_PRIVATE_CATEGORY_SLUG", "")
     disc_json_str  = _env_get("DISCOURSE", "")
+    disc_site_key  = _env_get("DISCOURSE_SITE", "")
 
     have_flat = bool(disc_url and disc_user)
     have_json = bool(disc_json_str.strip())
@@ -311,13 +349,18 @@ def discourse_manage() -> None:
         slug = disc_url.replace("https://", "").replace("http://", "").rstrip("/")
         cat_id_int = int(disc_cat_id) if disc_cat_id.strip().isdigit() else 1
         disc_json_str = json.dumps({"sites": [{
-            "slug":        slug,
-            "url":         disc_url,
-            "username":    disc_user,
-            "api_key":     disc_api_key,
-            "category_id": cat_id_int,
+            "slug":                  slug,
+            "url":                   disc_url,
+            "username":              disc_user,
+            "api_key":               disc_api_key,
+            "category_id":           cat_id_int,
+            "private_category_id":   cat_id_int,
+            "private_category_slug": disc_priv_slug,
         }]})
         _env_set("DISCOURSE", disc_json_str)
+        if not disc_site_key:
+            _env_set("DISCOURSE_SITE", slug)
+            disc_site_key = slug
         print("\n  ✓  Discourse configuration initialised from onboarding keys.")
         have_json = True
 
@@ -331,28 +374,47 @@ def discourse_manage() -> None:
         print("  Run:  st-admin --discourse-setup  to reconfigure.\n")
         return
 
+    # Honour DISCOURSE_SITE for the active site
+    if disc_site_key:
+        match = next((s for s in sites if s.get("slug") == disc_site_key), None)
+        if match:
+            site = match
+
     active_cat_id = site.get("category_id")
     site_url      = site.get("url",      disc_url  or "?")
     username      = site.get("username", disc_user or "?")
+    site_slug     = site.get("slug",     disc_site_key or "?")
 
-    private_id = int(disc_cat_id) if disc_cat_id.strip().isdigit() else None
+    # Private category info lives in the site dict (new schema).
+    # Fall back to flat keys for configs that predate the migration.
+    private_id   = site.get("private_category_id")
+    if private_id is None and disc_cat_id.strip().isdigit():
+        private_id = int(disc_cat_id)
+    priv_slug = site.get("private_category_slug") or disc_priv_slug or ""
 
-    def _cat_label(cat_id, priv_id, priv_slug) -> str:
+    def _cat_label(cat_id, priv_id, p_slug) -> str:
         if cat_id == _DISCOURSE_TEST_CATEGORY_ID:
             return f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={cat_id}]"
         if priv_id and cat_id == priv_id:
-            return f"{priv_slug or 'your-private'}  [id={cat_id}]"
+            return f"{p_slug or 'your-private'}  [id={cat_id}]"
         return f"[id={cat_id}]"
 
-    active_label  = _cat_label(active_cat_id,  private_id, disc_priv_slug)
-    private_label = (f"{disc_priv_slug}  [id={private_id}]"
-                     if disc_priv_slug and private_id else "(not configured)")
+    active_label  = _cat_label(active_cat_id, private_id, priv_slug)
+    private_label = (f"{priv_slug}  [id={private_id}]"
+                     if priv_slug and private_id else "(not configured)")
 
     # ── Display ───────────────────────────────────────────────────────────────
     W = 28
     print(f"\n  Discourse Site Management")
     print(f"  {_SEP}")
-    print(f"  {'Site':<{W}}  {site_url}")
+    if len(sites) > 1:
+        all_slugs = ", ".join(
+            f"[{s['slug']}]" if s.get("slug") == site_slug else s["slug"]
+            for s in sites
+        )
+        print(f"  {'Sites':<{W}}  {all_slugs}")
+        print(f"  {'Active site':<{W}}  {site_slug}")
+    print(f"  {'Site URL':<{W}}  {site_url}")
     print(f"  {'Username':<{W}}  {username}")
     print(f"  {'Default posting category':<{W}}  {active_label}")
     print(f"  {'Private category':<{W}}  {private_label}")
@@ -361,7 +423,7 @@ def discourse_manage() -> None:
     # ── Category picker ───────────────────────────────────────────────────────
     print("  Change default posting category?")
     if private_id:
-        print(f"    1.  {disc_priv_slug or 'your-private'}  (your private category)")
+        print(f"    1.  {priv_slug or 'your-private'}  (your private category)")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  — cleared daily, safe for testing")
     print(f"    3.  Enter a category ID manually")
     print(f"    q.  Keep current and exit")
@@ -380,7 +442,7 @@ def discourse_manage() -> None:
         return
     elif choice == "1" and private_id:
         new_cat_id    = private_id
-        new_cat_label = f"{disc_priv_slug or 'your-private'}  [id={new_cat_id}]"
+        new_cat_label = f"{priv_slug or 'your-private'}  [id={new_cat_id}]"
     elif choice == "2":
         new_cat_id    = _DISCOURSE_TEST_CATEGORY_ID
         new_cat_label = f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={new_cat_id}]"
