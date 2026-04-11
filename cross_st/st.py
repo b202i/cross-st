@@ -201,7 +201,7 @@ def execute_menu(menu_name, choice):
         case "Generate":
             match choice:
                 case "g":
-                    cmd = f"st-gen --prep --ai {ai} {file_prefix + '.prompt'}"
+                    cmd = f"st-gen --ai {ai} {file_prefix + '.prompt'}"
                 case "e":
                     cmd = f"vi {file_prefix + '.prompt'}"
                 case "s":
@@ -386,7 +386,7 @@ def main():
         if args.bang:
             cmd = f"st-bang {file_prompt}".split()
         else:
-            cmd = f"st-gen --prep --ai {args.ai} {file_prompt}".split()
+            cmd = f"st-gen --ai {args.ai} {file_prompt}".split()
         subprocess.run(cmd)
         cmd = ""
 
