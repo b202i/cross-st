@@ -271,7 +271,9 @@ Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–
 
 ### ⏳ Next release: cross-st 0.4.0
 
-Nothing accumulated yet — next release note goes here.
+See `CHANGELOG.md [0.4.0]` for the full list. Key changes: `st-admin` 2-level menu, `st-post --category` default → `test` (sandbox), T&C versioning (TAP-1), @mention escaping, setup-wizard restructure, 122 new tests (suite 676 passing).
+
+**Ready to release:** `pyproject.toml` is at `0.4.0`. Run `bash script/release.sh` when ready.
 
 ---
 

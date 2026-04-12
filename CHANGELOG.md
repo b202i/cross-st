@@ -7,6 +7,66 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0] — 2026-04-12
+
+### Added
+- **`st-post --category private|test`** — explicit posting-category flag;
+  `test` (sandbox, cleared daily) is now the default, keeping new users safe
+  from accidentally posting to their private area
+- **`st-admin` 2-level interactive menu** — top level: `a` AI, `t` Templates
+  & editor, `d` Discourse, `c` Cache, `s` show all settings, `u` upgrade;
+  each letter navigates into a submenu; ESC goes back; breadcrumb title shown
+  (`st-admin>AI>` etc.)
+- **`st-admin` Discourse D/c quick-pickers** — `d` selects default Discourse
+  site; `c` switches posting category (private | Test cleared daily) with
+  immediate single-keypress UX; both support ESC to go back
+- **T&C versioning (TAP-1)** — `cross_st/data/tos_versions.json` manifest
+  ships with the package; `get_tos_versions()` in `discourse_provision.py`;
+  version footer shown at the end of `display_terms_and_conditions()` output
+- **`st-admin --check-tos`** — compares stored vs manifest T&C version;
+  prompts re-acceptance and updates `DISCOURSE` JSON if stale
+- **@mention escaping in `st-post`** — Discourse posts with 10+ `@username`
+  mentions are now escaped before posting to avoid the moderation auto-flag
+
+### Changed
+- **`st.py` Settings submenu removed** — the 3-item Settings submenu is gone;
+  `x` now launches `st-admin` directly (no submenu)
+- **Setup wizard restructured** — mid-wizard "Configure a custom Discourse
+  forum?" prompt removed; wizard ends with two clear questions:
+  (1) crossai.dev community access (default Y) and
+  (2) additional self-hosted forum (default N); setup checklist shows the
+  resolved `~/.crossenv` path (not the literal `~` string); API key privacy
+  notice moved before the "Continue?" prompt
+- **T&C display** — pager (`less`) replaced with direct `print` to terminal;
+  no hidden exit key, works on all platforms without external tools
+- **Terminology** — user-visible text uses "report/reports" consistently;
+  renamed docstrings and CLI prompts (`story container` → `report container`,
+  `stories` → `reports` in Discourse prompt)
+
+### Fixed
+- **`st-gen` exit message** — suppressed redundant "file does not exist" error
+  when `st-gen` exits non-zero (API error already printed)
+- **`st-prep` filename hint** — shows the correct missing `.json` filename;
+  hints `st-gen` when a `.prompt` file is passed instead of `.json`
+- **`st.py` gen calls** — removed erroneous `--prep` flag from gen calls;
+  `st-gen` has `--no-prep` only (`prep=True` is the default)
+- **`st-admin --discourse-setup`** — UX messaging updated to give explicit
+  private/incognito window instructions at both the invite step and the
+  activation-email step; keyboard shortcuts shown for Chrome/Edge/Firefox/Safari
+
+### Tests
+- **COV-1** — 122 new unit tests across three previously untested modules:
+  - `test_mmd_util.py` (52 tests) — `get_project_root`, `tmp_safe_name`,
+    block-file helpers, `build_segments` (14 cases), `seed_*` helpers
+  - `test_ai_handler.py` (40 tests) — `get_default_ai`, `get_ai_model`
+    (env-var override), `get_content/put_content`, `get_content_auto/
+    put_content_auto`, `AIResponse` wrapper
+  - `test_mmd_data_analysis.py` (30 tests) — `get_flattened_fc_data`,
+    square-matrix logic, malformed-entry skipping, non-square trimming
+  - Suite: **676 passing, 57 skipped** (was 554)
+
+---
+
 ## [0.3.0] — 2026-04-08
 
 ### Added
