@@ -1478,21 +1478,21 @@ _MENU = {
         "T": "Set default template",
         "e": "View editor",
         "E": "Set editor",
-        "I": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
+        "i": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
     }),
     "d": ("Discourse", {
-        "D": "Select default site",
+        "d": "Select default site",
         "c": "Select posting category  (private | test-cleared-daily)",
         "m": "Full site manager",
         "o": "Community onboarding / re-accept T&C",
     }),
-    "C": ("Cache", {
+    "c": ("Cache", {
         "i": "Cache info  (path, file count, size)",
         "x": "Cache clear  (delete all cached AI responses)",
         "k": "Cache cull  (delete entries older than N days)",
     }),
     "s": "Show all settings",
-    "U": "Upgrade cross-st from PyPI + platform tools",
+    "u": "Upgrade cross-st from PyPI + platform tools",
 }
 
 
@@ -1557,7 +1557,7 @@ def interactive_menu() -> None:
                     case ("st-admin", "s"):
                         settings_show_all()
 
-                    case ("st-admin", "U"):
+                    case ("st-admin", "u"):
                         upgrade_cross()
 
                     # ── AI ────────────────────────────────────────────────────
@@ -1627,7 +1627,7 @@ def interactive_menu() -> None:
                             _env_set("EDITOR", new_editor)
                             print(f"  ✓  Editor set to: {new_editor}  (written to .env)")
 
-                    case ("Templates & editor", "I"):
+                    case ("Templates & editor", "i"):
                         print("\n  Seeding ~/.cross_templates/ from bundled defaults …")
                         overwrite_ans = input(
                             "  Overwrite existing files? [y/N]: "
@@ -1635,7 +1635,7 @@ def interactive_menu() -> None:
                         init_user_templates(overwrite=(overwrite_ans == "y"))
 
                     # ── Discourse ─────────────────────────────────────────────
-                    case ("Discourse", "D"):
+                    case ("Discourse", "d"):
                         _discourse_select_site()
 
                     case ("Discourse", "c"):

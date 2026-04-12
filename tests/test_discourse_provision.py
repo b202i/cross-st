@@ -1,9 +1,10 @@
 """
 tests/test_discourse_provision.py
-Unit tests for cross_st.discourse_provision (ONB-C6, TAP-1)
+Unit tests for cross_st.discourse_provision (ONB-C6, TAP-1, TAP-4)
 
 Mocks:
   - requests.post  (HTTP call to provisioning endpoint)
+  - requests.get   (HTTP call to tos-check endpoint)
   - dotenv.set_key (env file writes)
   - builtins.input (user prompts)
 """
@@ -14,6 +15,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
 import pytest
+import requests as _requests
 
 # Make sure cross_st is importable from repo root
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,6 +25,8 @@ from cross_st.discourse_provision import (
     write_discourse_env,
     get_tos_versions,
     display_terms_and_conditions,
+    check_tos_acceptance,
+    record_tos_acceptance,
     PROVISION_ENDPOINT,
 )
 
@@ -305,4 +309,212 @@ class TestDisplayTermsAndConditions:
                 display_terms_and_conditions()  # no versions= arg
         out = capsys.readouterr().out
         assert "2099-01-01" in out
+
+
+# ── TAP-4: TOS fields in discourse_onboard + write_discourse_env ─────────────
+
+class TestTap4DiscourseOnboardTos:
+    """TAP-4: discourse_onboard() passes TOS fields; backward-compat without them."""
+
+    def _mock_ok_response(self):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = MOCK_CREDS
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    def test_passes_tos_version_in_body(self):
+        """When tos_version + privacy_version + client_info are provided, they appear in the POST body."""
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._mock_ok_response()) as mock_post:
+            discourse_onboard(
+                "alice",
+                tos_version="2026-04-07",
+                privacy_version="2026-04-07",
+                client_info="cross-st/0.4.0 Python/3.12.3",
+            )
+        body = mock_post.call_args[1]["json"]
+        assert body["username"]        == "alice"
+        assert body["tos_version"]     == "2026-04-07"
+        assert body["privacy_version"] == "2026-04-07"
+        assert body["client_info"]     == "cross-st/0.4.0 Python/3.12.3"
+
+    def test_backward_compat_no_tos_fields(self):
+        """Without TOS args, POST body is {"username": "alice"} — no extra keys."""
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._mock_ok_response()) as mock_post:
+            discourse_onboard("alice")
+        body = mock_post.call_args[1]["json"]
+        assert body == {"username": "alice"}
+        assert "tos_version"     not in body
+        assert "privacy_version" not in body
+        assert "client_info"     not in body
+
+    def test_partial_tos_fields_not_included_when_none(self):
+        """Only fields with non-None/non-empty values are added to the body."""
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._mock_ok_response()) as mock_post:
+            discourse_onboard("alice", tos_version="2026-04-07")  # no privacy_version
+        body = mock_post.call_args[1]["json"]
+        assert body["tos_version"] == "2026-04-07"
+        assert "privacy_version" not in body
+
+
+class TestTap4WriteDiscourseEnvTos:
+    """TAP-4: write_discourse_env() stores TOS fields in the site JSON entry."""
+
+    def _written(self, monkeypatch, tmp_path, **kwargs):
+        """Call write_discourse_env and capture the written DISCOURSE JSON."""
+        fake_crossenv = str(tmp_path / ".crossenv")
+        monkeypatch.setattr("cross_st.discourse_provision._CROSSENV", fake_crossenv)
+        captured = {}
+        with patch("cross_st.discourse_provision.set_key",
+                   side_effect=lambda p, k, v: captured.update({k: v})):
+            write_discourse_env(MOCK_CREDS, **kwargs)
+        return json.loads(captured.get("DISCOURSE", "{}"))
+
+    def test_stores_tos_fields_when_supplied(self, monkeypatch, tmp_path):
+        disc = self._written(
+            monkeypatch, tmp_path,
+            tos_version="2026-04-07",
+            privacy_version="2026-04-07",
+            tos_agreed_at="2026-04-12T10:00:00.000Z",
+        )
+        site = disc["sites"][0]
+        assert site["tos_version"]     == "2026-04-07"
+        assert site["privacy_version"] == "2026-04-07"
+        assert site["tos_agreed_at"]   == "2026-04-12T10:00:00.000Z"
+
+    def test_no_tos_fields_when_not_supplied(self, monkeypatch, tmp_path):
+        """Without TOS args, site dict has no tos_* keys (backward compat)."""
+        disc = self._written(monkeypatch, tmp_path)
+        site = disc["sites"][0]
+        assert "tos_version"     not in site
+        assert "privacy_version" not in site
+        assert "tos_agreed_at"   not in site
+
+    def test_preserves_other_site_fields(self, monkeypatch, tmp_path):
+        """TOS fields are added without clobbering existing credential fields."""
+        disc = self._written(
+            monkeypatch, tmp_path,
+            tos_version="2026-04-07",
+        )
+        site = disc["sites"][0]
+        assert site["username"]  == "alice"
+        assert site["api_key"]   == "fakekey123"
+        assert site["category_id"] == 42
+
+
+# ── TAP-4: check_tos_acceptance() ────────────────────────────────────────────
+
+class TestCheckTosAcceptance:
+    """TAP-4: check_tos_acceptance() queries /api/tos-check on the server."""
+
+    def _ok_resp(self, payload: dict):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = payload
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    def test_needs_reaccept_true(self):
+        payload = {"needs_reaccept": True, "current_tos_version": "2026-04-07",
+                   "last_agreed_tos_version": None, "last_agreed_at": None}
+        with patch("cross_st.discourse_provision.requests.get",
+                   return_value=self._ok_resp(payload)):
+            result = check_tos_acceptance("alice")
+        assert result["needs_reaccept"] is True
+
+    def test_needs_reaccept_false(self):
+        payload = {"needs_reaccept": False, "current_tos_version": "2026-04-07",
+                   "last_agreed_tos_version": "2026-04-07",
+                   "last_agreed_at": "2026-04-12T10:00:00.000Z"}
+        with patch("cross_st.discourse_provision.requests.get",
+                   return_value=self._ok_resp(payload)):
+            result = check_tos_acceptance("alice")
+        assert result["needs_reaccept"] is False
+        assert result["last_agreed_tos_version"] == "2026-04-07"
+
+    def test_connection_error_propagates(self):
+        """Server unreachable → ConnectionError raised (caller handles gracefully)."""
+        with patch("cross_st.discourse_provision.requests.get",
+                   side_effect=_requests.ConnectionError("unreachable")):
+            with pytest.raises(_requests.ConnectionError):
+                check_tos_acceptance("alice")
+
+    def test_uses_custom_endpoint(self):
+        with patch("cross_st.discourse_provision.requests.get",
+                   return_value=self._ok_resp({"needs_reaccept": False})) as mock_get:
+            check_tos_acceptance("alice", endpoint="http://localhost:5000/api/tos-check")
+        assert "localhost:5000" in mock_get.call_args[0][0]
+
+    def test_sends_username_as_query_param(self):
+        with patch("cross_st.discourse_provision.requests.get",
+                   return_value=self._ok_resp({"needs_reaccept": False})) as mock_get:
+            check_tos_acceptance("Alice")   # uppercase → lowercased
+        params = mock_get.call_args[1].get("params", {})
+        assert params.get("username") == "alice"
+
+    def test_uses_bearer_auth(self):
+        with patch("cross_st.discourse_provision.requests.get",
+                   return_value=self._ok_resp({"needs_reaccept": False})) as mock_get:
+            check_tos_acceptance("alice")
+        headers = mock_get.call_args[1].get("headers", {})
+        assert headers.get("Authorization", "").startswith("Bearer ")
+
+
+# ── TAP-4: record_tos_acceptance() ───────────────────────────────────────────
+
+class TestRecordTosAcceptance:
+    """TAP-4: record_tos_acceptance() posts to /api/record-tos-acceptance; non-fatal."""
+
+    def _ok_resp(self):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    def test_success_returns_true(self):
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._ok_resp()):
+            assert record_tos_acceptance("alice", "2026-04-07", "2026-04-07") is True
+
+    def test_http_error_returns_false(self):
+        with patch("cross_st.discourse_provision.requests.post",
+                   side_effect=_requests.HTTPError("bad")):
+            assert record_tos_acceptance("alice", "2026-04-07", "2026-04-07") is False
+
+    def test_connection_error_returns_false(self):
+        with patch("cross_st.discourse_provision.requests.post",
+                   side_effect=_requests.ConnectionError("unreachable")):
+            assert record_tos_acceptance("alice", "2026-04-07", "2026-04-07") is False
+
+    def test_sends_correct_fields(self):
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._ok_resp()) as mock_post:
+            record_tos_acceptance(
+                "alice",
+                tos_version="2026-04-07",
+                privacy_version="2026-04-07",
+                method="cli_reaccept",
+                client_info="cross-st/0.4.0 Python/3.12.3",
+            )
+        body = mock_post.call_args[1]["json"]
+        assert body["username"]        == "alice"
+        assert body["tos_version"]     == "2026-04-07"
+        assert body["privacy_version"] == "2026-04-07"
+        assert body["method"]          == "cli_reaccept"
+        assert body["client_info"]     == "cross-st/0.4.0 Python/3.12.3"
+
+    def test_username_lowercased(self):
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._ok_resp()) as mock_post:
+            record_tos_acceptance("Alice", "2026-04-07", "2026-04-07")
+        assert mock_post.call_args[1]["json"]["username"] == "alice"
+
+    def test_default_method_is_cli_reaccept(self):
+        with patch("cross_st.discourse_provision.requests.post",
+                   return_value=self._ok_resp()) as mock_post:
+            record_tos_acceptance("alice", "2026-04-07", "2026-04-07")
+        assert mock_post.call_args[1]["json"]["method"] == "cli_reaccept"
 

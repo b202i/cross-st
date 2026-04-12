@@ -99,7 +99,7 @@ menus = {
             "v": "Speak story aloud with current voice",
             "V": "Render current voice to mp3 file",
         }),
-        "x": "Settings  (st-admin)",
+        "x": "Settings",
     }
 }
 

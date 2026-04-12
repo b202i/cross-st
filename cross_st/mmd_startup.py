@@ -171,22 +171,26 @@ def check_for_updates() -> None:
 
 
 def load_cross_env() -> None:
-    """Load Cross environment files in A1 three-layer order.
+    """Load Cross environment files in A1 four-layer order.
 
     Resolves layer 2 relative to the project root (cross/.env) so that the
     correct .env is found whether scripts run via an entry-point wrapper,
     via runpy.run_path(), or directly as ``python cross_st/st-*.py``.
 
-    Layer order (first writer of each key wins; CWD overrides all):
-      1. ~/.crossenv                — global config / API keys
-      2. <project-root>/.env        — repo-local developer keys (cross/.env)
-      2b. <cross_st-dir>/.env       — co-located .env (future / pip layout)
-      3. <CWD>/.env  override=True  — per-project override, highest priority
+    Layer order (later layers override earlier ones):
+      1. ~/.crossenv                — global fallback / shared API keys (lowest priority)
+      2. <project-root>/.env        — repo-local developer keys; overrides global
+      2b. <cross_st-dir>/.env       — co-located .env (pip install layout); overrides above
+      3. <CWD>/.env                 — per-project override, highest priority
+
+    Project-level .env always wins over ~/.crossenv so that per-repo settings
+    (DEFAULT_AI, model overrides, Discourse site, etc.) take effect without
+    having to edit the global file.
     """
     from dotenv import load_dotenv
     crossenv = os.path.expanduser("~/.crossenv")
-    load_dotenv(crossenv)                                          # 1. global
-    load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))               # 2. repo root
-    load_dotenv(os.path.join(_CROSS_ST_DIR, ".env"))               # 2b. cross_st/
-    load_dotenv(os.path.join(os.getcwd(), ".env"), override=True)  # 3. CWD
+    load_dotenv(crossenv)                                                       # 1. global fallback
+    load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=True)            # 2. repo root wins
+    load_dotenv(os.path.join(_CROSS_ST_DIR, ".env"), override=True)            # 2b. cross_st/
+    load_dotenv(os.path.join(os.getcwd(), ".env"),    override=True)           # 3. CWD — highest
     check_for_updates()

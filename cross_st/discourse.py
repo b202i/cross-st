@@ -76,11 +76,13 @@ def get_discourse_slugs_sites():
     # Return a list of sites and slug identifier for each site
 
     # Use realpath to get the actual path of the script
-    _basedir  = os.path.dirname(os.path.realpath(__file__))
-    _CROSSENV = os.path.expanduser("~/.crossenv")
-    load_dotenv(_CROSSENV)                                    # 1. global ~/.crossenv
-    load_dotenv(os.path.join(_basedir, ".env"))               # 2. repo-local .env (developer keys)
-    load_dotenv(".env", override=True)                        # 3. CWD .env overrides both
+    _cross_st_dir = os.path.dirname(os.path.realpath(__file__))
+    _project_root = os.path.dirname(_cross_st_dir)   # parent of cross_st/ = repo root
+    _CROSSENV     = os.path.expanduser("~/.crossenv")
+    load_dotenv(_CROSSENV)                                                       # 1. global fallback
+    load_dotenv(os.path.join(_project_root, ".env"), override=True)             # 2. repo root wins
+    load_dotenv(os.path.join(_cross_st_dir, ".env"), override=True)             # 2b. cross_st/
+    load_dotenv(os.path.join(os.getcwd(), ".env"),   override=True)             # 3. CWD — highest
 
     string = os.getenv("DISCOURSE")
     if not string:

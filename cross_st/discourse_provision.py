@@ -5,9 +5,11 @@ Client-side Discourse onboarding helpers.
 
 Exported:
   get_tos_versions()                → dict  — returns {"tos_version": ..., "privacy_version": ...}
-  discourse_onboard(username)       → dict  — calls provision endpoint, returns credentials
-  write_discourse_env(credentials)  → None  — writes keys to ~/.crossenv via set_key()
+  discourse_onboard(username, ...)  → dict  — calls provision endpoint, returns credentials
+  write_discourse_env(credentials, ...)  → None  — writes keys to ~/.crossenv via set_key()
   display_terms_and_conditions()    → bool  — pages T&C, returns True if accepted
+  check_tos_acceptance(username)    → dict  — asks server whether user needs to re-accept T&C
+  record_tos_acceptance(username, ...)  → bool  — records a re-acceptance event server-side
 """
 from __future__ import annotations
 
@@ -41,6 +43,16 @@ PROVISION_ENDPOINT = os.getenv(
 _INVITE_ENDPOINT = os.getenv(
     "DISCOURSE_INVITE_URL",
     "https://crossai.dev/api/invite-link",
+)
+
+# TOS-check and acceptance endpoints (TAP-4)
+_TOS_CHECK_ENDPOINT = os.getenv(
+    "DISCOURSE_TOS_CHECK_URL",
+    "https://crossai.dev/api/tos-check",
+)
+_TOS_ACCEPTANCE_ENDPOINT = os.getenv(
+    "DISCOURSE_TOS_ACCEPTANCE_URL",
+    "https://crossai.dev/api/record-tos-acceptance",
 )
 
 # ── Terms & Conditions ───────────────────────────────────────────────────────
@@ -157,6 +169,9 @@ def get_invite_link(
 
 def discourse_onboard(
     username: str,
+    tos_version: Optional[str] = None,
+    privacy_version: Optional[str] = None,
+    client_info: Optional[str] = None,
     provision_secret: Optional[str] = None,
     endpoint: Optional[str] = None,
     timeout: int = 30,
@@ -166,6 +181,11 @@ def discourse_onboard(
 
     Args:
         username:         Discourse username (must already exist and be email-verified).
+        tos_version:      TOS version string accepted by the user (e.g. "2026-04-07").
+                          When supplied, the server records the acceptance event.
+        privacy_version:  Privacy Policy version string accepted by the user.
+        client_info:      Client identifier string for the TOS audit trail
+                          (e.g. "cross-st/0.4.0 Python/3.12.3").
         provision_secret: Override PROVISION_SECRET (defaults to env var).
         endpoint:         Override PROVISION_ENDPOINT (for dev/test).
         timeout:          HTTP timeout in seconds.
@@ -190,9 +210,17 @@ def discourse_onboard(
     if not secret:
         raise ValueError("Could not determine provisioning secret — package may be corrupt.")
 
+    body: dict = {"username": username.strip().lower()}
+    if tos_version:
+        body["tos_version"] = tos_version
+    if privacy_version:
+        body["privacy_version"] = privacy_version
+    if client_info:
+        body["client_info"] = client_info
+
     resp = requests.post(
         url,
-        json={"username": username.strip().lower()},
+        json=body,
         headers={"Authorization": f"Bearer {secret}"},
         timeout=timeout,
     )
@@ -209,7 +237,12 @@ def discourse_onboard(
     return resp.json()
 
 
-def write_discourse_env(credentials: dict) -> None:
+def write_discourse_env(
+    credentials: dict,
+    tos_version: Optional[str] = None,
+    privacy_version: Optional[str] = None,
+    tos_agreed_at: Optional[str] = None,
+) -> None:
     """
     Write Discourse credentials to ~/.crossenv using python-dotenv set_key().
 
@@ -223,7 +256,10 @@ def write_discourse_env(credentials: dict) -> None:
                             slug, url, username, api_key,
                             category_id          (active posting category — mutable),
                             private_category_id  (original private cat — immutable),
-                            private_category_slug
+                            private_category_slug,
+                            tos_version          (TAP-4: version the user accepted),
+                            privacy_version      (TAP-4: privacy policy version accepted),
+                            tos_agreed_at        (TAP-4: ISO-8601 UTC timestamp)
 
                           Upserts: any other sites already in DISCOURSE (e.g. a
                           custom self-hosted forum) are preserved unchanged.
@@ -249,7 +285,7 @@ def write_discourse_env(credentials: dict) -> None:
     except (TypeError, ValueError):
         cat_id = 1
 
-    new_site = {
+    new_site: dict = {
         "slug":                  url_slug,
         "url":                   disc_url,
         "username":              disc_user,
@@ -258,6 +294,14 @@ def write_discourse_env(credentials: dict) -> None:
         "private_category_id":   cat_id,           # original private cat (immutable)
         "private_category_slug": disc_priv_slug,
     }
+
+    # Persist TOS acceptance fields when supplied (TAP-4)
+    if tos_version:
+        new_site["tos_version"] = tos_version
+    if privacy_version:
+        new_site["privacy_version"] = privacy_version
+    if tos_agreed_at:
+        new_site["tos_agreed_at"] = tos_agreed_at
 
     # Upsert: preserve any other sites (e.g. a custom self-hosted forum)
     # already in DISCOURSE JSON.  Replace the entry whose slug or url
@@ -292,4 +336,101 @@ def write_discourse_env(credentials: dict) -> None:
     # DISCOURSE_SITE = startup default slug
     set_key(_CROSSENV, "DISCOURSE_SITE", url_slug)
     os.environ["DISCOURSE_SITE"] = url_slug
+
+
+# ── TOS acceptance helpers (TAP-4) ───────────────────────────────────────────
+
+def check_tos_acceptance(
+    username: str,
+    provision_secret: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    timeout: int = 10,
+) -> dict:
+    """
+    Ask the crossai.dev server whether a user needs to re-accept the current T&C.
+
+    Args:
+        username:         Discourse username to check.
+        provision_secret: Override PROVISION_SECRET (defaults to env var).
+        endpoint:         Override _TOS_CHECK_ENDPOINT (for dev/test).
+        timeout:          HTTP timeout in seconds.
+
+    Returns:
+        Server response dict, e.g.:
+        {
+            "username": "alice",
+            "needs_reaccept": false,
+            "current_tos_version": "2026-04-07",
+            "current_privacy_version": "2026-04-07",
+            "last_agreed_tos_version": "2026-04-07",
+            "last_agreed_at": "2026-04-12T10:00:00.000Z"
+        }
+
+    Raises:
+        requests.HTTPError:      on 4xx/5xx from the server.
+        requests.ConnectionError: if the server is unreachable.
+    """
+    url    = endpoint or _TOS_CHECK_ENDPOINT
+    secret = provision_secret or os.getenv("PROVISION_SECRET", _PROVISION_SECRET_DEFAULT)
+
+    resp = requests.get(
+        url,
+        params={"username": username.strip().lower()},
+        headers={"Authorization": f"Bearer {secret}"},
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def record_tos_acceptance(
+    username: str,
+    tos_version: str,
+    privacy_version: str,
+    method: str = "cli_reaccept",
+    client_info: Optional[str] = None,
+    provision_secret: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    timeout: int = 10,
+) -> bool:
+    """
+    Record a TOS re-acceptance event for an already-provisioned user.
+
+    Called after the user accepts an updated T&C (version drift detected locally
+    or via check_tos_acceptance()).  Non-fatal: returns False on any error so the
+    caller can continue without blocking the user.
+
+    Args:
+        username:         Discourse username.
+        tos_version:      TOS version the user just accepted.
+        privacy_version:  Privacy Policy version accepted.
+        method:           "cli_reaccept" (default) or "cli_setup".
+        client_info:      Client identifier string (e.g. "cross-st/0.4.0 Python/3.12.3").
+        provision_secret: Override PROVISION_SECRET (defaults to env var).
+        endpoint:         Override _TOS_ACCEPTANCE_ENDPOINT (for dev/test).
+        timeout:          HTTP timeout in seconds.
+
+    Returns:
+        True on success, False on any error (HTTP or connection).
+    """
+    url    = endpoint or _TOS_ACCEPTANCE_ENDPOINT
+    secret = provision_secret or os.getenv("PROVISION_SECRET", _PROVISION_SECRET_DEFAULT)
+
+    try:
+        resp = requests.post(
+            url,
+            json={
+                "username":        username.strip().lower(),
+                "tos_version":     tos_version,
+                "privacy_version": privacy_version,
+                "method":          method,
+                "client_info":     client_info or None,
+            },
+            headers={"Authorization": f"Bearer {secret}"},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return True
+    except Exception:
+        return False
 
