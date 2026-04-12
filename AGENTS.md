@@ -142,9 +142,9 @@ without touching the global file. `~/.crossenv` acts as a fallback for keys not 
 pytest                        # runs tests/ with config from pytest.ini
 pytest tests/test_mmd_process_report.py -v
 ```
-Tests live in `tests/` with fixtures in `tests/fixtures/` (e.g. `pizza_dough.json`). **Never call real AI APIs in tests** — use fixtures and mocks. Current test coverage is minimal; unit tests for `mmd_util.py`, `ai_handler.py`, and `mmd_data_analysis.py` are the highest-priority gaps.
+Tests live in `tests/` with fixtures in `tests/fixtures/` (e.g. `pizza_dough.json`). **Never call real AI APIs in tests** — use fixtures and mocks. Suite: **676 passing, 57 skipped** (as of COV-1).
 
-Current test files: `test_mmd_process_report.py`, `test_container_loading.py`, `test_st_admin.py`, `test_st_plot.py`, `test_st_speed.py`, `test_st_stones.py`, `test_dotenv_resolution.py`, `test_tts_stack.py`, `test_cache_timing_preservation.py`, `test_cli_help.py`, `test_imports.py`, `test_st_bang.py`, `test_st_verdict.py`.
+Current test files: `test_mmd_process_report.py`, `test_container_loading.py`, `test_st_admin.py`, `test_st_plot.py`, `test_st_speed.py`, `test_st_stones.py`, `test_dotenv_resolution.py`, `test_tts_stack.py`, `test_cache_timing_preservation.py`, `test_cli_help.py`, `test_imports.py`, `test_st_bang.py`, `test_st_verdict.py`, `test_mmd_util.py`, `test_ai_handler.py`, `test_mmd_data_analysis.py`.
 
 ## Cross-Stones Benchmark (`st-stones`)
 `cross_st/cross_stones/domains/` contains 10 benchmark domain prompts + result containers. `cross_st/cross_stones/cross-stones-10.json` is the **named benchmark set config** — it locks the domain list, `n_claims`, and `max_fact_score` so scores are directly comparable across runs over time. Do not add or remove domains from that file; create a new named set for variants.
