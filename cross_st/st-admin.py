@@ -765,7 +765,11 @@ def _discourse_select_category() -> None:
     """
     Quick default-category picker for the interactive menu (c key).
 
-    Options: private | test-cleared-daily.
+    Always offers two options:
+      1. Private category  (username-private, or private_category_id if set)
+      2. Test (cleared daily) — the shared sandbox
+
+    The currently active option is labelled  (current).
     Writes category_id into the active site's DISCOURSE JSON in ~/.crossenv.
 
     Called from interactive_menu() by pressing c.
@@ -794,18 +798,20 @@ def _discourse_select_category() -> None:
             site = match
 
     active_cat_id = site.get("category_id")
-    private_id    = site.get("private_category_id")
-    priv_slug     = site.get("private_category_slug", "")
+    # private_category_id may be absent for older configs — fall back to category_id
+    private_id = site.get("private_category_id") or active_cat_id
+    # Build the private label: slug > username-private > "your-private"
+    priv_slug = (site.get("private_category_slug")
+                 or (site.get("username", "") + "-private" if site.get("username") else "")
+                 or "your-private")
 
-    def _active_marker(cat_id) -> str:
-        return "  ← active" if cat_id == active_cat_id else ""
+    def _current(cat_id) -> str:
+        return "  (current)" if cat_id == active_cat_id else ""
 
     print(f"\n  Select default posting category:")
-    if private_id:
-        print(f"    1.  {priv_slug or 'your-private'}  "
-              f"(your private category){_active_marker(private_id)}")
+    print(f"    1.  {priv_slug}  (your private category){_current(private_id)}")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  "
-          f"— cleared daily, safe for testing{_active_marker(_DISCOURSE_TEST_CATEGORY_ID)}")
+          f"— cleared daily, safe for testing{_current(_DISCOURSE_TEST_CATEGORY_ID)}")
     print(f"    q.  Keep current and exit")
     print()
 
@@ -817,9 +823,9 @@ def _discourse_select_category() -> None:
 
     if choice in ("q", ""):
         return
-    elif choice == "1" and private_id:
+    elif choice == "1":
         new_cat_id    = private_id
-        new_cat_label = f"{priv_slug or 'your-private'}  [id={new_cat_id}]"
+        new_cat_label = f"{priv_slug}  [id={new_cat_id}]"
     elif choice == "2":
         new_cat_id    = _DISCOURSE_TEST_CATEGORY_ID
         new_cat_label = f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={new_cat_id}]"

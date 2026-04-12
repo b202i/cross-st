@@ -1037,7 +1037,7 @@ class TestDiscourseSelectCategory:
         monkeypatch.setattr("builtins.input", lambda prompt="": "q")
         st_admin._discourse_select_category()
         out = capsys.readouterr().out
-        assert "← active" in out
+        assert "(current)" in out
 
     def test_choice_2_sets_test_category(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(cat_id=42, priv_id=42)
@@ -1080,14 +1080,36 @@ class TestDiscourseSelectCategory:
         st_admin._discourse_select_category()
         assert "Invalid" in capsys.readouterr().out
 
-    def test_choice_1_without_private_is_invalid(self, tmp_settings, monkeypatch, capsys):
-        """If no private_category_id set, choice 1 should not change category."""
+    def test_choice_1_without_explicit_private_falls_back_to_active(
+            self, tmp_settings, monkeypatch, capsys):
+        """No private_category_id → choice 1 falls back to category_id."""
         j = _make_discourse_json(cat_id=42)  # no private_category_id
         monkeypatch.setenv("DISCOURSE", j)
         monkeypatch.setattr("builtins.input", lambda prompt="": "1")
         st_admin._discourse_select_category()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
-        assert data["sites"][0]["category_id"] == 42  # unchanged
+        # Falls back to active cat_id — category stays 42
+        assert data["sites"][0]["category_id"] == 42
+
+    def test_private_option_always_shown_even_without_private_id(
+            self, tmp_settings, monkeypatch, capsys):
+        """Option 1 (private) must always appear, even without private_category_id."""
+        j = _make_discourse_json(cat_id=42)  # no private_category_id
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_category()
+        out = capsys.readouterr().out
+        assert "1." in out  # option 1 always present
+
+    def test_private_label_uses_username_when_no_slug(
+            self, tmp_settings, monkeypatch, capsys):
+        """With username 'alice' and no slug → label shows 'alice-private'."""
+        j = _make_discourse_json(cat_id=42, user="alice")
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_category()
+        out = capsys.readouterr().out
+        assert "alice-private" in out
 
 
