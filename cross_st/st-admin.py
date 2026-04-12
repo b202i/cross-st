@@ -710,6 +710,7 @@ def _discourse_select_site() -> None:
     Called from interactive_menu() by pressing D.
     """
     import json
+    from mmd_single_key import get_single_key
 
     disc_json_str = _env_get("DISCOURSE", "")
     if not disc_json_str:
@@ -739,18 +740,15 @@ def _discourse_select_site() -> None:
     for i, s in enumerate(sites, 1):
         slug   = s.get("slug", "?")
         url    = s.get("url",  "")
-        marker = "  ← active" if slug == current else ""
+        marker = "  (current)" if slug == current else ""
         print(f"    {i}.  {slug}  ({url}){marker}")
-    print(f"    q.  Keep current and exit")
-    print()
+    print(f"\n  esc: Go back")
 
-    try:
-        choice = input("  Select site [q]: ").strip().lower()
-    except (KeyboardInterrupt, EOFError):
-        print()
-        return
+    print(f"\n  Site> ", end="", flush=True)
+    choice = get_single_key()
+    print(choice)
 
-    if choice in ("q", ""):
+    if choice in ("ESC", "q", "RETURN"):
         return
     if choice.isdigit() and 1 <= int(choice) <= len(sites):
         idx      = int(choice) - 1
@@ -775,6 +773,7 @@ def _discourse_select_category() -> None:
     Called from interactive_menu() by pressing c.
     """
     import json
+    from mmd_single_key import get_single_key
 
     disc_json_str = _env_get("DISCOURSE", "")
     if not disc_json_str:
@@ -812,16 +811,13 @@ def _discourse_select_category() -> None:
     print(f"    1.  {priv_slug}  (your private category){_current(private_id)}")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  "
           f"— cleared daily, safe for testing{_current(_DISCOURSE_TEST_CATEGORY_ID)}")
-    print(f"    q.  Keep current and exit")
-    print()
+    print(f"\n  esc: Go back")
 
-    try:
-        choice = input("  Choice [q]: ").strip().lower()
-    except (KeyboardInterrupt, EOFError):
-        print()
-        return
+    print(f"\n  Category> ", end="", flush=True)
+    choice = get_single_key()
+    print(choice)
 
-    if choice in ("q", ""):
+    if choice in ("ESC", "q", "RETURN"):
         return
     elif choice == "1":
         new_cat_id    = private_id

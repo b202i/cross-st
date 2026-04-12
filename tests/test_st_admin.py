@@ -540,6 +540,7 @@ class TestCLI:
 
 import builtins
 import json as _json  # noqa: F401 — used in test helpers below
+import mmd_single_key as _msk  # for mocking get_single_key in the new pickers
 
 _DISCOURSE_TEST_CAT_ID = st_admin._DISCOURSE_TEST_CATEGORY_ID  # 6
 
@@ -942,7 +943,7 @@ class TestDiscourseSelectSite:
     def test_multi_site_shows_all_sites(self, tmp_settings, monkeypatch, capsys):
         j = _make_multi_site_json()
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_site()
         out = capsys.readouterr().out
         assert "crossai.dev" in out
@@ -952,16 +953,16 @@ class TestDiscourseSelectSite:
         j = _make_multi_site_json()
         monkeypatch.setenv("DISCOURSE", j)
         monkeypatch.setenv("DISCOURSE_SITE", "my-forum")
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_site()
         out = capsys.readouterr().out
-        assert "← active" in out
+        assert "(current)" in out
 
     def test_select_site_writes_discourse_site_env(self, tmp_settings, monkeypatch, capsys):
         j = _make_multi_site_json()
         monkeypatch.setenv("DISCOURSE", j)
         monkeypatch.delenv("DISCOURSE_SITE", raising=False)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
         st_admin._discourse_select_site()
         capsys.readouterr()
         assert os.environ.get("DISCOURSE_SITE") == "my-forum"
@@ -969,15 +970,15 @@ class TestDiscourseSelectSite:
     def test_select_site_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
         j = _make_multi_site_json()
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "1")
         st_admin._discourse_select_site()
         assert "✓" in capsys.readouterr().out
 
-    def test_quit_does_not_change_site(self, tmp_settings, monkeypatch, capsys):
+    def test_esc_does_not_change_site(self, tmp_settings, monkeypatch, capsys):
         j = _make_multi_site_json()
         monkeypatch.setenv("DISCOURSE", j)
         monkeypatch.setenv("DISCOURSE_SITE", "crossai.dev")
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_site()
         capsys.readouterr()
         assert os.environ.get("DISCOURSE_SITE") == "crossai.dev"
@@ -985,9 +986,16 @@ class TestDiscourseSelectSite:
     def test_invalid_choice_prints_error(self, tmp_settings, monkeypatch, capsys):
         j = _make_multi_site_json()
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "99")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "9")
         st_admin._discourse_select_site()
         assert "Invalid" in capsys.readouterr().out
+
+    def test_shows_esc_go_back_hint(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
+        st_admin._discourse_select_site()
+        assert "esc" in capsys.readouterr().out.lower()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1017,7 +1025,7 @@ class TestDiscourseSelectCategory:
     def test_shows_test_category_option(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private()
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_category()
         out = capsys.readouterr().out
         assert st_admin._DISCOURSE_TEST_CATEGORY_NAME in out
@@ -1025,7 +1033,7 @@ class TestDiscourseSelectCategory:
     def test_shows_private_category_when_configured(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(priv_slug="alice-private")
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_category()
         out = capsys.readouterr().out
         assert "alice-private" in out
@@ -1034,7 +1042,7 @@ class TestDiscourseSelectCategory:
         j = _make_discourse_json_with_private(cat_id=_DISCOURSE_TEST_CAT_ID,
                                                priv_id=42)
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_category()
         out = capsys.readouterr().out
         assert "(current)" in out
@@ -1042,7 +1050,7 @@ class TestDiscourseSelectCategory:
     def test_choice_2_sets_test_category(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(cat_id=42, priv_id=42)
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
         st_admin._discourse_select_category()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
@@ -1051,16 +1059,16 @@ class TestDiscourseSelectCategory:
     def test_choice_1_sets_private_category(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(cat_id=_DISCOURSE_TEST_CAT_ID, priv_id=42)
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "1")
         st_admin._discourse_select_category()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
         assert data["sites"][0]["category_id"] == 42
 
-    def test_choice_q_no_change(self, tmp_settings, monkeypatch, capsys):
+    def test_esc_no_change(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(cat_id=42)
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_category()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
@@ -1069,14 +1077,14 @@ class TestDiscourseSelectCategory:
     def test_switch_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(cat_id=42, priv_id=42)
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
         st_admin._discourse_select_category()
         assert "✓" in capsys.readouterr().out
 
     def test_invalid_choice_prints_error(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json_with_private(cat_id=42)
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "9")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "9")
         st_admin._discourse_select_category()
         assert "Invalid" in capsys.readouterr().out
 
@@ -1085,11 +1093,10 @@ class TestDiscourseSelectCategory:
         """No private_category_id → choice 1 falls back to category_id."""
         j = _make_discourse_json(cat_id=42)  # no private_category_id
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "1")
         st_admin._discourse_select_category()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
-        # Falls back to active cat_id — category stays 42
         assert data["sites"][0]["category_id"] == 42
 
     def test_private_option_always_shown_even_without_private_id(
@@ -1097,7 +1104,7 @@ class TestDiscourseSelectCategory:
         """Option 1 (private) must always appear, even without private_category_id."""
         j = _make_discourse_json(cat_id=42)  # no private_category_id
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_category()
         out = capsys.readouterr().out
         assert "1." in out  # option 1 always present
@@ -1107,9 +1114,16 @@ class TestDiscourseSelectCategory:
         """With username 'alice' and no slug → label shows 'alice-private'."""
         j = _make_discourse_json(cat_id=42, user="alice")
         monkeypatch.setenv("DISCOURSE", j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
         st_admin._discourse_select_category()
         out = capsys.readouterr().out
         assert "alice-private" in out
+
+    def test_shows_esc_go_back_hint(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
+        st_admin._discourse_select_category()
+        assert "esc" in capsys.readouterr().out.lower()
 
 
