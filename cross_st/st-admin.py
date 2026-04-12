@@ -1466,162 +1466,216 @@ def cache_cull(days: int) -> None:
 # ── Interactive menu ───────────────────────────────────────────────────────────
 
 _MENU = {
-    "d": "View / set default AI provider",
-    "a": "View AI models  (all providers)",
-    "m": "Set AI model for a provider",
-    "v": "View TTS voice",
-    "V": "Set TTS voice  (launches st-voice)",
-    "t": "View default prompt template",
-    "T": "Set default prompt template",
-    "e": "View editor",
-    "E": "Set editor",
-    "D": "Select default Discourse site",
-    "c": "Select default Discourse posting category  (private | test-cleared-daily)",
-    "I": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
-    "U": "Upgrade cross-st from PyPI + platform tools",
-    "C": "Cache info  (path, file count, size)",
-    "X": "Cache clear  (delete all cached AI responses)",
-    "K": "Cache cull  (delete entries older than N days)",
+    "a": ("AI", {
+        "d": "View / set default AI provider",
+        "m": "Set AI model for a provider",
+        "M": "View all AI models",
+        "v": "View TTS voice",
+        "V": "Set TTS voice  (launches st-voice)",
+    }),
+    "t": ("Templates & editor", {
+        "t": "View default template",
+        "T": "Set default template",
+        "e": "View editor",
+        "E": "Set editor",
+        "I": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
+    }),
+    "d": ("Discourse", {
+        "D": "Select default site",
+        "c": "Select posting category  (private | test-cleared-daily)",
+        "m": "Full site manager",
+        "o": "Community onboarding / re-accept T&C",
+    }),
+    "C": ("Cache", {
+        "i": "Cache info  (path, file count, size)",
+        "x": "Cache clear  (delete all cached AI responses)",
+        "k": "Cache cull  (delete entries older than N days)",
+    }),
     "s": "Show all settings",
-    "q": "Quit",
-    "?": "Show this menu",
+    "U": "Upgrade cross-st from PyPI + platform tools",
 }
 
 
-def _print_menu():
-    print("\n=== st-admin Settings ===")
-    for key, label in _MENU.items():
+def _print_menu(menu: dict, title: str) -> None:
+    print(f"\n=== {title} ===")
+    for key, value in menu.items():
+        label = value[0] if isinstance(value, tuple) else value
         print(f"  {key}: {label}")
+    print()
+    print("  esc: Escape back to the previous menu")
+    print("  ?: Display this menu")
 
 
 def interactive_menu() -> None:
-    """Full interactive settings panel — mirrors the style of st.py."""
+    """Full interactive settings panel — 2-level menu, ESC to go back."""
     from mmd_single_key import get_single_key
 
     ai_list = get_ai_list()
-    _print_menu()
+    current_menu = _MENU
+    menu_stack: list = []
+    menu_names = ["st-admin"]
+    show_menu = True
 
     while True:
-        print("\nst-admin> ", end="", flush=True)
+        title = ">".join(menu_names)
+
+        if show_menu:
+            _print_menu(current_menu, title)
+            show_menu = False
+
+        print(f"\n{title}> ", end="", flush=True)
         key = get_single_key()
         print(key)
 
-        if key in ("q", "ESC"):
-            print("  Exiting st-admin.")
-            break
+        # ── Navigation ────────────────────────────────────────────────────────
+        if key in ("ESC", "q"):
+            if menu_stack:
+                current_menu = menu_stack.pop()
+                menu_names.pop()
+                show_menu = True
+            else:
+                print("  Exiting st-admin.")
+                break
 
         elif key == "?":
-            _print_menu()
+            show_menu = True
 
-        elif key == "d":
-            current = settings_get_default_ai()
-            rotation = "  ".join(
-                f"[{m}]" if m == current else m for m in ai_list
-            )
-            print(f"\n  Current default AI: {current}")
-            print(f"  Available: {rotation}")
-            new_ai = input("  New default AI (blank to cancel): ").strip()
-            if new_ai:
-                try:
-                    settings_set_default_ai(new_ai)
-                    print(f"  ✓  Default AI set to: {new_ai}  (written to .env)")
-                except ValueError as exc:
-                    print(f"  ✗  {exc}")
-
-        elif key == "a":
-            print(f"\n  {'Provider':<14}  Model")
-            print(f"  {'─' * 14}  {'─' * 36}")
-            for make in ai_list:
-                print(f"  {make:<14}  {settings_get_ai_model(make)}")
-
-        elif key == "m":
-            print(f"\n  Available providers: {', '.join(ai_list)}")
-            make = input("  Provider (blank to cancel): ").strip()
-            if make:
-                if make not in ai_list:
-                    print(f"  ✗  Unknown provider: {make!r}")
-                else:
-                    current_model = settings_get_ai_model(make)
-                    print(f"  Current model for {make}: {current_model}")
-                    new_model = input("  New model (blank to cancel): ").strip()
-                    if new_model:
-                        settings_set_ai_model(make, new_model)
-                        print(f"  ✓  {make} model set to: {new_model}  (written to .ai_models)")
-
-        elif key == "v":
-            print(f"\n  TTS voice: {settings_get_tts_voice()}")
-
-        elif key == "V":
-            subprocess.run(["st-voice"])
-
-        elif key == "t":
-            print(f"\n  Default template: {settings_get_default_template()}")
-
-        elif key == "T":
-            current = settings_get_default_template()
-            print(f"\n  Current default template: {current}")
-            new_tmpl = input("  New template name (blank to cancel): ").strip()
-            if new_tmpl:
-                _env_set("DEFAULT_TEMPLATE", new_tmpl)
-                print(f"  ✓  Default template set to: {new_tmpl}  (written to .env)")
-
-        elif key == "e":
-            print(f"\n  Editor: {settings_get_editor()}")
-
-        elif key == "E":
-            current = settings_get_editor()
-            print(f"\n  Current editor: {current}")
-            new_editor = input(
-                "  New editor (e.g. nano, code, micro — blank to cancel): "
-            ).strip()
-            if new_editor:
-                _env_set("EDITOR", new_editor)
-                print(f"  ✓  Editor set to: {new_editor}  (written to .env)")
-
-        elif key == "D":
-            _discourse_select_site()
-
-        elif key == "c":
-            _discourse_select_category()
-
-        elif key == "I":
-            print("\n  Seeding ~/.cross_templates/ from bundled defaults …")
-            overwrite_ans = input(
-                "  Overwrite existing files? [y/N]: "
-            ).strip().lower()
-            init_user_templates(overwrite=(overwrite_ans == "y"))
-
-        elif key == "U":
-            upgrade_cross()
-
-        elif key == "C":
-            cache_info()
-
-        elif key == "X":
-            try:
-                ans = input("  Delete ALL cached AI responses? [y/N]: ").strip().lower()
-            except (KeyboardInterrupt, EOFError):
-                ans = "n"
-            if ans == "y":
-                cache_clear()
+        elif key in current_menu:
+            item = current_menu[key]
+            if isinstance(item, tuple):
+                # Navigate into submenu
+                menu_stack.append(current_menu)
+                menu_names.append(item[0])
+                current_menu = item[1]
+                show_menu = True
             else:
-                print("  Cancelled.")
+                # ── Actions ───────────────────────────────────────────────────
+                ctx = menu_names[-1]  # "st-admin", "AI", "Templates & editor", etc.
+                match (ctx, key):
 
-        elif key == "K":
-            try:
-                raw = input("  Delete cache entries older than how many days? ").strip()
-            except (KeyboardInterrupt, EOFError):
-                raw = ""
-            if raw:
-                try:
-                    cache_cull(int(raw))
-                except ValueError:
-                    print(f"  ✗  Not a valid number: {raw!r}")
-            else:
-                print("  Cancelled.")
+                    # ── Top-level ─────────────────────────────────────────────
+                    case ("st-admin", "s"):
+                        settings_show_all()
 
-        elif key == "s":
-            settings_show_all()
+                    case ("st-admin", "U"):
+                        upgrade_cross()
+
+                    # ── AI ────────────────────────────────────────────────────
+                    case ("AI", "d"):
+                        current = settings_get_default_ai()
+                        rotation = "  ".join(
+                            f"[{m}]" if m == current else m for m in ai_list
+                        )
+                        print(f"\n  Current default AI: {current}")
+                        print(f"  Available: {rotation}")
+                        new_ai = input("  New default AI (blank to cancel): ").strip()
+                        if new_ai:
+                            try:
+                                settings_set_default_ai(new_ai)
+                                print(f"  ✓  Default AI set to: {new_ai}  (written to .env)")
+                            except ValueError as exc:
+                                print(f"  ✗  {exc}")
+
+                    case ("AI", "m"):
+                        print(f"\n  Available providers: {', '.join(ai_list)}")
+                        make = input("  Provider (blank to cancel): ").strip()
+                        if make:
+                            if make not in ai_list:
+                                print(f"  ✗  Unknown provider: {make!r}")
+                            else:
+                                current_model = settings_get_ai_model(make)
+                                print(f"  Current model for {make}: {current_model}")
+                                new_model = input("  New model (blank to cancel): ").strip()
+                                if new_model:
+                                    settings_set_ai_model(make, new_model)
+                                    print(f"  ✓  {make} model set to: {new_model}  (written to .ai_models)")
+
+                    case ("AI", "M"):
+                        print(f"\n  {'Provider':<14}  Model")
+                        print(f"  {'─' * 14}  {'─' * 36}")
+                        for make in ai_list:
+                            print(f"  {make:<14}  {settings_get_ai_model(make)}")
+
+                    case ("AI", "v"):
+                        print(f"\n  TTS voice: {settings_get_tts_voice()}")
+
+                    case ("AI", "V"):
+                        subprocess.run(["st-voice"])
+
+                    # ── Templates & editor ────────────────────────────────────
+                    case ("Templates & editor", "t"):
+                        print(f"\n  Default template: {settings_get_default_template()}")
+
+                    case ("Templates & editor", "T"):
+                        current = settings_get_default_template()
+                        print(f"\n  Current default template: {current}")
+                        new_tmpl = input("  New template name (blank to cancel): ").strip()
+                        if new_tmpl:
+                            _env_set("DEFAULT_TEMPLATE", new_tmpl)
+                            print(f"  ✓  Default template set to: {new_tmpl}  (written to .env)")
+
+                    case ("Templates & editor", "e"):
+                        print(f"\n  Editor: {settings_get_editor()}")
+
+                    case ("Templates & editor", "E"):
+                        current = settings_get_editor()
+                        print(f"\n  Current editor: {current}")
+                        new_editor = input(
+                            "  New editor (e.g. nano, code, micro — blank to cancel): "
+                        ).strip()
+                        if new_editor:
+                            _env_set("EDITOR", new_editor)
+                            print(f"  ✓  Editor set to: {new_editor}  (written to .env)")
+
+                    case ("Templates & editor", "I"):
+                        print("\n  Seeding ~/.cross_templates/ from bundled defaults …")
+                        overwrite_ans = input(
+                            "  Overwrite existing files? [y/N]: "
+                        ).strip().lower()
+                        init_user_templates(overwrite=(overwrite_ans == "y"))
+
+                    # ── Discourse ─────────────────────────────────────────────
+                    case ("Discourse", "D"):
+                        _discourse_select_site()
+
+                    case ("Discourse", "c"):
+                        _discourse_select_category()
+
+                    case ("Discourse", "m"):
+                        discourse_manage()
+
+                    case ("Discourse", "o"):
+                        _run_discourse_setup()
+
+                    # ── Cache ─────────────────────────────────────────────────
+                    case ("Cache", "i"):
+                        cache_info()
+
+                    case ("Cache", "x"):
+                        try:
+                            ans = input("  Delete ALL cached AI responses? [y/N]: ").strip().lower()
+                        except (KeyboardInterrupt, EOFError):
+                            ans = "n"
+                        if ans == "y":
+                            cache_clear()
+                        else:
+                            print("  Cancelled.")
+
+                    case ("Cache", "k"):
+                        try:
+                            raw = input("  Delete cache entries older than how many days? ").strip()
+                        except (KeyboardInterrupt, EOFError):
+                            raw = ""
+                        if raw:
+                            try:
+                                cache_cull(int(raw))
+                            except ValueError:
+                                print(f"  ✗  Not a valid number: {raw!r}")
+                        else:
+                            print("  Cancelled.")
+
+                    case _:
+                        print(f"  Invalid choice: {key!r}  (press ? for menu)")
 
         else:
             print(f"  Invalid choice: {key!r}  (press ? for menu)")

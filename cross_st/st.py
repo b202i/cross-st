@@ -99,11 +99,7 @@ menus = {
             "v": "Speak story aloud with current voice",
             "V": "Render current voice to mp3 file",
         }),
-        "x": ("Settings", {
-            "a": "Open admin settings panel  (st-admin)",
-            "D": "Manage Discourse sites and categories  (st-admin --discourse)",
-            "s": "Show all current settings",
-        }),
+        "x": "Settings  (st-admin)",
     }
 }
 
@@ -213,6 +209,13 @@ def execute_menu(menu_name, choice):
     global cmd
 
     match menu_name:
+        case "Main":
+            match choice:
+                case "x":
+                    cmd = "st-admin"
+                case _:
+                    print("\nCommand not implemented yet.")
+
         case "Generate":
             match choice:
                 case "g":
@@ -348,17 +351,6 @@ def execute_menu(menu_name, choice):
                             print(f"  Audio: {os.path.abspath(mp3)}")
                     except KeyboardInterrupt:
                         print()  # clean line after ^C
-                case _:
-                    print("\nCommand not implemented yet.")
-
-        case "Settings":
-            match choice:
-                case "a":
-                    cmd = "st-admin"
-                case "D":
-                    cmd = "st-admin --discourse"
-                case "s":
-                    cmd = "st-admin --show"
                 case _:
                     print("\nCommand not implemented yet.")
 

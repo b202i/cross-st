@@ -114,13 +114,17 @@ X_COM_BEARER_TOKEN=...  # X/Twitter bearer token (st-fetch tweet_id source only)
 CROSS_STONES_DIR=...    # custom benchmark domain directory (default: ~/cross-stones/)
 ```
 `.ai_models` (never commit) holds per-provider model overrides: `xai=grok-3` one per line.
-All scripts load config in this 3-layer order (A1 convention):
+All scripts load config in this 4-layer order (A1 convention). **Project `.env` overrides `~/.crossenv`** — later layers always win:
 ```python
 _CROSSENV = os.path.expanduser("~/.crossenv")
-load_dotenv(_CROSSENV)                                    # 1. global ~/.crossenv
-load_dotenv(os.path.join(_basedir, ".env"))               # 2. repo-local .env (developer keys)
-load_dotenv(".env", override=True)                        # 3. CWD .env — highest priority
+load_dotenv(_CROSSENV)                                              # 1. global fallback (lowest priority)
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=True)    # 2. repo-local .env — wins over global
+load_dotenv(os.path.join(_CROSS_ST_DIR, ".env"), override=True)    # 2b. cross_st/.env (pip install layout)
+load_dotenv(os.path.join(os.getcwd(),    ".env"), override=True)   # 3. CWD .env — highest priority
 ```
+Per-repo settings (`DEFAULT_AI`, `DISCOURSE`, model overrides, etc.) in a project `.env` take effect
+without touching the global file. `~/.crossenv` acts as a fallback for keys not set in any project file.
+
 `DEFAULT_AI` is read by `ai_handler.get_default_ai()` — the single source of truth for the default provider.
 
 ### Home-directory conventions (A1)
@@ -197,6 +201,67 @@ st-stones cross_st/cross_stones/domains/             # score all domains in that
 
 Benchmark domains (standard set): `software_development`, `customer_service`, `marketing_content`, `education_learning`, `data_analytics`, `healthcare_medical`, `finance_business`, `writing_editing`, `research_qa`, `creative_media`.
 
+## Known Regression Traps
+
+These patterns have each caused a real regression. Read before touching env loading or module init.
+
+### R1 — `discourse.py` (and any file with its own `load_dotenv`) must use `_project_root`
+
+After the C1 migration, `cross_st/` became a subdirectory.  Any file that does its own
+`load_dotenv` and computes a base path with `os.path.dirname(__file__)` now gets `cross_st/`,
+**not** the project root where `.env` lives.  It must walk up one level:
+
+```python
+# WRONG — gives cross_st/, .env is never found from non-repo CWD
+_basedir = os.path.dirname(os.path.realpath(__file__))
+
+# CORRECT — gives project root (parent of cross_st/)
+_cross_st_dir = os.path.dirname(os.path.realpath(__file__))
+_project_root = os.path.dirname(_cross_st_dir)
+```
+
+The canonical loader is `mmd_startup.load_cross_env()`.  Prefer calling it over reimplementing the layers.
+
+### R2 — Module-level code in `st.py` must not read env before `load_cross_env()`
+
+`st.py` calls `get_discourse_slugs_sites()` at module level.  That call reads `DISCOURSE` from
+the environment.  `load_cross_env()` **must** run first, or the call silently sees an empty
+environment when the CWD has no `.env` (e.g. running `st` from `~/mmd/`).
+
+```python
+# WRONG — DISCOURSE unset if CWD != repo root
+slugs, sites = get_discourse_slugs_sites()
+
+# CORRECT
+load_cross_env()
+slugs, sites = get_discourse_slugs_sites()
+```
+
+Test: `tests/test_dotenv_resolution.py::TestStPyInitOrder::test_load_cross_env_called_before_discourse`
+
+### R3 — Layer 2 must use `override=True` so project `.env` wins over `~/.crossenv`
+
+The old code loaded both `~/.crossenv` and the project `.env` without `override=True`.
+Because `load_dotenv` (without override) never overwrites an already-set key, `~/.crossenv`
+silently won every collision — the opposite of the stated intent.
+
+```python
+# WRONG — ~/.crossenv wins any collision
+load_dotenv(crossenv)
+load_dotenv(project_env)          # no-op for keys already set by crossenv
+
+# CORRECT — project .env wins
+load_dotenv(crossenv)
+load_dotenv(project_env, override=True)   # clobbers crossenv values intentionally
+```
+
+Test: `tests/test_dotenv_resolution.py::TestDotenvResolution::test_layer2_overrides_layer1`
+
+> **Warning:** `st-admin --set-default-ai` and `st-admin` model-setting commands write to
+> `~/.crossenv`.  If your project `.env` also sets those keys, the project `.env` wins and
+> `st-admin` changes appear to have no effect.  Remove the key from the project `.env` to
+> let `~/.crossenv` control it.
+
 ## Error Handling Convention
 All API errors go through `ai_error_handler.handle_api_error()`. It distinguishes quota/billing errors (permanent — exit) from rate-limit/503 errors (transient — retry). Import from `ai_error_handler` rather than catching raw exceptions per-script.
 
@@ -223,7 +288,7 @@ Nothing accumulated yet — next release note goes here.
 ## Key Files for Context
 | File | Why It Matters |
 |------|----------------|
-| `cross_st/st.py` | Menu structure and `POST_CMD_REFRESH` set |
+| `cross_st/st.py` | Menu structure and `POST_CMD_REFRESH` set — **reserved keys: `A` `S` `F` cycle global AI/Story/Fact selectors at ALL menu levels; never use these as menu item keys in `st.py`** |
 | `cross_st/st-admin.py` | Settings manager — `DEFAULT_AI`, model overrides, TTS voice, editor, `--init-templates`; `--overwrite-templates` replaces existing template files |
 | `cross_st/st-domain.py` | Interactive wizard: create a new Cross-Stones domain prompt (Phases 2–4) |
 | `cross_st/st-find.py` | Keyword search: `parse_boolean_pattern()` handles `+required ^excluded` operators; `wildcard_to_regex()` expands `*`/`?`; searches titles, prompts, and story text |
