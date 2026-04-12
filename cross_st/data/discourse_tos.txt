@@ -1,3 +1,4 @@
+# VERSION: tos=2026-04-07 privacy=2026-04-07
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║         crossai.dev — Community Terms of Service & Privacy Summary         ║
 ║                          Effective: April 7, 2026                          ║

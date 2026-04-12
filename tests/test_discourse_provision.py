@@ -1,6 +1,6 @@
 """
 tests/test_discourse_provision.py
-Unit tests for cross_st.discourse_provision (ONB-C6)
+Unit tests for cross_st.discourse_provision (ONB-C6, TAP-1)
 
 Mocks:
   - requests.post  (HTTP call to provisioning endpoint)
@@ -9,6 +9,7 @@ Mocks:
 """
 import os
 import sys
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
@@ -20,6 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from cross_st.discourse_provision import (
     discourse_onboard,
     write_discourse_env,
+    get_tos_versions,
+    display_terms_and_conditions,
     PROVISION_ENDPOINT,
 )
 
@@ -199,4 +202,107 @@ class TestWriteDiscourseEnv:
         # custom forum untouched
         mf = next(s for s in sites if s["slug"] == "myforum")
         assert mf["api_key"] == "customkey"
+
+
+# ── get_tos_versions() — TAP-1 ───────────────────────────────────────────────
+
+class TestGetTosVersions:
+    def test_returns_dict_with_expected_keys(self):
+        """Manifest file ships with the package — should always be readable."""
+        result = get_tos_versions()
+        assert isinstance(result, dict)
+        assert "tos_version" in result
+        assert "privacy_version" in result
+
+    def test_version_strings_are_date_format(self):
+        result = get_tos_versions()
+        import re
+        date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+        assert date_re.match(result["tos_version"])
+        assert date_re.match(result["privacy_version"])
+
+    def test_fallback_when_manifest_missing(self, monkeypatch, tmp_path):
+        """If tos_versions.json is absent, returns hardcoded 2026-04-07."""
+        missing = tmp_path / "tos_versions.json"  # does not exist
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_VERSIONS_PATH", missing)
+        result = get_tos_versions()
+        assert result["tos_version"]     == "2026-04-07"
+        assert result["privacy_version"] == "2026-04-07"
+
+    def test_reads_custom_manifest(self, monkeypatch, tmp_path):
+        """Reads and parses a custom manifest from disk."""
+        manifest = tmp_path / "tos_versions.json"
+        manifest.write_text(json.dumps({
+            "tos_version": "2026-11-01",
+            "privacy_version": "2026-10-15",
+            "updated_at": "2026-11-01",
+        }), encoding="utf-8")
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_VERSIONS_PATH", manifest)
+        result = get_tos_versions()
+        assert result["tos_version"]     == "2026-11-01"
+        assert result["privacy_version"] == "2026-10-15"
+
+
+# ── display_terms_and_conditions() — TAP-1 ───────────────────────────────────
+
+class TestDisplayTermsAndConditions:
+    """Tests that display_terms_and_conditions strips the VERSION comment and shows the footer."""
+
+    def _make_tos_file(self, tmp_path, with_version_line=True):
+        content = ""
+        if with_version_line:
+            content += "# VERSION: tos=2026-04-07 privacy=2026-04-07\n"
+        content += "╔══ Terms ══╗\nSome terms here.\n"
+        tos_file = tmp_path / "discourse_tos.txt"
+        tos_file.write_text(content, encoding="utf-8")
+        return tos_file
+
+    def test_strips_version_comment_from_display(self, monkeypatch, tmp_path, capsys):
+        tos_file = self._make_tos_file(tmp_path, with_version_line=True)
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_PATH", tos_file)
+        with patch("builtins.input", return_value="yes"):
+            display_terms_and_conditions(versions={"tos_version": "2026-04-07", "privacy_version": "2026-04-07"})
+        out = capsys.readouterr().out
+        assert "# VERSION:" not in out
+        assert "Some terms here." in out
+
+    def test_shows_version_footer(self, monkeypatch, tmp_path, capsys):
+        tos_file = self._make_tos_file(tmp_path, with_version_line=True)
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_PATH", tos_file)
+        with patch("builtins.input", return_value="yes"):
+            display_terms_and_conditions(versions={"tos_version": "2026-04-07", "privacy_version": "2026-04-07"})
+        out = capsys.readouterr().out
+        assert "Terms version: 2026-04-07" in out
+        assert "Privacy version: 2026-04-07" in out
+
+    def test_shows_version_footer_with_custom_versions(self, monkeypatch, tmp_path, capsys):
+        tos_file = self._make_tos_file(tmp_path, with_version_line=False)
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_PATH", tos_file)
+        with patch("builtins.input", return_value="no"):
+            display_terms_and_conditions(versions={"tos_version": "2026-11-01", "privacy_version": "2026-10-15"})
+        out = capsys.readouterr().out
+        assert "Terms version: 2026-11-01" in out
+        assert "Privacy version: 2026-10-15" in out
+
+    def test_returns_true_on_yes(self, monkeypatch, tmp_path):
+        tos_file = self._make_tos_file(tmp_path)
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_PATH", tos_file)
+        with patch("builtins.input", return_value="yes"):
+            assert display_terms_and_conditions() is True
+
+    def test_returns_false_on_no(self, monkeypatch, tmp_path):
+        tos_file = self._make_tos_file(tmp_path)
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_PATH", tos_file)
+        with patch("builtins.input", return_value="no"):
+            assert display_terms_and_conditions() is False
+
+    def test_uses_get_tos_versions_when_no_arg(self, monkeypatch, tmp_path, capsys):
+        tos_file = self._make_tos_file(tmp_path)
+        monkeypatch.setattr("cross_st.discourse_provision._TOS_PATH", tos_file)
+        custom = {"tos_version": "2099-01-01", "privacy_version": "2099-01-01"}
+        with patch("cross_st.discourse_provision.get_tos_versions", return_value=custom):
+            with patch("builtins.input", return_value="yes"):
+                display_terms_and_conditions()  # no versions= arg
+        out = capsys.readouterr().out
+        assert "2099-01-01" in out
 

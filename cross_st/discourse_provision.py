@@ -4,12 +4,14 @@ cross_st/discourse_provision.py
 Client-side Discourse onboarding helpers.
 
 Exported:
+  get_tos_versions()                → dict  — returns {"tos_version": ..., "privacy_version": ...}
   discourse_onboard(username)       → dict  — calls provision endpoint, returns credentials
   write_discourse_env(credentials)  → None  — writes keys to ~/.crossenv via set_key()
   display_terms_and_conditions()    → bool  — pages T&C, returns True if accepted
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import textwrap
@@ -43,21 +45,52 @@ _INVITE_ENDPOINT = os.getenv(
 
 # ── Terms & Conditions ───────────────────────────────────────────────────────
 
-def display_terms_and_conditions() -> bool:
+_TOS_VERSIONS_PATH = Path(__file__).parent / "data" / "tos_versions.json"
+
+def get_tos_versions() -> dict:
+    """
+    Return the current T&C version manifest.
+
+    Returns:
+        {"tos_version": "YYYY-MM-DD", "privacy_version": "YYYY-MM-DD", "updated_at": "..."}
+
+    Falls back to hardcoded 2026-04-07 if the manifest file is missing
+    (e.g. editable install with the file deleted — should not happen in production).
+    """
+    if _TOS_VERSIONS_PATH.exists():
+        return json.loads(_TOS_VERSIONS_PATH.read_text(encoding="utf-8"))
+    return {"tos_version": "2026-04-07", "privacy_version": "2026-04-07", "updated_at": "2026-04-07"}
+
+
+def display_terms_and_conditions(versions: Optional[dict] = None) -> bool:
     """
     Display the crossai.dev T&C to the user, then ask for acceptance.
-    Returns True if the user explicitly types "yes", False otherwise.
+
+    Args:
+        versions: dict from get_tos_versions(); if None, get_tos_versions() is called.
+
+    Returns:
+        True if the user explicitly types "yes", False otherwise.
     """
+    if versions is None:
+        versions = get_tos_versions()
+
     if not _TOS_PATH.exists():
         print("  ⚠️  Terms & Conditions file not found. Skipping display.")
     else:
         tos_text = _TOS_PATH.read_text(encoding="utf-8")
+        # Strip the machine-readable # VERSION: comment line (first line) before display
+        lines = tos_text.splitlines(keepends=True)
+        if lines and lines[0].startswith("# VERSION:"):
+            tos_text = "".join(lines[1:])
         print()
         print("─" * 78)
         print(tos_text)
         print("─" * 78)
         print("  Full Terms:  https://crossai.dev/tos")
         print("  Privacy:     https://crossai.dev/privacy")
+        print(f"  Terms version: {versions.get('tos_version', '—')}"
+              f"   |   Privacy version: {versions.get('privacy_version', '—')}")
         print("─" * 78)
 
     print()
