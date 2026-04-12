@@ -721,3 +721,373 @@ class TestDiscourseManage:
         data = _json.loads(os.environ["DISCOURSE"])
         assert data["sites"][0]["category_id"] == _DISCOURSE_TEST_CAT_ID
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# check_tos_flag  (TAP-4)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from unittest.mock import patch as _patch
+
+_CURRENT_TOS  = "2026-04-07"
+_CURRENT_PRIV = "2026-04-07"
+_STALE_TOS    = "2025-01-01"
+
+
+def _site_json(tos_version=None, priv_version=None, tos_agreed_at=None,
+               url="https://crossai.dev", user="alice"):
+    """Build a DISCOURSE JSON string with an optional TOS version recorded."""
+    site = {"slug": "crossai.dev", "url": url, "username": user,
+            "api_key": "k", "category_id": 42}
+    if tos_version:
+        site["tos_version"]     = tos_version
+    if priv_version:
+        site["privacy_version"] = priv_version
+    if tos_agreed_at:
+        site["tos_agreed_at"]   = tos_agreed_at
+    return _json.dumps({"sites": [site]})
+
+
+class TestCheckTos:
+    """TAP-4: st-admin --check-tos and check_tos_flag()."""
+
+    # ── No config ─────────────────────────────────────────────────────────────
+
+    def test_no_discourse_config_prints_message(self, tmp_settings, monkeypatch, capsys):
+        monkeypatch.delenv("DISCOURSE", raising=False)
+        st_admin.check_tos_flag()
+        assert "No Discourse configuration" in capsys.readouterr().out
+
+    def test_no_crossai_site_prints_message(self, tmp_settings, monkeypatch, capsys):
+        j = _json.dumps({"sites": [{"slug": "other", "url": "https://forum.example.com",
+                                    "username": "alice", "api_key": "k", "category_id": 1}]})
+        monkeypatch.setenv("DISCOURSE", j)
+        st_admin.check_tos_flag()
+        out = capsys.readouterr().out
+        assert "crossai.dev" in out.lower() or "No crossai.dev" in out
+
+    # ── Already up to date ────────────────────────────────────────────────────
+
+    def test_up_to_date_prints_no_action_needed(self, tmp_settings, monkeypatch, capsys):
+        j = _site_json(tos_version=_CURRENT_TOS, priv_version=_CURRENT_PRIV)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            st_admin.check_tos_flag()
+        out = capsys.readouterr().out
+        assert "No action needed" in out
+
+    def test_up_to_date_does_not_prompt_acceptance(self, tmp_settings, monkeypatch, capsys):
+        j = _site_json(tos_version=_CURRENT_TOS, priv_version=_CURRENT_PRIV)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("builtins.input") as mock_input:
+                st_admin.check_tos_flag()
+        mock_input.assert_not_called()
+
+    # ── Stale TOS ─────────────────────────────────────────────────────────────
+
+    def test_stale_version_shows_update_warning(self, tmp_settings, monkeypatch, capsys):
+        j = _site_json(tos_version=_STALE_TOS, priv_version=_STALE_TOS)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("builtins.input", return_value="no"):
+                st_admin.check_tos_flag()
+        out = capsys.readouterr().out
+        assert "updated" in out.lower() or "⚠️" in out
+
+    def test_stale_accepted_updates_discourse_json(self, tmp_settings, monkeypatch, capsys):
+        """User accepts → DISCOURSE JSON updated with new TOS version."""
+        j = _site_json(tos_version=_STALE_TOS, priv_version=_STALE_TOS)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("cross_st.discourse_provision.record_tos_acceptance",
+                        return_value=True):
+                with _patch("builtins.input", return_value="yes"):
+                    st_admin.check_tos_flag()
+        capsys.readouterr()
+        disc = _json.loads(os.environ.get("DISCOURSE", "{}"))
+        site = disc["sites"][0]
+        assert site["tos_version"] == _CURRENT_TOS
+
+    def test_stale_declined_does_not_update_discourse_json(self, tmp_settings, monkeypatch, capsys):
+        """User declines → DISCOURSE JSON NOT updated."""
+        j = _site_json(tos_version=_STALE_TOS, priv_version=_STALE_TOS)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("builtins.input", return_value="no"):
+                st_admin.check_tos_flag()
+        capsys.readouterr()
+        disc = _json.loads(os.environ.get("DISCOURSE", "{}"))
+        assert disc["sites"][0]["tos_version"] == _STALE_TOS  # unchanged
+
+    def test_no_stored_tos_shows_info_message(self, tmp_settings, monkeypatch, capsys):
+        """Config without tos_version → info banner + T&C displayed."""
+        j = _site_json()  # no tos fields
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("cross_st.discourse_provision.record_tos_acceptance",
+                        return_value=True):
+                with _patch("builtins.input", return_value="yes"):
+                    st_admin.check_tos_flag()
+        out = capsys.readouterr().out
+        assert "accepted" in out.lower() or "✅" in out
+
+    # ── CLI --check-tos flag ──────────────────────────────────────────────────
+
+    def test_cli_check_tos_no_config(self, tmp_settings, monkeypatch, capsys):
+        monkeypatch.delenv("DISCOURSE", raising=False)
+        monkeypatch.setattr(sys, "argv", ["st-admin", "--check-tos"])
+        st_admin.main()
+        assert "No Discourse configuration" in capsys.readouterr().out
+
+    def test_cli_check_tos_up_to_date(self, tmp_settings, monkeypatch, capsys):
+        j = _site_json(tos_version=_CURRENT_TOS, priv_version=_CURRENT_PRIV)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr(sys, "argv", ["st-admin", "--check-tos"])
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            st_admin.main()
+        assert "No action needed" in capsys.readouterr().out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _run_discourse_setup version check  (TAP-4)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRunDiscourseSetupVersionCheck:
+    """TAP-4: _run_discourse_setup() returns early / re-accepts based on TOS version."""
+
+    def test_returns_early_when_tos_current(self, tmp_settings, monkeypatch, capsys):
+        """If crossai.dev already configured with current TOS → 'up to date', no wizard."""
+        j = _site_json(tos_version=_CURRENT_TOS, priv_version=_CURRENT_PRIV)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            st_admin._run_discourse_setup()
+        out = capsys.readouterr().out
+        assert "up to date" in out.lower() or "No action needed" in out
+
+    def test_reaccept_flow_when_tos_stale(self, tmp_settings, monkeypatch, capsys):
+        """Stale TOS + existing user → re-acceptance banner shown, full wizard skipped."""
+        j = _site_json(tos_version=_STALE_TOS, priv_version=_STALE_TOS)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("cross_st.discourse_provision.record_tos_acceptance",
+                        return_value=True):
+                with _patch("builtins.input", return_value="yes"):
+                    st_admin._run_discourse_setup()
+        out = capsys.readouterr().out
+        assert "accepted" in out.lower() or "✅" in out
+        # Stored TOS version updated
+        disc = _json.loads(os.environ.get("DISCOURSE", "{}"))
+        assert disc["sites"][0]["tos_version"] == _CURRENT_TOS
+
+    def test_reaccept_declined_prints_warning(self, tmp_settings, monkeypatch, capsys):
+        j = _site_json(tos_version=_STALE_TOS, priv_version=_STALE_TOS)
+        monkeypatch.setenv("DISCOURSE", j)
+        with _patch("cross_st.discourse_provision.get_tos_versions",
+                    return_value={"tos_version": _CURRENT_TOS,
+                                  "privacy_version": _CURRENT_PRIV}):
+            with _patch("builtins.input", return_value="no"):
+                st_admin._run_discourse_setup()
+        out = capsys.readouterr().out
+        assert "must accept" in out.lower() or "⚠️" in out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _discourse_select_site  (POST-2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _make_multi_site_json(sites=None) -> str:
+    if sites is None:
+        sites = [
+            {"slug": "crossai.dev", "url": "https://crossai.dev",
+             "username": "alice", "api_key": "k1", "category_id": 42},
+            {"slug": "my-forum", "url": "https://my-forum.example.com",
+             "username": "alice", "api_key": "k2", "category_id": 10},
+        ]
+    return _json.dumps({"sites": sites})
+
+
+class TestDiscourseSelectSite:
+    """POST-2: _discourse_select_site() in interactive menu (D key)."""
+
+    def test_no_config_prints_message(self, tmp_settings, monkeypatch, capsys):
+        monkeypatch.delenv("DISCOURSE", raising=False)
+        st_admin._discourse_select_site()
+        assert "No Discourse configuration" in capsys.readouterr().out
+
+    def test_single_site_prints_nothing_to_switch(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        st_admin._discourse_select_site()
+        out = capsys.readouterr().out
+        assert "Nothing to switch" in out
+
+    def test_multi_site_shows_all_sites(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_site()
+        out = capsys.readouterr().out
+        assert "crossai.dev" in out
+        assert "my-forum" in out
+
+    def test_multi_site_marks_active_site(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setenv("DISCOURSE_SITE", "my-forum")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_site()
+        out = capsys.readouterr().out
+        assert "← active" in out
+
+    def test_select_site_writes_discourse_site_env(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.delenv("DISCOURSE_SITE", raising=False)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        st_admin._discourse_select_site()
+        capsys.readouterr()
+        assert os.environ.get("DISCOURSE_SITE") == "my-forum"
+
+    def test_select_site_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        st_admin._discourse_select_site()
+        assert "✓" in capsys.readouterr().out
+
+    def test_quit_does_not_change_site(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setenv("DISCOURSE_SITE", "crossai.dev")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_site()
+        capsys.readouterr()
+        assert os.environ.get("DISCOURSE_SITE") == "crossai.dev"
+
+    def test_invalid_choice_prints_error(self, tmp_settings, monkeypatch, capsys):
+        j = _make_multi_site_json()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "99")
+        st_admin._discourse_select_site()
+        assert "Invalid" in capsys.readouterr().out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _discourse_select_category  (POST-2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _make_discourse_json_with_private(url="https://crossai.dev", user="alice",
+                                       api_key="k", cat_id=42, priv_id=42,
+                                       priv_slug="alice-private",
+                                       slug="crossai.dev") -> str:
+    return _json.dumps({"sites": [{
+        "slug": slug, "url": url, "username": user, "api_key": api_key,
+        "category_id": cat_id,
+        "private_category_id": priv_id,
+        "private_category_slug": priv_slug,
+    }]})
+
+
+class TestDiscourseSelectCategory:
+    """POST-2: _discourse_select_category() in interactive menu (c key)."""
+
+    def test_no_config_prints_message(self, tmp_settings, monkeypatch, capsys):
+        monkeypatch.delenv("DISCOURSE", raising=False)
+        st_admin._discourse_select_category()
+        assert "No Discourse configuration" in capsys.readouterr().out
+
+    def test_shows_test_category_option(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private()
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_category()
+        out = capsys.readouterr().out
+        assert st_admin._DISCOURSE_TEST_CATEGORY_NAME in out
+
+    def test_shows_private_category_when_configured(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(priv_slug="alice-private")
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_category()
+        out = capsys.readouterr().out
+        assert "alice-private" in out
+
+    def test_marks_active_category(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(cat_id=_DISCOURSE_TEST_CAT_ID,
+                                               priv_id=42)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_category()
+        out = capsys.readouterr().out
+        assert "← active" in out
+
+    def test_choice_2_sets_test_category(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(cat_id=42, priv_id=42)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        st_admin._discourse_select_category()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == _DISCOURSE_TEST_CAT_ID
+
+    def test_choice_1_sets_private_category(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(cat_id=_DISCOURSE_TEST_CAT_ID, priv_id=42)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        st_admin._discourse_select_category()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42
+
+    def test_choice_q_no_change(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(cat_id=42)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        st_admin._discourse_select_category()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42  # unchanged
+
+    def test_switch_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(cat_id=42, priv_id=42)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        st_admin._discourse_select_category()
+        assert "✓" in capsys.readouterr().out
+
+    def test_invalid_choice_prints_error(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json_with_private(cat_id=42)
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "9")
+        st_admin._discourse_select_category()
+        assert "Invalid" in capsys.readouterr().out
+
+    def test_choice_1_without_private_is_invalid(self, tmp_settings, monkeypatch, capsys):
+        """If no private_category_id set, choice 1 should not change category."""
+        j = _make_discourse_json(cat_id=42)  # no private_category_id
+        monkeypatch.setenv("DISCOURSE", j)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        st_admin._discourse_select_category()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42  # unchanged
+
+

@@ -218,7 +218,13 @@ After completing `--discourse-setup`, use `--discourse` at any time to view your
 st-admin --discourse
 ```
 
-### Interactive display
+You can also change the default site and default posting category directly from the interactive `st-admin` menu — press `D` to select a site or `c` to select a category without running the full `--discourse` manager:
+
+```bash
+st-admin          # then press D or c
+```
+
+### Interactive display (`--discourse`)
 
 ```
   Discourse Site Management
@@ -238,6 +244,25 @@ st-admin --discourse
 ```
 
 Selecting an option immediately updates `category_id` inside the `DISCOURSE` JSON in `~/.crossenv`. The change takes effect for the next `st-post` call — no restart required.
+
+### Quick-select from the interactive menu
+
+From `st-admin` (no flags), two new keys are available:
+
+| Key | Action |
+|-----|--------|
+| `D` | Select default Discourse site (when you have multiple sites configured) |
+| `c` | Select default posting category: **private** or **Test (cleared daily)** |
+
+```
+=== st-admin Settings ===
+  D: Select default Discourse site
+  c: Select default Discourse posting category  (private | test-cleared-daily)
+  ...
+```
+
+`D` writes the chosen slug to `DISCOURSE_SITE` in `~/.crossenv`.
+`c` writes the chosen `category_id` into the active site's `DISCOURSE` JSON — same effect as using `--discourse`, but faster for day-to-day category switching.
 
 ### Test (cleared daily) category
 
@@ -260,12 +285,14 @@ If you completed `--discourse-setup` but `st-post` is still failing, run `--disc
 
 This closes the gap between provisioning and posting without requiring you to re-run setup.
 
-### Flag comparison
+### Flag / key comparison
 
-| Flag | Purpose | When to use |
-|------|---------|-------------|
+| Flag / Key | Purpose | When to use |
+|-----------|---------|-------------|
 | `--discourse-setup` | One-time account provisioning (T&C, API key, private category) | Once per user |
-| `--discourse` | Show config; switch default posting category | Any time |
+| `--discourse` | Show full config; switch default posting category (incl. custom ID) | Any time |
+| `D` (interactive menu) | Select default Discourse site | When you have multiple sites |
+| `c` (interactive menu) | Quick-switch posting category: private or test-cleared-daily | Day-to-day use |
 
 ---
 

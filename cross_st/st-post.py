@@ -3,13 +3,14 @@
 st-post — Post a story to Discourse
 
 ```
-st-post subject.json                    # post story 1 to default site
+st-post subject.json                    # post to Test (cleared daily) — safe default
+st-post --category private subject.json # post to your private category
 st-post -s 2 subject.json              # post story 2
 st-post --site MySite subject.json     # post to a named Discourse site
 st-post --check                        # verify credentials without posting
 ```
 
-Options: -s story  --site  --fact  --check  -v  -q
+Options: -s story  --site  --category  --fact  --check  -v  -q
 """
 import argparse
 import json
@@ -47,11 +48,11 @@ def main():
                         help='Select story to publish: default 1')
     parser.add_argument('-f', '--fact', type=int,
                         help='Reply with fact-check to the post, default: no reply')
-    parser.add_argument('--category', type=str, choices=['private', 'test'], default=None,
+    parser.add_argument('--category', type=str, choices=['private', 'test'], default='test',
                         help=('Post to a specific category: '
                               '"private" = your private area, '
                               '"test" = Test (cleared daily, id=6). '
-                              'Default: use the site\'s configured default category.'))
+                              'Default: "test" (safe sandbox — cleared nightly).'))
     parser.add_argument('--check', action='store_true',
                         help='Validate Discourse credentials and connection without posting')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -160,8 +161,8 @@ def main():
 
     # Resolve the posting category for the story post.
     # --category private → user's own private category (private_category_id or default)
-    # --category test    → Test (cleared daily) category, id=6
-    # default (None)     → whatever category_id is configured in the site JSON
+    # --category test    → Test (cleared daily) category, id=6  [default]
+    # (site['category_id'] fallback kept for safety but not normally reached)
     _DISCOURSE_TEST_CATEGORY_ID = 6
     if args.category == 'private':
         post_category_id = site.get('private_category_id') or site['category_id']

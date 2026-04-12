@@ -20,14 +20,16 @@ import subprocess
 import sys
 
 from dotenv import load_dotenv
+from mmd_startup import load_cross_env
 from ai_handler import get_ai_list, get_default_ai
 from discourse import get_discourse_slugs_sites
 from mmd_single_key import get_single_key, line_edit
 
+load_cross_env()   # must happen before get_discourse_slugs_sites() reads env vars
 slugs, sites = get_discourse_slugs_sites()
 site_sel = slugs[0] if slugs else ""  # Currently selected Discourse site
-cat_categories = ["", "private", "test"]  # "" = use site's configured default
-cat_sel = ""                               # Session-level post category selection
+cat_categories = ["test", "private", ""]  # test = default; "" = use site's configured default
+cat_sel = "test"                           # Session-level post category selection (default: test)
 
 # Commands that mutate the .json container — state is re-read after these run.
 # st.py builds and fires the command; the st-* tool owns all the logic.

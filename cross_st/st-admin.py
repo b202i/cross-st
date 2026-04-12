@@ -25,6 +25,7 @@ Non-interactive (scripting / shell):
   st-admin --cache-info           # print cache path, file count, and total size
   st-admin --cache-clear          # delete all cached AI responses
   st-admin --cache-cull DAYS      # delete cache entries older than DAYS days
+  st-admin --check-tos            # check T&C acceptance; prompt re-acceptance if stale
 
 Settings are persisted in:
   ~/.crossenv   — DEFAULT_AI, TTS_VOICE, DEFAULT_TEMPLATE, EDITOR, API keys
@@ -192,26 +193,136 @@ def _tool_check(cmd: str, flag: str = "--version") -> tuple[bool, str]:
         return True, "(installed)"
 
 
+def _build_client_info() -> str:
+    """
+    Assemble a client identifier string for TOS audit trail.
+
+    Returns e.g. "cross-st/0.4.0 Python/3.12.3"
+    """
+    try:
+        from importlib.metadata import version as _pkg_ver
+        _cross_ver = _pkg_ver("cross-st")
+    except Exception:
+        _cross_ver = "unknown"
+    return f"cross-st/{_cross_ver} Python/{sys.version.split()[0]}"
+
+
 def _run_discourse_setup() -> None:
     """
     Discourse community onboarding sub-wizard.
     Called from setup_wizard() opt-in prompt, or directly via --discourse-setup.
+
+    Handles two scenarios:
+    - First-time setup: full 4-step wizard (T&C → invite → username → provision).
+    - Re-acceptance:    if crossai.dev already configured but TOS is stale, shows
+                        updated T&C, records acceptance, updates ~/.crossenv, returns.
+    - Already current:  if crossai.dev configured and TOS is current, prints
+                        "up to date" and returns immediately.
     """
     from cross_st.discourse_provision import (
         display_terms_and_conditions,
         discourse_onboard,
         get_invite_link,
         write_discourse_env,
+        get_tos_versions,
+        record_tos_acceptance,
     )
+    import json
     import webbrowser
+    from datetime import datetime, timezone
 
     print(f"\n  {'─' * 60}")
     print("  crossai.dev Community Onboarding")
     print(f"  {'─' * 60}\n")
 
+    versions     = get_tos_versions()
+    manifest_tos = versions.get("tos_version", "")
+    manifest_priv = versions.get("privacy_version", "")
+
+    # ── Check if already configured ───────────────────────────────────────────
+    method            = "cli_setup"
+    existing_username = None
+    disc_json_str     = _env_get("DISCOURSE", "")
+
+    if disc_json_str:
+        try:
+            existing_data = json.loads(disc_json_str)
+            sites = (existing_data.get("sites", [])
+                     if isinstance(existing_data, dict) else [])
+            crossai_site = next(
+                (s for s in sites if "crossai.dev" in s.get("url", "")), None
+            )
+            if crossai_site:
+                existing_username = crossai_site.get("username", "")
+                stored_tos  = crossai_site.get("tos_version",  "")
+                stored_priv = crossai_site.get("privacy_version", "")
+
+                if (stored_tos and manifest_tos and
+                        stored_tos >= manifest_tos and
+                        stored_priv and stored_priv >= manifest_priv):
+                    # TOS up to date — nothing to do
+                    print(
+                        f"  ✅  Terms of Service are up to date "
+                        f"(version {stored_tos}). No action needed.\n"
+                    )
+                    return
+
+                if existing_username:
+                    # Already provisioned but TOS is stale (or no TOS recorded) —
+                    # quick re-acceptance flow; no need to re-run the full wizard.
+                    if stored_tos:
+                        print(
+                            f"  ⚠️  Terms of Service have been updated. "
+                            f"Re-acceptance required.\n"
+                            f"  Previous version: {stored_tos}  →  Current: {manifest_tos}\n"
+                        )
+                    method = "cli_reaccept"
+        except Exception:
+            pass
+
+    # ── Quick re-acceptance (already provisioned, TOS stale) ─────────────────
+    if method == "cli_reaccept" and existing_username:
+        accepted = display_terms_and_conditions(versions=versions)
+        if not accepted:
+            print("\n  ⚠️  You must accept the Terms of Service.")
+            print(
+                "  Run st-admin --discourse-setup or "
+                "st-admin --check-tos to accept.\n"
+            )
+            return
+        print("  ✅  Terms accepted.\n")
+
+        ok = record_tos_acceptance(
+            existing_username,
+            tos_version=manifest_tos,
+            privacy_version=manifest_priv,
+            method="cli_reaccept",
+            client_info=_build_client_info(),
+        )
+        if ok:
+            print(f"  ✓  Acceptance recorded for {existing_username}\n")
+
+        # Update stored TOS version in DISCOURSE JSON
+        tos_agreed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        try:
+            data  = json.loads(_env_get("DISCOURSE", "{}"))
+            sites = data.get("sites", []) if isinstance(data, dict) else []
+            for s in sites:
+                if "crossai.dev" in s.get("url", ""):
+                    s["tos_version"]     = manifest_tos
+                    s["privacy_version"] = manifest_priv
+                    s["tos_agreed_at"]   = tos_agreed_at
+            _env_set("DISCOURSE", json.dumps({"sites": sites}))
+            print(f"  ✓  TOS version updated to {manifest_tos} in ~/.crossenv\n")
+        except Exception:
+            pass
+        return
+
+    # ── First-time setup: full 4-step wizard ─────────────────────────────────
+
     # ── Step 1: Display and accept T&C ────────────────────────────────────
     print("  Step 1/4 — Terms of Service\n")
-    accepted = display_terms_and_conditions()
+    accepted = display_terms_and_conditions(versions=versions)
     if not accepted:
         print("\n  ⚠️  You must accept the Terms of Service to join.")
         print("  Run st-admin --discourse-setup at any time to try again.\n")
@@ -284,7 +395,12 @@ def _run_discourse_setup() -> None:
     # ── Step 4: Provision account ──────────────────────────────────────────
     print(f"\n  Step 4/4 — Provisioning your account…")
     try:
-        creds = discourse_onboard(username)
+        creds = discourse_onboard(
+            username,
+            tos_version=manifest_tos,
+            privacy_version=manifest_priv,
+            client_info=_build_client_info(),
+        )
     except ValueError as exc:
         print(f"\n  ✗  {exc}\n")
         print("  Make sure your Discourse account exists and email is verified.")
@@ -298,7 +414,13 @@ def _run_discourse_setup() -> None:
         print("  Check your internet connection and try st-admin --discourse-setup later.\n")
         return
 
-    write_discourse_env(creds)
+    tos_agreed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    write_discourse_env(
+        creds,
+        tos_version=manifest_tos,
+        privacy_version=manifest_priv,
+        tos_agreed_at=tos_agreed_at,
+    )
     print(
         f"\n  ✅  Your Discourse account is configured. You're ready to use st-post.\n"
         f"\n  Community:  {creds['discourse_url']}"
@@ -306,6 +428,113 @@ def _run_discourse_setup() -> None:
         f"\n  Category:   {creds['discourse_private_category_slug']}"
         f"\n"
     )
+
+
+def check_tos_flag() -> None:
+    """
+    Check TOS acceptance status for the configured crossai.dev account.
+
+    Compares the TOS version stored in the DISCOURSE site JSON against the
+    manifest bundled with the installed cross-st package.
+
+    - If up to date: prints ✅ and exits.
+    - If stale (or no version recorded): displays current T&C, prompts
+      acceptance, records it via /api/record-tos-acceptance, and updates
+      the stored version in ~/.crossenv.
+
+    Called by: st-admin --check-tos
+    """
+    from cross_st.discourse_provision import (
+        get_tos_versions,
+        display_terms_and_conditions,
+        record_tos_acceptance,
+    )
+    import json
+    from datetime import datetime, timezone
+
+    versions      = get_tos_versions()
+    manifest_tos  = versions.get("tos_version", "")
+    manifest_priv = versions.get("privacy_version", "")
+
+    # ── Find crossai.dev site in DISCOURSE JSON ───────────────────────────────
+    disc_json = _env_get("DISCOURSE", "")
+    if not disc_json:
+        print("\n  No Discourse configuration found.")
+        print("  Run:  st-admin --discourse-setup  to join crossai.dev.\n")
+        return
+
+    site  = None
+    sites = []
+    try:
+        data  = json.loads(disc_json)
+        sites = data.get("sites", []) if isinstance(data, dict) else []
+        site  = next(
+            (s for s in sites if "crossai.dev" in s.get("url", "")), None
+        )
+    except Exception:
+        pass
+
+    if not site:
+        print("\n  No crossai.dev configuration found in your DISCOURSE settings.")
+        print("  Run:  st-admin --discourse-setup  to join crossai.dev.\n")
+        return
+
+    username    = site.get("username", "")
+    stored_tos  = site.get("tos_version",  "")
+    stored_priv = site.get("privacy_version", "")
+
+    # ── Already up to date? ───────────────────────────────────────────────────
+    if (stored_tos and manifest_tos and stored_tos >= manifest_tos and
+            stored_priv and stored_priv >= manifest_priv):
+        print(
+            f"\n  ✅  Terms of Service accepted (version {stored_tos}). "
+            f"No action needed.\n"
+        )
+        return
+
+    # ── Stale or not yet recorded → prompt re-acceptance ─────────────────────
+    if stored_tos:
+        print(
+            f"\n  ⚠️  Terms of Service have been updated.\n"
+            f"  Previous version: {stored_tos}  →  Current: {manifest_tos}\n"
+        )
+    else:
+        print(f"\n  ℹ️  No stored Terms version found. Displaying current T&C.\n")
+
+    accepted = display_terms_and_conditions(versions=versions)
+    if not accepted:
+        print("\n  ⚠️  You must accept the Terms of Service.")
+        print("  Run st-admin --check-tos at any time to review and accept.\n")
+        return
+
+    print("  ✅  Terms accepted.\n")
+
+    # Record server-side (non-fatal)
+    if username:
+        ok = record_tos_acceptance(
+            username,
+            tos_version=manifest_tos,
+            privacy_version=manifest_priv,
+            method="cli_reaccept",
+            client_info=_build_client_info(),
+        )
+        if ok:
+            print(f"  ✓  Acceptance recorded for {username}\n")
+
+    # Update stored version in DISCOURSE JSON
+    tos_agreed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    try:
+        data  = json.loads(_env_get("DISCOURSE", "{}"))
+        sites = data.get("sites", []) if isinstance(data, dict) else []
+        for s in sites:
+            if "crossai.dev" in s.get("url", ""):
+                s["tos_version"]     = manifest_tos
+                s["privacy_version"] = manifest_priv
+                s["tos_agreed_at"]   = tos_agreed_at
+        _env_set("DISCOURSE", json.dumps({"sites": sites}))
+        print(f"  ✓  TOS version updated to {manifest_tos} in {_CROSSENV}\n")
+    except Exception:
+        pass
 
 
 def discourse_manage() -> None:
@@ -465,6 +694,139 @@ def discourse_manage() -> None:
         return
 
     # ── Mutate category_id in DISCOURSE JSON and persist ─────────────────────
+    site["category_id"] = new_cat_id
+    _env_set("DISCOURSE", json.dumps({"sites": sites}))
+    print(f"\n  ✓  Default category set to: {new_cat_label}\n")
+
+
+def _discourse_select_site() -> None:
+    """
+    Select the default Discourse site from the interactive menu.
+
+    Shows the list of configured sites, lets the user pick one, and writes
+    the choice to DISCOURSE_SITE in ~/.crossenv so that st-post / st use it
+    as the startup default.
+
+    Called from interactive_menu() by pressing D.
+    """
+    import json
+
+    disc_json_str = _env_get("DISCOURSE", "")
+    if not disc_json_str:
+        print("\n  No Discourse configuration found.")
+        print("  Run:  st-admin --discourse-setup  to join crossai.dev.\n")
+        return
+
+    try:
+        data  = json.loads(disc_json_str)
+        sites = data.get("sites", data) if isinstance(data, dict) else data
+    except (ValueError, AttributeError):
+        print("\n  ✗  DISCOURSE JSON is malformed.\n")
+        return
+
+    if not sites:
+        print("\n  No sites configured.\n")
+        return
+
+    if len(sites) == 1:
+        slug = sites[0].get("slug", "?")
+        print(f"\n  Only one Discourse site configured: {slug}")
+        print("  Nothing to switch.\n")
+        return
+
+    current = _env_get("DISCOURSE_SITE", sites[0].get("slug", ""))
+    print(f"\n  Configured Discourse sites:")
+    for i, s in enumerate(sites, 1):
+        slug   = s.get("slug", "?")
+        url    = s.get("url",  "")
+        marker = "  ← active" if slug == current else ""
+        print(f"    {i}.  {slug}  ({url}){marker}")
+    print(f"    q.  Keep current and exit")
+    print()
+
+    try:
+        choice = input("  Select site [q]: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return
+
+    if choice in ("q", ""):
+        return
+    if choice.isdigit() and 1 <= int(choice) <= len(sites):
+        idx      = int(choice) - 1
+        new_slug = sites[idx].get("slug", "")
+        _env_set("DISCOURSE_SITE", new_slug)
+        print(f"\n  ✓  Default site set to: {new_slug}\n")
+    else:
+        print("  ✗  Invalid choice.\n")
+
+
+def _discourse_select_category() -> None:
+    """
+    Quick default-category picker for the interactive menu (c key).
+
+    Options: private | test-cleared-daily.
+    Writes category_id into the active site's DISCOURSE JSON in ~/.crossenv.
+
+    Called from interactive_menu() by pressing c.
+    """
+    import json
+
+    disc_json_str = _env_get("DISCOURSE", "")
+    if not disc_json_str:
+        print("\n  No Discourse configuration found.")
+        print("  Run:  st-admin --discourse-setup  to join crossai.dev.\n")
+        return
+
+    try:
+        data  = json.loads(disc_json_str)
+        sites = data.get("sites", data) if isinstance(data, dict) else data
+        site  = sites[0] if sites else {}
+    except (ValueError, IndexError, AttributeError):
+        print("\n  ✗  DISCOURSE JSON is malformed.\n")
+        return
+
+    # Honour DISCOURSE_SITE for the active site
+    disc_site_key = _env_get("DISCOURSE_SITE", "")
+    if disc_site_key:
+        match = next((s for s in sites if s.get("slug") == disc_site_key), None)
+        if match:
+            site = match
+
+    active_cat_id = site.get("category_id")
+    private_id    = site.get("private_category_id")
+    priv_slug     = site.get("private_category_slug", "")
+
+    def _active_marker(cat_id) -> str:
+        return "  ← active" if cat_id == active_cat_id else ""
+
+    print(f"\n  Select default posting category:")
+    if private_id:
+        print(f"    1.  {priv_slug or 'your-private'}  "
+              f"(your private category){_active_marker(private_id)}")
+    print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  "
+          f"— cleared daily, safe for testing{_active_marker(_DISCOURSE_TEST_CATEGORY_ID)}")
+    print(f"    q.  Keep current and exit")
+    print()
+
+    try:
+        choice = input("  Choice [q]: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return
+
+    if choice in ("q", ""):
+        return
+    elif choice == "1" and private_id:
+        new_cat_id    = private_id
+        new_cat_label = f"{priv_slug or 'your-private'}  [id={new_cat_id}]"
+    elif choice == "2":
+        new_cat_id    = _DISCOURSE_TEST_CATEGORY_ID
+        new_cat_label = f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={new_cat_id}]"
+    else:
+        print("  ✗  Invalid choice.\n")
+        return
+
     site["category_id"] = new_cat_id
     _env_set("DISCOURSE", json.dumps({"sites": sites}))
     print(f"\n  ✓  Default category set to: {new_cat_label}\n")
@@ -1111,6 +1473,8 @@ _MENU = {
     "T": "Set default prompt template",
     "e": "View editor",
     "E": "Set editor",
+    "D": "Select default Discourse site",
+    "c": "Select default Discourse posting category  (private | test-cleared-daily)",
     "I": "Init templates  (seed ~/.cross_templates/ from bundled defaults)",
     "U": "Upgrade cross-st from PyPI + platform tools",
     "C": "Cache info  (path, file count, size)",
@@ -1212,6 +1576,12 @@ def interactive_menu() -> None:
                 _env_set("EDITOR", new_editor)
                 print(f"  ✓  Editor set to: {new_editor}  (written to .env)")
 
+        elif key == "D":
+            _discourse_select_site()
+
+        elif key == "c":
+            _discourse_select_category()
+
         elif key == "I":
             print("\n  Seeding ~/.cross_templates/ from bundled defaults …")
             overwrite_ans = input(
@@ -1293,6 +1663,10 @@ def main() -> None:
         help="Manage Discourse site connection and default posting category",
     )
     parser.add_argument(
+        "--check-tos", action="store_true",
+        help="Check whether the stored T&C version is current; prompt re-acceptance if stale",
+    )
+    parser.add_argument(
         "--show", action="store_true",
         help="Print all current settings and exit",
     )
@@ -1358,6 +1732,10 @@ def main() -> None:
 
     if args.discourse:
         discourse_manage()
+        return
+
+    if args.check_tos:
+        check_tos_flag()
         return
 
     if args.show:
