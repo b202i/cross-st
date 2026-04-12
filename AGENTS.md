@@ -267,13 +267,12 @@ All API errors go through `ai_error_handler.handle_api_error()`. It distinguishe
 
 ## Active Sprint
 
-Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–A9, B1–B5, C1, C2, C3 are complete. `cross-st 0.3.0` is live at https://pypi.org/project/cross-st/0.3.0/.
+Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–A9, B1–B5, C1, C2, C3 are complete. `cross-st 0.4.0` is live at https://pypi.org/project/cross-st/0.4.0/.
 
-### ⏳ Next release: cross-st 0.4.0
+### ✅ cross-st 0.4.0 — released 2026-04-12
 
 See `CHANGELOG.md [0.4.0]` for the full list. Key changes: `st-admin` 2-level menu, `st-post --category` default → `test` (sandbox), T&C versioning (TAP-1), @mention escaping, setup-wizard restructure, 122 new tests (suite 676 passing).
 
-**Ready to release:** `pyproject.toml` is at `0.4.0`. Run `bash script/release.sh` when ready.
 
 ---
 
