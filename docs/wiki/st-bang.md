@@ -15,7 +15,7 @@ st-bang --no-cache subject.prompt       # bypass API cache
 
 **Options:** `--ai`  `--no-cache`  `--merge`  `-v`  `-q`
 
-**Related:** [st-gen](st-gen.md) · [st-merge](st-merge.md) · [st-cross](st-cross.md)
+**Related:** [st-gen](st-gen) · [st-merge](st-merge) · [st-cross](st-cross)
 
 ---
 

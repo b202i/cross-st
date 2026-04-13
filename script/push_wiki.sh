@@ -23,8 +23,8 @@
 
 set -euo pipefail
 
-WIKI_HTTPS="https://github.com/b202i/cross.wiki.git"
-WIKI_SSH_URL="git@github.com:b202i/cross.wiki.git"
+WIKI_HTTPS="https://github.com/b202i/cross-st.wiki.git"
+WIKI_SSH_URL="git@github.com:b202i/cross-st.wiki.git"
 WIKI_REPO="${WIKI_HTTPS}"
 if [ "${WIKI_SSH:-0}" = "1" ]; then
     WIKI_REPO="${WIKI_SSH_URL}"
@@ -80,6 +80,12 @@ if compgen -G "${WIKI_SRC}/*.svg" > /dev/null 2>&1; then
     cp "${WIKI_SRC}"/*.svg "${WIKI_TMP}/"
 fi
 
+# Copy PNG assets (example screenshots, charts) if any exist
+if compgen -G "${WIKI_SRC}/*.png" > /dev/null 2>&1; then
+    echo "→ Copying docs/wiki/*.png → ${WIKI_TMP}/"
+    cp "${WIKI_SRC}"/*.png "${WIKI_TMP}/"
+fi
+
 cd "${WIKI_TMP}"
 git add -A
 if git diff --cached --quiet; then
@@ -87,5 +93,5 @@ if git diff --cached --quiet; then
 else
     git commit -m "${MSG}"
     git push
-    echo "→ Wiki updated: https://github.com/b202i/cross/wiki"
+    echo "→ Wiki updated: https://github.com/b202i/cross-st/wiki"
 fi

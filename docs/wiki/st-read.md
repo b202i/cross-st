@@ -14,7 +14,7 @@ st-read --legend subject.json  # table + metric legend
 
 **Options:** `-l`  `legend`  `-v`  `-q`
 
-**Related:** [st-edit](st-edit.md) · [st-prep](st-prep.md)
+**Related:** [st-edit](st-edit) · [st-prep](st-prep)
 
 ---
 

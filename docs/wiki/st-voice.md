@@ -3,7 +3,7 @@
 
 Lists available TTS voices and sets the active voice used by `st-speak`. The selected voice is saved to `TTS_VOICE` in your config.
 
-**Related:** [st-speak](st-speak.md) · [st-admin](st-admin.md) · [TTS Audio](tts-audio.md)
+**Related:** [st-speak](st-speak) · [st-admin](st-admin) · [TTS Audio](tts-audio)
 
 ---
 

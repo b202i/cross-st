@@ -5,7 +5,7 @@ Runs the full research pipeline in one command: generates a story from every AI,
 
 **Run after:** `st-new`  ·  **Run before:** `st-merge` · `st-heatmap` · `st-verdict` · `st-analyze`
 
-**Related:** [st-bang](st-bang.md) · [st-fact](st-fact.md) · [st-heatmap](st-heatmap.md) · [st-verdict](st-verdict.md)
+**Related:** [st-bang](st-bang) · [st-fact](st-fact) · [st-heatmap](st-heatmap) · [st-verdict](st-verdict)
 
 ---
 

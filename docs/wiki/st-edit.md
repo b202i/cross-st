@@ -16,5 +16,5 @@ st-edit --view subject.json            # view without editing
 
 **Options:** `-s`  `story`  `--field`  `--view`  `-v`  `-q`
 
-**Related:** [st-prep](st-prep.md) · [st-fix](st-fix.md) · [st-admin](st-admin.md)
+**Related:** [st-prep](st-prep) · [st-fix](st-fix) · [st-admin](st-admin)
 

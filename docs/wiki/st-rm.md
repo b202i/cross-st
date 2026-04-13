@@ -15,7 +15,7 @@ st-rm -F --all-stories subject.json  # clear all fact-checks from every story
 
 **Options:** `-d`  `data`  `-s`  `story`  `-f`  `fact`  `-F`  `clear-facts`  `--all-stories`  `-v`  `-q`
 
-**Related:** [st-ls](st-ls.md) · [st-cat](st-cat.md)
+**Related:** [st-ls](st-ls) · [st-cat](st-cat)
 
 ---
 

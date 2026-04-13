@@ -16,10 +16,10 @@ st-prep -d 1 --all subject.json   # export md, mp3, title, and txt files
 
 **Options:** `-d`  `data`  `-a`  `all`  `--markdown`  `--mp3`  `--title`  `--txt`  `--bang`  `-v`  `-q`
 
-**Related:** [st-gen](st-gen.md) · [st-fact](st-fact.md) · [st-speak](st-speak.md)
+**Related:** [st-gen](st-gen) · [st-fact](st-fact) · [st-speak](st-speak)
 
 ---
 
 ## For developers
 
-Called automatically by `st-gen --prep`, `st-cross`, `st-fetch`, and `st-fix`. Writes to `story[]` in the container. TTS rendering (`--mp3`) uses `mmd_voice.py` and requires the TTS extras (`pip install 'cross-st[tts]'`).
+Called automatically by `st-gen --prep`, `st-cross`, `st-fetch`, and `st-fix`. Writes to `story[]` in the container. TTS rendering (`--mp3`) uses `mmd_voice.py` and requires the TTS extras (`pip install 'cross-ai[tts]'`).

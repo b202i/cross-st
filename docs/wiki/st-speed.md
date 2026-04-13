@@ -5,7 +5,7 @@ Compares AI provider performance across a container: generation time, tokens per
 
 **Run after:** `st-bang` · `st-cross`
 
-**Related:** [st-stones](st-stones.md) · [st-cross](st-cross.md) · [st-heatmap](st-heatmap.md)
+**Related:** [st-stones](st-stones) · [st-cross](st-cross) · [st-heatmap](st-heatmap)
 
 ---
 

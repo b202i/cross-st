@@ -8,14 +8,16 @@ Creates a fresh prompt file from a template and opens your editor so you can fil
 ## Examples
 
 ```bash
-st-new                                  # pick a template interactively
+st-new subject                          # create prompt, open editor
+st-new -g subject                       # create, edit, then run st-gen + st-prep automatically
+st-new -g --ai gemini subject           # same, using a specific AI provider
 st-new --template custom subject        # use a named template
-st-new --no-bang                        # edit only, skip st-bang
+st-new --bang subject                   # edit then run st-bang (all AIs)
 ```
 
-**Options:** `--template`  `--no-bang`  `--no-spell`  `-v`  `-q`
+**Options:** `--template`  `-g/--gen`  `--ai`  `--bang`  `--st`  `--no-spell`  `-v`  `-q`
 
-**Related:** [st-gen](st-gen.md) · [st-bang](st-bang.md) · [st-admin](st-admin.md)
+**Related:** [st-gen](st-gen) · [st-bang](st-bang) · [st-admin](st-admin)
 
 ---
 

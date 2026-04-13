@@ -14,7 +14,7 @@ st-cat --text -s 2 subject.json     # print plain text body of story 2
 
 **Options:** `-s`  `story`  `-f`  `fact`  `--title`  `--text`  `--markdown`  `--hashtags`  `--spoken`
 
-**Related:** [st-ls](st-ls.md) · [st-edit](st-edit.md)
+**Related:** [st-ls](st-ls) · [st-edit](st-edit)
 
 ---
 

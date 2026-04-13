@@ -5,7 +5,7 @@ Scores AI providers on the Cross-Stones benchmark: a fixed set of domain prompts
 
 **Run after:** `st-cross`
 
-**Related:** [st-domain](st-domain.md) · [st-speed](st-speed.md) · [Cross-Stones](cross-stones.md)
+**Related:** [st-domain](st-domain) · [st-speed](st-speed) · [Cross-Stones](cross-stones)
 
 ---
 

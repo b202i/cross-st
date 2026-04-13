@@ -16,10 +16,10 @@ st-speak --voice en_US-ryan-high subject.json  # override voice for this render
 
 **Options:** `-s`  `story`  `--source`  `{text,fact}`  `--voice`  `model`  `-v`  `-q`
 
-**Related:** [st-voice](st-voice.md) · [st-post](st-post.md) · [TTS Audio](tts-audio.md)
+**Related:** [st-voice](st-voice) · [st-post](st-post) · [TTS Audio](tts-audio)
 
 ---
 
 ## For developers
 
-Requires `pip install 'cross-st[tts]'`. Uses `mmd_voice.py` which connects to a local Piper TTS server (`TTS_HOST`/`TTS_PORT` in `.env`). Exits cleanly with an error message if TTS dependencies are missing.
+Requires `pip install 'cross-ai[tts]'`. Uses `mmd_voice.py` which connects to a local Piper TTS server (`TTS_HOST`/`TTS_PORT` in `.env`). Exits cleanly with an error message if TTS dependencies are missing.

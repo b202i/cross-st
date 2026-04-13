@@ -21,7 +21,7 @@ st-plot --ai-short subject.json                        # AI short summary
 
 **Options:** `--plot`  `--file`  `--path`  `--display`  `--file_kv`
 
-**Related:** [st-cross](st-cross.md) · [st-heatmap](st-heatmap.md) · [st-verdict](st-verdict.md) · [st-speed](st-speed.md)
+**Related:** [st-cross](st-cross) · [st-heatmap](st-heatmap) · [st-verdict](st-verdict) · [st-speed](st-speed)
 
 ---
 

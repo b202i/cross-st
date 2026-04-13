@@ -3,7 +3,7 @@
 
 Shows the built-in help page for any `st-*` command, like the Linux `man` command. Add `--web` to open the full documentation page in your browser.
 
-**Related:** [Home](Home.md)
+**Related:** [Home](Home)
 
 ---
 

@@ -13,9 +13,9 @@ st-analyze --ai gemini subject.json     # use a specific provider
 st-analyze --plot bar subject.json      # include a bar chart
 ```
 
-**Options:** `--ai`  `--plot`  `--post`  `--no-cache`  `-v`  `-q`
+**Options:** `--ai`  `--plot`  `--post`  `--no-cache`  `--ai-title`  `--ai-short`  `--ai-caption`  `--ai-summary`  `--ai-story`  `-v`  `-q`
 
-**Related:** [st-cross](st-cross.md) · [st-heatmap](st-heatmap.md) · [st-verdict](st-verdict.md)
+**Related:** [st-cross](st-cross) · [st-heatmap](st-heatmap) · [st-verdict](st-verdict)
 
 ---
 

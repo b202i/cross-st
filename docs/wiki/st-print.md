@@ -19,7 +19,7 @@ st-print --printer "HP_LaserJet" s.json   # send to a specific printer
 
 **Options:** `-s`  `story`  `--all`  `--save-pdf`  `--output`  `FILE`  `--preview`  `--printer`  `-v`  `-q`
 
-**Related:** [st-post](st-post.md) · [st-edit](st-edit.md)
+**Related:** [st-post](st-post) · [st-edit](st-edit)
 
 ---
 

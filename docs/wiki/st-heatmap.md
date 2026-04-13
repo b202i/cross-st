@@ -104,7 +104,7 @@ frequent disagreement or identified errors.
 
 ---
 
-**Related:** [st-cross](st-cross.md) · [st-verdict](st-verdict.md) · [st-speed](st-speed.md) · [st-analyze](st-analyze.md)
+**Related:** [st-cross](st-cross) · [st-verdict](st-verdict) · [st-speed](st-speed) · [st-analyze](st-analyze)
 
 ---
 

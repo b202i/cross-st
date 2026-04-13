@@ -8,15 +8,16 @@ Publishes a story to your Discourse forum. Optionally attaches an MP3 audio file
 ## Examples
 
 ```bash
-st-post subject.json                    # post story 1 to default site
+st-post subject.json                    # post to Test (cleared daily) — safe default
+st-post --category private subject.json # post to your private category
 st-post -s 2 subject.json              # post story 2
 st-post --site MySite subject.json     # post to a named Discourse site
 st-post --check                        # verify credentials without posting
 ```
 
-**Options:** `-s`  `story`  `--site`  `--fact`  `--check`  `-v`  `-q`
+**Options:** `-s`  `story`  `--site`  `--category`  `--fact`  `--check`  `-v`  `-q`
 
-**Related:** [st-prep](st-prep.md)  [st-speak](st-speak.md)  [st-admin](st-admin.md)  [discourse-workflows](discourse-workflows.md)
+**Related:** [st-prep](st-prep) · [st-speak](st-speak) · [st-admin](st-admin)
 
 ---
 

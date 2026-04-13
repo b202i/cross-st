@@ -27,7 +27,7 @@ st-find "+pizza +dough" -t          # can quote boolean operators too
 
 **Options:** `-t/--title`  `-p/--prompt`  `-s/--story`  `-a/--all`  `-r/--recursive`  `-v/--verbose`
 
-**Related:** [st-ls](st-ls.md) · [st-cat](st-cat.md)
+**Related:** [st-ls](st-ls) · [st-cat](st-cat)
 
 ---
 
