@@ -18,7 +18,7 @@ Input:  subject.json  — populated story container (run st-cross first)
 Output: chart on screen (--display) and/or PNG saved to --path (default ./tmp/)
 
 Options: --file  --path  --display
-         --ai-title  --ai-short  --ai-caption
+         --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story
          --ai  --cache  --no-cache  -v  -q
 
 See also: st-verdict  (verdict category bar chart)

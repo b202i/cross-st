@@ -113,10 +113,10 @@ METADATA: dict[str, dict] = {
         "dev": "Writes a new entry to `data[]` in the container. Caching is MD5-keyed on the serialized request payload — two identical prompts to the same model always hit the cache. `--bang N` is used internally by `st-bang` (writes to `tmp/` and creates a block file); don't call it directly.",
     },
     "st-heatmap": {
-        "desc": "Generates a color-coded grid showing how every AI-pair scored in the cross-product fact-check. Rows are report authors, columns are fact-checkers.",
+        "desc": "Generates a color-coded grid showing how every AI-pair scored in the cross-product fact-check. Rows are evaluator AIs, columns are target story authors. Darker cells = higher veracity scores. The diagonal shows self-evaluation scores.",
         "after": ["st-cross"],
         "related": ["st-cross", "st-verdict", "st-speed", "st-analyze"],
-        "dev": "Uses `mmd_data_analysis.get_flattened_fc_data()` to build the score matrix, then renders with `mmd_plot`.",
+        "dev": "Uses `mmd_data_analysis.get_flattened_fc_data()` to build the score matrix, then renders with `mmd_plot`. AI content flags (`--ai-caption` etc.) call `process_prompt()` from `ai_handler` with the flattened score data as context.",
     },
     "st-ls": {
         "desc": "Lists the stories and fact-checks stored inside a `.json` container — titles, AI authors, scores, and timestamps.",
