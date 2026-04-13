@@ -663,17 +663,21 @@ def discourse_manage() -> None:
     print()
 
     # ── Category picker ───────────────────────────────────────────────────────
+    from mmd_single_key import get_single_key
+
     print("  Change default posting category?")
     if private_id:
         print(f"    1.  {priv_slug or 'your-private'}  (your private category)")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  — cleared daily, safe for testing")
     print(f"    3.  {_DISCOURSE_REPORTS_CATEGORY_NAME}  — your public portfolio")
     print(f"    4.  Enter a category ID manually")
-    print(f"    q.  Keep current and exit")
+    print(f"\n  esc: Escape back to the previous menu")
     print()
 
+    print(f"  Choice> ", end="", flush=True)
     try:
-        choice = input("  Choice [q]: ").strip().lower()
+        choice = get_single_key()
+        print(choice)
     except (KeyboardInterrupt, EOFError):
         print()
         return
@@ -681,7 +685,7 @@ def discourse_manage() -> None:
     new_cat_id    = None
     new_cat_label = ""
 
-    if choice in ("q", ""):
+    if choice in ("ESC", "q", "RETURN", ""):
         return
     elif choice == "1" and private_id:
         new_cat_id    = private_id
