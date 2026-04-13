@@ -71,9 +71,12 @@ _models_path = os.path.join(_PROJECT_ROOT, ".ai_models")  # repo root, not cross
 load_cross_env()
 
 # ── Discourse constants ────────────────────────────────────────────────────────
-_DISCOURSE_TEST_CATEGORY_ID   = 6
-_DISCOURSE_TEST_CATEGORY_SLUG = "test-cleared-daily"
-_DISCOURSE_TEST_CATEGORY_NAME = "Test (cleared daily)"
+_DISCOURSE_TEST_CATEGORY_ID      = 6
+_DISCOURSE_TEST_CATEGORY_SLUG    = "test-cleared-daily"
+_DISCOURSE_TEST_CATEGORY_NAME    = "Test (cleared daily)"
+_DISCOURSE_REPORTS_CATEGORY_ID   = 16
+_DISCOURSE_REPORTS_CATEGORY_SLUG = "reports"
+_DISCOURSE_REPORTS_CATEGORY_NAME = "📄 Reports"
 
 
 # ── Low-level helpers ──────────────────────────────────────────────────────────
@@ -542,8 +545,14 @@ def discourse_manage() -> None:
     Interactive Discourse site manager.
 
     Shows the current Discourse configuration and lets the user switch the
-    default posting category between their private category, the shared
-    'Test (cleared daily)' sandbox, or a custom category ID.
+    default posting category between three named destinations:
+
+      1. Private    (@username-private)  — visible only to you
+      2. Test       (cleared daily)      — safe sandbox, cleared every night
+      3. Reports    (📄 Reports, id=16)  — public portfolio on crossai.dev
+         Portfolio URL: crossai.dev/u/<username>/activity/topics
+
+    Also accepts a custom category ID for other Discourse sites.
 
     On first run: if flat DISCOURSE_* keys (written by --discourse-setup) exist
     but no DISCOURSE JSON is present, automatically builds and writes the JSON so
@@ -624,6 +633,8 @@ def discourse_manage() -> None:
     def _cat_label(cat_id, priv_id, p_slug) -> str:
         if cat_id == _DISCOURSE_TEST_CATEGORY_ID:
             return f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={cat_id}]"
+        if cat_id == _DISCOURSE_REPORTS_CATEGORY_ID:
+            return f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={cat_id}]"
         if priv_id and cat_id == priv_id:
             return f"{p_slug or 'your-private'}  [id={cat_id}]"
         return f"[id={cat_id}]"
@@ -647,6 +658,8 @@ def discourse_manage() -> None:
     print(f"  {'Username':<{W}}  {username}")
     print(f"  {'Default posting category':<{W}}  {active_label}")
     print(f"  {'Private category':<{W}}  {private_label}")
+    portfolio_url = f"{site_url.rstrip('/')}/u/{username}/activity/topics"
+    print(f"  {'Public portfolio':<{W}}  {portfolio_url}")
     print()
 
     # ── Category picker ───────────────────────────────────────────────────────
@@ -654,7 +667,8 @@ def discourse_manage() -> None:
     if private_id:
         print(f"    1.  {priv_slug or 'your-private'}  (your private category)")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  — cleared daily, safe for testing")
-    print(f"    3.  Enter a category ID manually")
+    print(f"    3.  {_DISCOURSE_REPORTS_CATEGORY_NAME}  — your public portfolio")
+    print(f"    4.  Enter a category ID manually")
     print(f"    q.  Keep current and exit")
     print()
 
@@ -676,6 +690,10 @@ def discourse_manage() -> None:
         new_cat_id    = _DISCOURSE_TEST_CATEGORY_ID
         new_cat_label = f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={new_cat_id}]"
     elif choice == "3":
+        new_cat_id    = _DISCOURSE_REPORTS_CATEGORY_ID
+        new_cat_label = f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={new_cat_id}]"
+        print(f"\n  Your public portfolio: {portfolio_url}")
+    elif choice == "4":
         try:
             raw = input("  Category ID: ").strip()
         except (KeyboardInterrupt, EOFError):
@@ -763,9 +781,11 @@ def _discourse_select_category() -> None:
     """
     Quick default-category picker for the interactive menu (c key).
 
-    Always offers two options:
-      1. Private category  (username-private, or private_category_id if set)
-      2. Test (cleared daily) — the shared sandbox
+    Always offers three named options:
+      1. Private    (@username-private)  — visible only to you
+      2. Test       (cleared daily)      — safe sandbox, cleared every night
+      3. Reports    (📄 Reports, id=16)  — public portfolio on crossai.dev
+         Portfolio: crossai.dev/u/<username>/activity/topics
 
     The currently active option is labelled  (current).
     Writes category_id into the active site's DISCOURSE JSON in ~/.crossenv.
@@ -807,10 +827,18 @@ def _discourse_select_category() -> None:
     def _current(cat_id) -> str:
         return "  (current)" if cat_id == active_cat_id else ""
 
+    username = site.get("username", "")
+    site_url = site.get("url", "").rstrip("/")
+    portfolio_url = f"{site_url}/u/{username}/activity/topics" if username else ""
+
     print(f"\n  Select default posting category:")
     print(f"    1.  {priv_slug}  (your private category){_current(private_id)}")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  "
           f"— cleared daily, safe for testing{_current(_DISCOURSE_TEST_CATEGORY_ID)}")
+    print(f"    3.  {_DISCOURSE_REPORTS_CATEGORY_NAME}  "
+          f"— your public portfolio{_current(_DISCOURSE_REPORTS_CATEGORY_ID)}")
+    if portfolio_url:
+        print(f"         {portfolio_url}")
     print(f"\n  esc: Go back")
 
     print(f"\n  Category> ", end="", flush=True)
@@ -825,6 +853,9 @@ def _discourse_select_category() -> None:
     elif choice == "2":
         new_cat_id    = _DISCOURSE_TEST_CATEGORY_ID
         new_cat_label = f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={new_cat_id}]"
+    elif choice == "3":
+        new_cat_id    = _DISCOURSE_REPORTS_CATEGORY_ID
+        new_cat_label = f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={new_cat_id}]"
     else:
         print("  ✗  Invalid choice.\n")
         return

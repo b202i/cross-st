@@ -48,10 +48,12 @@ def main():
                         help='Select story to publish: default 1')
     parser.add_argument('-f', '--fact', type=int,
                         help='Reply with fact-check to the post, default: no reply')
-    parser.add_argument('--category', type=str, choices=['private', 'test'], default='test',
+    parser.add_argument('--category', type=str, choices=['private', 'test', 'reports'], default='test',
                         help=('Post to a specific category: '
-                              '"private" = your private area, '
-                              '"test" = Test (cleared daily, id=6). '
+                              '"private" = your private area (visible only to you), '
+                              '"test" = Test (cleared daily, id=6) — safe sandbox, '
+                              '"reports" = 📄 Reports (id=16) — your public portfolio at '
+                              'crossai.dev/u/<username>/activity/topics. '
                               'Default: "test" (safe sandbox — cleared nightly).'))
     parser.add_argument('--check', action='store_true',
                         help='Validate Discourse credentials and connection without posting')
@@ -160,14 +162,18 @@ def main():
     site = get_discourse_site(args.site, sites)
 
     # Resolve the posting category for the story post.
-    # --category private → user's own private category (private_category_id or default)
-    # --category test    → Test (cleared daily) category, id=6  [default]
+    # --category private  → user's own private category (private_category_id or default)
+    # --category test     → Test (cleared daily) category, id=6  [default]
+    # --category reports  → public Reports showcase category, id=16
     # (site['category_id'] fallback kept for safety but not normally reached)
-    _DISCOURSE_TEST_CATEGORY_ID = 6
+    _DISCOURSE_TEST_CATEGORY_ID    = 6
+    _DISCOURSE_REPORTS_CATEGORY_ID = 16
     if args.category == 'private':
         post_category_id = site.get('private_category_id') or site['category_id']
     elif args.category == 'test':
         post_category_id = _DISCOURSE_TEST_CATEGORY_ID
+    elif args.category == 'reports':
+        post_category_id = _DISCOURSE_REPORTS_CATEGORY_ID
     else:
         post_category_id = site['category_id']
 
