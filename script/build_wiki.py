@@ -182,10 +182,11 @@ METADATA: dict[str, dict] = {
         "dev": "Requires `pip install 'cross-ai[tts]'`. Uses `mmd_voice.py` which connects to a local Piper TTS server (`TTS_HOST`/`TTS_PORT` in `.env`). Exits cleanly with an error message if TTS dependencies are missing.",
     },
     "st-speed": {
-        "desc": "Compares AI provider performance across a container: generation time, tokens per second, and time-to-first-token. Useful for choosing a provider when speed matters.",
+        # NOTE: docs/wiki/st-speed.md is hand-authored — build_wiki.py will not overwrite it.
+        "desc": "Compares AI provider performance across a container: generation time, tokens per second, fact-checking throughput, and consistency. Useful for choosing a provider when speed matters.",
         "after": ["st-bang", "st-cross"],
         "related": ["st-stones", "st-cross", "st-heatmap"],
-        "dev": "Reads `timing{}` dicts from `data[]` entries. Timing is written by `st-gen` on every non-cached call and is absent on cache hits.",
+        "dev": "Reads `timing{}` dicts from `data[]` entries (generation) and `fact[].timing` dicts (fact-checking). Timing is written by `st-gen` / `st-fact` on every non-cached call and is absent on cache hits.",
     },
     "st-stones": {
         "desc": "Scores AI providers on the Cross-Stones benchmark: a fixed set of domain prompts, each requiring exactly 10 fact-checkable claims. Produces a composite accuracy + speed leaderboard.",
