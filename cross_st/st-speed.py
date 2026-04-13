@@ -744,8 +744,10 @@ def main():
     parser.add_argument('json_file', type=str, nargs='+',
                         help='Path to JSON file(s)', metavar='file.json')
     parser.add_argument('--ai', type=str, default=None,
-                        help='AI to use for content generation (default: xai); also filters performance data')
-    
+                        help='AI to use for content generation (default: auto). When used with --ai-* flags, '
+                             'selects which AI generates the content but does NOT filter the performance display. '
+                             'Without --ai-* flags, also filters the performance display to one provider.')
+
     # AI Content Generation Options (Standardized Framework)
     ai_group = parser.add_argument_group('AI Content Generation')
     ai_group.add_argument('--ai-title', action='store_true',
@@ -830,8 +832,13 @@ def main():
             print(f"\nPerformance Summary: {Path(file_path).name}\n")
             print("=" * 70)
             
+            # When --ai is paired with an --ai-* content flag, it selects the generation
+            # AI only — do NOT filter the performance display (show all providers).
+            # When --ai is used alone (no content flag), it filters the display as before.
+            display_filter = args.ai if not content_types else None
+
             # Generation summary (filtered for display)
-            gen_summary_display = summarize_generation(gen_data, args.ai)
+            gen_summary_display = summarize_generation(gen_data, display_filter)
             if gen_summary_display:
                 print("\nStory Generation:")
                 print(tabulate(gen_summary_display, headers="keys", tablefmt="simple"))
@@ -839,7 +846,7 @@ def main():
                 print("\nStory Generation: No timing data found")
             
             # Fact-check summary (filtered for display)
-            fact_summary_display = summarize_fact_checks(fact_data, args.ai)
+            fact_summary_display = summarize_fact_checks(fact_data, display_filter)
             if fact_summary_display:
                 print("\nFact-Checking Performance:")
                 print(tabulate(fact_summary_display, headers="keys", tablefmt="simple"))
