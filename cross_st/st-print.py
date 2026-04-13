@@ -39,10 +39,12 @@ from datetime import datetime
 from pathlib import Path
 from mmd_startup import require_config, load_cross_env
 
+_WEASYPRINT_ERR: str | None = None
 try:
     from weasyprint import HTML as _WeasyHTML
-except ImportError:
+except (ImportError, OSError) as _wp_exc:
     _WeasyHTML = None  # type: ignore[assignment,misc]
+    _WEASYPRINT_ERR = str(_wp_exc)
 
 # ── Environment loading (A1 convention) ──────────────────────────────────────
 load_cross_env()
@@ -316,9 +318,33 @@ def _esc(text: str) -> str:
 def _render_pdf(html: str) -> bytes:
     """Render HTML to PDF bytes using WeasyPrint."""
     if _WeasyHTML is None:
-        print("Error: WeasyPrint is not installed. Run: pip install weasyprint")
+        _print_weasyprint_install_hint()
         sys.exit(1)
     return _WeasyHTML(string=html).write_pdf()
+
+
+def _print_weasyprint_install_hint() -> None:
+    """Print a platform-appropriate WeasyPrint install hint and exit."""
+    import platform
+    system = platform.system()
+    print()
+    print("Error: st-print requires WeasyPrint and its native Pango/GObject libraries.")
+    if _WEASYPRINT_ERR:
+        print(f"  Detail: {_WEASYPRINT_ERR}")
+    print()
+    if system == "Darwin":
+        print("  Fix (macOS / Homebrew):")
+        print("    brew install pango")
+        print()
+        print("  If WeasyPrint itself is missing from your pipx environment:")
+        print("    pipx inject cross-st weasyprint")
+    elif system == "Linux":
+        print("  Fix (Debian/Ubuntu):")
+        print("    sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0")
+        print("    sudo apt-get install -y libcairo2 libgdk-pixbuf2.0-0 libffi-dev")
+    else:
+        print("  See: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation")
+    print()
 
 
 # ── Print / save helpers ──────────────────────────────────────────────────────
