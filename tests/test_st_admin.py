@@ -731,6 +731,194 @@ class TestDiscourseManage:
         data = _json.loads(os.environ["DISCOURSE"])
         assert data["sites"][0]["category_id"] == _DISCOURSE_TEST_CAT_ID
 
+    # ── Display labels ────────────────────────────────────────────────────────
+
+    def test_shows_reports_category_label_when_active(self, tmp_settings, monkeypatch, capsys):
+        """Active label shows _DISCOURSE_REPORTS_CATEGORY_NAME when cat_id == REPORTS_ID."""
+        j = _make_discourse_json(cat_id=st_admin._DISCOURSE_REPORTS_CATEGORY_ID)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        assert st_admin._DISCOURSE_REPORTS_CATEGORY_NAME in capsys.readouterr().out
+
+    def test_shows_portfolio_url(self, tmp_settings, monkeypatch, capsys):
+        """Portfolio URL (site_url/u/username/activity/topics) appears in the display."""
+        j = _make_discourse_json(url="https://crossai.dev", user="alice")
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        assert "/u/alice/activity/topics" in capsys.readouterr().out
+
+    def test_private_label_shows_slug_and_id(self, tmp_settings, monkeypatch, capsys):
+        """Private category row shows '<slug>  [id=<N>]' when both are configured."""
+        j = _json.dumps({"sites": [{
+            "slug": "crossai.dev", "url": "https://crossai.dev",
+            "username": "alice", "api_key": "k", "category_id": 42,
+            "private_category_id": 42, "private_category_slug": "alice-private",
+        }]})
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "alice-private" in out
+        assert "[id=42]" in out
+
+    def test_private_label_shows_not_configured_when_absent(self, tmp_settings, monkeypatch, capsys):
+        """Private category row shows '(not configured)' when no slug/id is known."""
+        j = _make_discourse_json(cat_id=42)  # no private_category_id/slug fields
+        _discourse_env(monkeypatch, discourse_json=j)  # no flat DISCOURSE_CATEGORY_ID
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        assert "(not configured)" in capsys.readouterr().out
+
+    def test_option_1_not_shown_when_no_private_id(self, tmp_settings, monkeypatch, capsys):
+        """'(your private category)' option is only printed when private_id is known."""
+        j = _make_discourse_json(cat_id=42)  # no private_category_id
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        assert "(your private category)" not in capsys.readouterr().out
+
+    # ── Migration edge cases ──────────────────────────────────────────────────
+
+    def test_migration_seeds_private_category_id(self, tmp_settings, monkeypatch, capsys):
+        """Migration should seed private_category_id equal to category_id."""
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="key", cat_id="42", priv_slug="alice-private")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["private_category_id"] == 42
+
+    def test_migration_sets_discourse_site_env(self, tmp_settings, monkeypatch, capsys):
+        """Migration derives and writes DISCOURSE_SITE from the URL slug when not set."""
+        monkeypatch.delenv("DISCOURSE_SITE", raising=False)
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="key", cat_id="42")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        assert os.environ.get("DISCOURSE_SITE") == "crossai.dev"
+
+    def test_migration_preserves_existing_discourse_site(self, tmp_settings, monkeypatch, capsys):
+        """Migration must not overwrite DISCOURSE_SITE when it is already set."""
+        monkeypatch.setenv("DISCOURSE_SITE", "custom-site")
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="key", cat_id="42")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        assert os.environ.get("DISCOURSE_SITE") == "custom-site"
+
+    def test_migration_non_digit_cat_id_defaults_to_1(self, tmp_settings, monkeypatch, capsys):
+        """Non-digit DISCOURSE_CATEGORY_ID during migration falls back to category_id=1."""
+        _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
+                       api_key="key", cat_id="not-a-number")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 1
+
+    # ── Error paths ───────────────────────────────────────────────────────────
+
+    def test_malformed_json_prints_error(self, tmp_settings, monkeypatch, capsys):
+        """Malformed DISCOURSE JSON produces a friendly error rather than a traceback."""
+        _discourse_env(monkeypatch, discourse_json="{not valid json}")
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "malformed" in out.lower() or "✗" in out
+
+    def test_invalid_choice_prints_error(self, tmp_settings, monkeypatch, capsys):
+        """An unrecognised key prints the invalid-choice error."""
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "x")
+        st_admin.discourse_manage()
+        assert "Invalid" in capsys.readouterr().out
+
+    def test_choice_1_without_private_id_prints_invalid(self, tmp_settings, monkeypatch, capsys):
+        """Choice '1' when no private_id is known falls through to 'Invalid choice'."""
+        j = _make_discourse_json(cat_id=42)   # no private_category_id field
+        _discourse_env(monkeypatch, discourse_json=j)  # no flat DISCOURSE_CATEGORY_ID
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "1")
+        st_admin.discourse_manage()
+        assert "Invalid" in capsys.readouterr().out
+
+    def test_choice_4_zero_id_prints_error(self, tmp_settings, monkeypatch, capsys):
+        """Choice '4' with id '0' is rejected (must be a positive integer)."""
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "4")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "0")
+        st_admin.discourse_manage()
+        assert "Invalid" in capsys.readouterr().out
+
+    # ── Extra quit paths ──────────────────────────────────────────────────────
+
+    def test_choice_esc_no_change(self, tmp_settings, monkeypatch, capsys):
+        """ESC key leaves category unchanged."""
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "ESC")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42
+
+    def test_choice_return_no_change(self, tmp_settings, monkeypatch, capsys):
+        """RETURN key (bare Enter) leaves category unchanged."""
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "RETURN")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == 42
+
+    # ── Choice "3" extra ──────────────────────────────────────────────────────
+
+    def test_choice_3_prints_portfolio_url(self, tmp_settings, monkeypatch, capsys):
+        """Selecting Reports (choice '3') also prints the public portfolio URL."""
+        j = _make_discourse_json(url="https://crossai.dev", user="alice")
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "3")
+        st_admin.discourse_manage()
+        assert "/u/alice/activity/topics" in capsys.readouterr().out
+
+    # ── DISCOURSE_SITE selection ──────────────────────────────────────────────
+
+    def test_discourse_site_key_selects_active_site(self, tmp_settings, monkeypatch, capsys):
+        """DISCOURSE_SITE env var causes the matching site's data to be displayed."""
+        sites = [
+            {"slug": "crossai.dev",   "url": "https://crossai.dev",
+             "username": "alice",     "api_key": "k1", "category_id": 10},
+            {"slug": "my-forum",      "url": "https://my-forum.example.com",
+             "username": "bob",       "api_key": "k2", "category_id": 20},
+        ]
+        j = _json.dumps({"sites": sites})
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setenv("DISCOURSE_SITE", "my-forum")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
+        st_admin.discourse_manage()
+        out = capsys.readouterr().out
+        assert "bob" in out
+        assert "my-forum.example.com" in out
+
+    # ── Persistence ───────────────────────────────────────────────────────────
+
+    def test_category_change_persists_to_env_file(self, tmp_settings, monkeypatch, capsys):
+        """After switching category the new DISCOURSE JSON is written to the env file."""
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        env_content = tmp_settings["env"].read_text()
+        assert "DISCOURSE" in env_content
+        assert str(_DISCOURSE_TEST_CAT_ID) in env_content
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # check_tos_flag  (TAP-4)
