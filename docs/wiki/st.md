@@ -21,7 +21,18 @@ The menus follow the natural top-down workflow:
 
 Press a letter to enter a submenu, then a second letter to run the command.  Press `q` to go back, `q` again to quit.
 
-**Related:** [Onboarding](Onboarding.md) · [st-new](st-new.md) · [st-bang](st-bang.md) · [Command Reference](Home.md)
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `file.json / file.prompt` | Path to the story container or prompt file (auto-detected if only one exists in CWD) |
+| `--site {MMD,DIYRV,Shang}` | Discourse site to use for posting; overrides `DISCOURSE_SITE` in config |
+| `-a`, `--ai {xai,anthropic,openai,perplexity,gemini}` | AI provider to start with; overrides `DEFAULT_AI` |
+| `-b`, `--bang` | Start the parallel generator (`st-bang`) instead of single-AI generation |
+| `-q`, `--quiet` | Minimal output |
+| `-v`, `--verbose` | Verbose output |
+
+**Related:** [Onboarding](Onboarding)  [st-new](st-new)  [st-bang](st-bang)  [Command Reference](Home)
 
 ---
 

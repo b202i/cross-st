@@ -112,7 +112,7 @@ where response time is not a constraint.
 ## AI content options
 
 | Flag | Output | Length |
-|---|---|---|
+|------|--------|--------|
 | `--ai-title` | Punchy headline | ≤ 10 words |
 | `--ai-short` | One-paragraph summary | ≤ 80 words |
 | `--ai-caption` | Two-paragraph detailed caption | 100–160 words |
@@ -125,6 +125,21 @@ Combine any content flag with `--ai <provider>` to choose who writes it:
 st-speed --ai anthropic --ai-summary report.json
 st-speed --ai gemini --ai-story report.json
 ```
+
+---
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `file.json [file.json …]` | Path to one or more JSON container files |
+| `--ai AI` | AI for content generation (default: auto). When used with `--ai-*` flags, selects which AI generates the content but does **not** filter the performance display. Without `--ai-*` flags, also filters the display to one provider. |
+| `--csv CSV` | Export raw timing data to a CSV file |
+| `--history` | Analyze trends across multiple files |
+| `--cache` | Enable API response caching (default for AI content generation) |
+| `--no-cache` | Disable API response caching (forces fresh AI calls) |
+| `-q`, `--quiet` | Minimal output |
+| `-v`, `--verbose` | Verbose output (show generation details) |
 
 ---
 

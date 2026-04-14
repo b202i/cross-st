@@ -89,8 +89,9 @@ At the end:
 | `--n-claims N` | Number of claims per domain (default: 10). Match the benchmark set you're adding to. |
 | `--no-smoketest` | Skip Phase 4 — save the prompt without sending it to an AI first. |
 | `--set CONFIG.JSON` | Register the new domain in a named benchmark set config after saving. |
-| `--no-cache` | Bypass the API cache — useful when retrying a smoke-test after editing. |
-| `-v` | Verbose: print raw AI responses. |
+ `--no-cache`  Bypass the API cache — useful when retrying a smoke-test after editing. 
+ `--cache`  Enable the API cache (default: on). 
+ `-v`  Verbose: print raw AI responses. 
 
 ### Adding to a benchmark set
 

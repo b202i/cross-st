@@ -13,13 +13,22 @@ prompt templates, TTS voice, and editor.
 st-admin                        # interactive menu
 st-admin --setup                # first-time wizard
 st-admin --show                 # print current config
+st-admin --version              # print installed version
+st-admin --get-default-ai       # print current default AI provider
 st-admin --set-default-ai NAME  # switch default AI (gemini xai anthropic openai perplexity)
+st-admin --set-ai-model MAKE=MODEL  # per-provider model override (e.g. xai=grok-3)
+st-admin --set-tts-voice VOICE  # set TTS voice string (written to TTS_VOICE)
+st-admin --set-template NAME    # set default prompt template name
+st-admin --set-editor NAME      # set editor (written to EDITOR)
+st-admin --init-templates       # seed ~/.cross_templates/ with bundled .prompt files
+st-admin --overwrite-templates  # replace existing template files when seeding
 st-admin --upgrade              # upgrade cross-st + platform tools
 st-admin --cache-info           # cache path, file count, size
 st-admin --cache-clear          # delete all cached AI responses
 st-admin --cache-cull DAYS      # delete cache entries older than N days
 st-admin --discourse            # view / change Discourse posting category
 st-admin --discourse-setup      # one-time Discourse account provisioning
+st-admin --check-tos            # check T&C version; prompt re-acceptance if stale
 ```
 
 ---
@@ -236,11 +245,11 @@ st-admin          # then press D or c
 
   Change default posting category?
     1.  alice-private  (your private category)
-    2.  Test (cleared daily)  — cleared daily, safe for testing
-    3.  Enter a category ID manually
-    q.  Keep current and exit
+    2.  Test (cleared daily)  — cleared nightly, safe for testing
+    3.  📄 Reports  (id=16)  — public portfolio at crossai.dev/u/alice/activity/topics
+    ESC.  Keep current and exit
 
-  Choice [q]: _
+  Choice [esc]: _
 ```
 
 Selecting an option immediately updates `category_id` inside the `DISCOURSE` JSON in `~/.crossenv`. The change takes effect for the next `st-post` call — no restart required.
@@ -249,10 +258,10 @@ Selecting an option immediately updates `category_id` inside the `DISCOURSE` JSO
 
 From `st-admin` (no flags), two new keys are available:
 
-| Key | Action |
-|-----|--------|
-| `D` | Select default Discourse site (when you have multiple sites configured) |
-| `c` | Select default posting category: **private** or **Test (cleared daily)** |
+ Key  Action 
+-------------
+ `D`  Select default Discourse site (when you have multiple sites configured) 
+ `c`  Select default posting category: **private**, **Test (cleared daily)**, or **📄 Reports** 
 
 ```
 === st-admin Settings ===
