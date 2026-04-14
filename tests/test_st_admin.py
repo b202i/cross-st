@@ -594,7 +594,7 @@ class TestDiscourseManage:
         """Flat keys present, no DISCOURSE JSON → JSON built and written."""
         _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
                        api_key="testkey", cat_id="42", priv_slug="alice-private")
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         capsys.readouterr()
         discourse_val = os.environ.get("DISCOURSE", "")
@@ -609,7 +609,7 @@ class TestDiscourseManage:
     def test_migration_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
         _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
                        api_key="key", cat_id="42")
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         out = capsys.readouterr().out
         assert "initialised" in out
@@ -619,7 +619,7 @@ class TestDiscourseManage:
         existing = _make_discourse_json(cat_id=99)
         _discourse_env(monkeypatch, url="https://crossai.dev", user="alice",
                        api_key="key", cat_id="42", discourse_json=existing)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         out = capsys.readouterr().out
         assert "initialised" not in out
@@ -628,20 +628,20 @@ class TestDiscourseManage:
 
     def test_shows_site_url(self, tmp_settings, monkeypatch, capsys):
         _discourse_env(monkeypatch, discourse_json=_make_discourse_json())
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         assert "crossai.dev" in capsys.readouterr().out
 
     def test_shows_username(self, tmp_settings, monkeypatch, capsys):
         _discourse_env(monkeypatch, discourse_json=_make_discourse_json(user="bob"))
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         assert "bob" in capsys.readouterr().out
 
     def test_shows_test_category_name_when_active(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json(cat_id=_DISCOURSE_TEST_CAT_ID)
         _discourse_env(monkeypatch, discourse_json=j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         assert st_admin._DISCOURSE_TEST_CATEGORY_NAME in capsys.readouterr().out
 
@@ -651,7 +651,7 @@ class TestDiscourseManage:
         j = _make_discourse_json(cat_id=42)
         _discourse_env(monkeypatch, cat_id="42", priv_slug="alice-private",
                        discourse_json=j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
         st_admin.discourse_manage()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
@@ -661,27 +661,36 @@ class TestDiscourseManage:
         j = _make_discourse_json(cat_id=_DISCOURSE_TEST_CAT_ID)
         _discourse_env(monkeypatch, cat_id="42", priv_slug="alice-private",
                        discourse_json=j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "1")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "1")
         st_admin.discourse_manage()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
         assert data["sites"][0]["category_id"] == 42
 
-    def test_choice_3_manual_id(self, tmp_settings, monkeypatch, capsys):
+    def test_choice_3_sets_reports_category(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json(cat_id=42)
         _discourse_env(monkeypatch, discourse_json=j)
-        responses = iter(["3", "99"])
-        monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "3")
+        st_admin.discourse_manage()
+        capsys.readouterr()
+        data = _json.loads(os.environ["DISCOURSE"])
+        assert data["sites"][0]["category_id"] == st_admin._DISCOURSE_REPORTS_CATEGORY_ID
+
+    def test_choice_4_manual_id(self, tmp_settings, monkeypatch, capsys):
+        j = _make_discourse_json(cat_id=42)
+        _discourse_env(monkeypatch, discourse_json=j)
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "4")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "99")
         st_admin.discourse_manage()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
         assert data["sites"][0]["category_id"] == 99
 
-    def test_choice_3_invalid_id_no_change(self, tmp_settings, monkeypatch, capsys):
+    def test_choice_4_invalid_id_no_change(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json(cat_id=42)
         _discourse_env(monkeypatch, discourse_json=j)
-        responses = iter(["3", "notanumber"])
-        monkeypatch.setattr("builtins.input", lambda prompt="": next(responses))
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "4")
+        monkeypatch.setattr("builtins.input", lambda prompt="": "notanumber")
         st_admin.discourse_manage()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
@@ -690,7 +699,7 @@ class TestDiscourseManage:
     def test_choice_q_no_change(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json(cat_id=42)
         _discourse_env(monkeypatch, discourse_json=j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "q")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "q")
         st_admin.discourse_manage()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
@@ -699,7 +708,7 @@ class TestDiscourseManage:
     def test_switch_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
         j = _make_discourse_json(cat_id=42)
         _discourse_env(monkeypatch, discourse_json=j)
-        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
         st_admin.discourse_manage()
         out = capsys.readouterr().out
         assert "✓" in out
@@ -716,7 +725,7 @@ class TestDiscourseManage:
         j = _make_discourse_json(cat_id=42)
         _discourse_env(monkeypatch, discourse_json=j)
         monkeypatch.setattr(sys, "argv", ["st-admin", "--discourse"])
-        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        monkeypatch.setattr(_msk, "get_single_key", lambda: "2")
         st_admin.main()
         capsys.readouterr()
         data = _json.loads(os.environ["DISCOURSE"])
