@@ -1,0 +1,142 @@
+<svg width="800" height="195" viewBox="0 0 800 195" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main gray arrowhead -->
+    <marker id="arr"  markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#9ca3af"/>
+    </marker>
+    <!-- Amber arrowhead (bar chart branch) -->
+    <marker id="arrA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#d97706"/>
+    </marker>
+    <!-- Teal arrowhead (AI analysis branch) -->
+    <marker id="arrT" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#0d9488"/>
+    </marker>
+  </defs>
+
+  <!-- ── Title ─────────────────────────────────────────────────────── -->
+  <text x="400" y="16" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="13" font-weight="600" fill="#111827">
+    st-verdict — compare AI accuracy · stacked bar chart · written analysis
+  </text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       INPUT BOXES  (stacked, centres at y=60 and y=140)
+  ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Box 1: st-fact  (red)  x=10, y=30, w=110, h=60 -->
+  <rect x="10"  y="30" width="110" height="60" rx="7" fill="#fff1f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <rect x="10"  y="30" width="110" height="26" rx="7" fill="#dc2626"/>
+  <rect x="10"  y="44" width="110" height="12"        fill="#dc2626"/>
+  <text x="65"  y="47" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-fact</text>
+  <text x="65"  y="70" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="600" fill="#7f1d1d">Single-AI check</text>
+  <text x="65"  y="83" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#991b1b">one story at a time</text>
+
+  <!-- "or" label in the gap between the two input boxes -->
+  <text x="65"  y="105" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-style="italic" fill="#9ca3af">or</text>
+
+  <!-- Box 2: st-cross  (blue)  x=10, y=110, w=110, h=60 -->
+  <rect x="10"  y="110" width="110" height="60" rx="7" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="10"  y="110" width="110" height="26" rx="7" fill="#2563eb"/>
+  <rect x="10"  y="124" width="110" height="12"        fill="#2563eb"/>
+  <text x="65"  y="127" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-cross</text>
+  <text x="65"  y="150" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="600" fill="#1e3a8a">N×N fact-check</text>
+  <text x="65"  y="163" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#1e40af">all AIs · all stories</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       MERGE JUNCTION  (y=60 → y=100 → y=140)
+  ══════════════════════════════════════════════════════════════════ -->
+  <!-- Short H-lines from each input box to the junction rail -->
+  <line x1="120" y1="60"  x2="132" y2="60"  stroke="#9ca3af" stroke-width="1.5"/>
+  <line x1="120" y1="140" x2="132" y2="140" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- Vertical rail -->
+  <line x1="132" y1="60"  x2="132" y2="140" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- Arrow from mid-rail to subject.json -->
+  <line x1="132" y1="100" x2="152" y2="100" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 3 — subject.json  (slate)  x=154, y=68, w=124, h=64
+       centre (216, 100)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="154" y="68" width="124" height="64" rx="7" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <rect x="154" y="68" width="124" height="26" rx="7" fill="#475569"/>
+  <rect x="154" y="82" width="124" height="12"        fill="#475569"/>
+  <text x="216" y="85" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">subject.json</text>
+  <text x="216" y="107" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="600" fill="#1e293b">fact[] entries</text>
+  <text x="216" y="120" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#334155">scores · claims · timing</text>
+
+  <!-- Arrow subject.json → st-verdict -->
+  <line x1="278" y1="100" x2="303" y2="100" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 4 — st-verdict ⚙  (indigo)  x=305, y=68, w=136, h=64
+       centre (373, 100)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="305" y="68" width="136" height="64" rx="7" fill="#eef2ff" stroke="#a5b4fc" stroke-width="1.5"/>
+  <rect x="305" y="68" width="136" height="26" rx="7" fill="#4f46e5"/>
+  <rect x="305" y="82" width="136" height="12"        fill="#4f46e5"/>
+  <text x="373" y="85" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-verdict &#x2699;</text>
+  <text x="373" y="107" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="600" fill="#1e1b4b">Analyse results</text>
+  <text x="373" y="120" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#3730a3">per AI author</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       FAN TREE  (trunk → spine → 2 coloured branches)
+  ══════════════════════════════════════════════════════════════════ -->
+  <!-- Trunk: st-verdict right → spine -->
+  <line x1="441" y1="100" x2="462" y2="100" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- Vertical spine: y=60 (bar chart centre) → y=140 (AI analysis centre) -->
+  <line x1="462" y1="60"  x2="462" y2="140" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- Branch → bar chart (amber) -->
+  <line x1="462" y1="60"  x2="479" y2="60"  stroke="#d97706" stroke-width="1.5" marker-end="url(#arrA)"/>
+  <!-- Branch → AI analysis (teal) -->
+  <line x1="462" y1="140" x2="479" y2="140" stroke="#0d9488" stroke-width="1.5" marker-end="url(#arrT)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       OUTPUT BOX 5 — Bar chart  (amber)  x=481, y=30, w=295, h=60
+       centre (628, 60)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="481" y="30" width="295" height="60" rx="7" fill="#fefce8" stroke="#fcd34d" stroke-width="1.5"/>
+  <rect x="481" y="30" width="295" height="26" rx="7" fill="#d97706"/>
+  <rect x="481" y="44" width="295" height="12"        fill="#d97706"/>
+  <text x="628" y="47" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">&#x1F4CA; Bar chart</text>
+  <text x="628" y="69" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="600" fill="#78350f">AI accuracy comparison</text>
+  <text x="628" y="82" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#92400e">true · ~true · opinion · ~false · false per author</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       OUTPUT BOX 6 — AI analysis  (teal)  x=481, y=110, w=295, h=60
+       centre (628, 140)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="481" y="110" width="295" height="60" rx="7" fill="#ccfbf1" stroke="#5eead4" stroke-width="1.5"/>
+  <rect x="481" y="110" width="295" height="26" rx="7" fill="#0d9488"/>
+  <rect x="481" y="124" width="295" height="12"        fill="#0d9488"/>
+  <text x="628" y="127" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">&#x1F916; AI analysis</text>
+  <text x="628" y="149" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="600" fill="#134e4a">Caption / summary / story</text>
+  <text x="628" y="162" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#115e59">natural-language insight on results</text>
+
+  <!-- ── Footer ────────────────────────────────────────────────────── -->
+  <text x="400" y="184" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#6b7280">
+    --ai-short on by default  ·  use --ai-caption / --ai-summary / --ai-story for longer analysis  ·  --file saves PNG
+  </text>
+</svg>
+
