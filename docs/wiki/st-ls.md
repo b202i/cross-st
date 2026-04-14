@@ -13,7 +13,18 @@ st-ls -C subject.json           # cross-AI claims comparison table
 st-ls --fact -C subject.json    # fact-check table + claims
 ```
 
-**Options:** `-d`  `data`  `-s`  `story`  `-f`  `fact`  `-C`  `claims`  `-c`  `clip-length`  `-a`  `all`  `-v`  `-q`
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-d`, `--data` | Display raw API data items |
+| `-s`, `--story` | Display the stories section (titles, scores, flags) |
+| `-f`, `--fact` | Display the fact-check summary table |
+| `-C`, `--claims` | Display the cross-AI claims comparison table (segment × AI verdict) |
+| `-c N`, `--clip N` | Clip displayed title length to N characters (default: 60) |
+| `-a`, `--all` | Display all sections: data, stories, fact-checks, and claims |
+| `-v`, `--verbose` | Verbose output |
+| `-q`, `--quiet` | Minimal output |
 
 **Related:** [st-cat](st-cat) · [st-edit](st-edit)
 
