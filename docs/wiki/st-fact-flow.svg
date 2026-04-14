@@ -1,0 +1,115 @@
+<svg width="800" height="195" viewBox="0 0 800 195" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main gray arrowhead (main flow) -->
+    <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#9ca3af"/>
+    </marker>
+    <!-- Small gray arrowhead (per-claim row mini-arrows) -->
+    <marker id="arrSm" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+      <path d="M0,0.5 L4,2.5 L0,4.5 Z" fill="#9ca3af"/>
+    </marker>
+  </defs>
+
+  <!-- ── Title ─────────────────────────────────────────────────────── -->
+  <text x="400" y="16" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="13" font-weight="600" fill="#111827">
+    st-fact — read report · extract claims · verify with AI · save results
+  </text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 1 — subject.json (input)
+       x=12, y=66, w=122, h=80   centre (73, 106)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="12"  y="66" width="122" height="80" rx="7" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <rect x="12"  y="66" width="122" height="26" rx="7" fill="#475569"/>
+  <rect x="12"  y="80" width="122" height="12"        fill="#475569"/>
+  <text x="73"  y="83" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">subject.json</text>
+  <text x="73"  y="107" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#1e293b">Report text</text>
+  <text x="73"  y="123" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#334155">story[] · title · text</text>
+
+  <!-- Arrow 1 → 2 -->
+  <line x1="134" y1="106" x2="160" y2="106" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 2 — st-fact ⚙  (red/rose)
+       x=162, y=66, w=142, h=80   centre (233, 106)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="162" y="66" width="142" height="80" rx="7" fill="#fff1f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <rect x="162" y="66" width="142" height="26" rx="7" fill="#dc2626"/>
+  <rect x="162" y="80" width="142" height="12"        fill="#dc2626"/>
+  <text x="233" y="83" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-fact &#x2699;</text>
+  <text x="233" y="107" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#7f1d1d">Extract claims</text>
+  <text x="233" y="123" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#991b1b">splits report into segments</text>
+
+  <!-- Arrow 2 → 3 -->
+  <line x1="304" y1="106" x2="335" y2="106" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 3 — per-claim verification loop  (amber)
+       x=337, y=50, w=258, h=112   centre (466, 106)
+       header: y=50..76   rows at y-centre: 90 · 118 · 146
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="337" y="50"  width="258" height="112" rx="7" fill="#fefce8" stroke="#fcd34d" stroke-width="1.5"/>
+  <rect x="337" y="50"  width="258" height="26"  rx="7" fill="#d97706"/>
+  <rect x="337" y="64"  width="258" height="12"         fill="#d97706"/>
+  <text x="466" y="67"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">Verify each claim</text>
+
+  <!-- ── Row 1  y-centre=90  ── Claim 1 ──→ AI ──→ ✓ true -->
+  <text x="352"  y="94"  font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#78350f">Claim 1</text>
+  <line x1="391" y1="90"  x2="406" y2="90"  stroke="#9ca3af" stroke-width="1" marker-end="url(#arrSm)"/>
+  <rect x="408"  y="83"  width="28" height="14" rx="4" fill="#3b82f6"/>
+  <text x="422"  y="94"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" font-weight="700" fill="white">AI</text>
+  <line x1="436" y1="90"  x2="451" y2="90"  stroke="#9ca3af" stroke-width="1" marker-end="url(#arrSm)"/>
+  <text x="455"  y="94"  font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" font-weight="700" fill="#16a34a">&#x2713; true</text>
+
+  <!-- ── Row 2  y-centre=118  ── Claim 2 ──→ AI ──→ ⚠ partial -->
+  <text x="352"  y="122" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#78350f">Claim 2</text>
+  <line x1="391" y1="118" x2="406" y2="118" stroke="#9ca3af" stroke-width="1" marker-end="url(#arrSm)"/>
+  <rect x="408"  y="111" width="28" height="14" rx="4" fill="#3b82f6"/>
+  <text x="422"  y="122" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" font-weight="700" fill="white">AI</text>
+  <line x1="436" y1="118" x2="451" y2="118" stroke="#9ca3af" stroke-width="1" marker-end="url(#arrSm)"/>
+  <text x="455"  y="122" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" font-weight="700" fill="#d97706">&#x26A0; partial</text>
+
+  <!-- ── Row 3  y-centre=146  ── Claim 3 ──→ AI ──→ ✗ false -->
+  <text x="352"  y="150" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#78350f">Claim 3</text>
+  <line x1="391" y1="146" x2="406" y2="146" stroke="#9ca3af" stroke-width="1" marker-end="url(#arrSm)"/>
+  <rect x="408"  y="139" width="28" height="14" rx="4" fill="#3b82f6"/>
+  <text x="422"  y="150" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" font-weight="700" fill="white">AI</text>
+  <line x1="436" y1="146" x2="451" y2="146" stroke="#9ca3af" stroke-width="1" marker-end="url(#arrSm)"/>
+  <text x="455"  y="150" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" font-weight="700" fill="#dc2626">&#x2717; false</text>
+
+  <!-- Arrow 3 → 4 -->
+  <line x1="595" y1="106" x2="624" y2="106" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 4 — subject.json (updated, green = data written back)
+       x=626, y=66, w=148, h=80   centre (700, 106)
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="626" y="66" width="148" height="80" rx="7" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <rect x="626" y="66" width="148" height="26" rx="7" fill="#15803d"/>
+  <rect x="626" y="80" width="148" height="12"        fill="#15803d"/>
+  <text x="700" y="83" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">subject.json &#x2713;</text>
+  <text x="700" y="107" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#14532d">fact[] appended</text>
+  <text x="700" y="123" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#166534">scores · verdicts · summary</text>
+
+  <!-- ── Footer ────────────────────────────────────────────────────── -->
+  <text x="400" y="182" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#6b7280">
+    one AI call per claim  ·  results saved back in subject.json  ·  use --ai all to run all providers in parallel
+  </text>
+</svg>
+

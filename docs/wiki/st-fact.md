@@ -4,6 +4,8 @@ Sends a single story to an AI and asks it to fact-check every claim, scoring eac
 
 **Run after:** `st-prep`    **Run before:** `st-fix`  `st-heatmap`
 
+![st-fact workflow](st-fact-flow.svg)
+
 ```bash
 st-fact subject.json                    # fact-check story 1 with default AI
 st-fact -s 2 --ai gemini subject.json  # fact-check story 2 with Gemini
