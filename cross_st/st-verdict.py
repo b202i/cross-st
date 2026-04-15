@@ -463,6 +463,8 @@ def main():
         for flag, ctype, label in content_type_map:
             if not flag:
                 continue
+            if not args.quiet:
+                print(f"  Generating {label} with {content_ai}…", flush=True)
             def _generate(ctype=ctype):
                 ai_content[ctype] = generate_ai_content(
                     df, story_titles, content_ai, ctype, args.verbose, args.cache)

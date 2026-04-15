@@ -231,13 +231,15 @@ def _run_story_ai_content(args, story_text: str, story_title: str, ai_make: str)
         if not flag:
             continue
         if not args.quiet:
-            print(f"\n{label}:")
-            print("─" * 70)
+            print(f"  Generating {label} with {ai_make}…", flush=True)
         prompt = _build_story_ai_prompt(context, ctype)
         try:
             result  = process_prompt(ai_make, prompt, use_cache=args.cache)
             _, _, response, _ = result
             content = get_content(ai_make, response).strip()
+            if not args.quiet:
+                print(f"\n{label}:")
+                print("─" * 70)
             print(content)
         except Exception as e:
             print(f"  Generation failed ({ctype}): {e}")
