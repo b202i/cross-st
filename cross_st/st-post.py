@@ -3,11 +3,13 @@
 st-post — Post a story to Discourse
 
 ```
-st-post subject.json                    # post to Test (cleared daily) — safe default
-st-post --category private subject.json # post to your private category
-st-post -s 2 subject.json              # post story 2
-st-post --site MySite subject.json     # post to a named Discourse site
-st-post --check                        # verify credentials without posting
+st-post subject.json                         # post to Test (cleared daily) — safe default
+st-post --category private subject.json      # post to your private category
+st-post --category reports subject.json      # post to your public portfolio
+st-post --category prompt-lab subject.json   # post to 🧪 Prompt Lab
+st-post -s 2 subject.json                   # post story 2
+st-post --site MySite subject.json          # post to a named Discourse site
+st-post --check                             # verify credentials without posting
 ```
 
 Options: -s story  --site  --category  --fact  --check  -v  -q
@@ -48,7 +50,7 @@ def main():
                         help='Select story to publish: default 1')
     parser.add_argument('-f', '--fact', type=int,
                         help='Reply with fact-check to the post, default: no reply')
-    parser.add_argument('--category', type=str, choices=['private', 'test', 'reports'], default='test',
+    parser.add_argument('--category', type=str, choices=['private', 'test', 'reports', 'prompt-lab'], default='test',
                         help=('Post to a specific category: '
                               '"private" = your private area (visible only to you), '
                               '"test" = Test (cleared daily, id=6) — safe sandbox, '
@@ -166,14 +168,17 @@ def main():
     # --category test     → Test (cleared daily) category, id=6  [default]
     # --category reports  → public Reports showcase category, id=16
     # (site['category_id'] fallback kept for safety but not normally reached)
-    _DISCOURSE_TEST_CATEGORY_ID    = 6
-    _DISCOURSE_REPORTS_CATEGORY_ID = 16
+    _DISCOURSE_TEST_CATEGORY_ID       = 6
+    _DISCOURSE_REPORTS_CATEGORY_ID    = 16
+    _DISCOURSE_PROMPT_LAB_CATEGORY_ID = 17
     if args.category == 'private':
         post_category_id = site.get('private_category_id') or site['category_id']
     elif args.category == 'test':
         post_category_id = _DISCOURSE_TEST_CATEGORY_ID
     elif args.category == 'reports':
         post_category_id = _DISCOURSE_REPORTS_CATEGORY_ID
+    elif args.category == 'prompt-lab':
+        post_category_id = _DISCOURSE_PROMPT_LAB_CATEGORY_ID
     else:
         post_category_id = site['category_id']
 

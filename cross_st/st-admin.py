@@ -71,12 +71,15 @@ _models_path = os.path.join(_PROJECT_ROOT, ".ai_models")  # repo root, not cross
 load_cross_env()
 
 # ── Discourse constants ────────────────────────────────────────────────────────
-_DISCOURSE_TEST_CATEGORY_ID      = 6
-_DISCOURSE_TEST_CATEGORY_SLUG    = "test-cleared-daily"
-_DISCOURSE_TEST_CATEGORY_NAME    = "Test (cleared daily)"
-_DISCOURSE_REPORTS_CATEGORY_ID   = 16
-_DISCOURSE_REPORTS_CATEGORY_SLUG = "reports"
-_DISCOURSE_REPORTS_CATEGORY_NAME = "📄 Reports"
+_DISCOURSE_TEST_CATEGORY_ID         = 6
+_DISCOURSE_TEST_CATEGORY_SLUG       = "test-cleared-daily"
+_DISCOURSE_TEST_CATEGORY_NAME       = "Test (cleared daily)"
+_DISCOURSE_REPORTS_CATEGORY_ID      = 16
+_DISCOURSE_REPORTS_CATEGORY_SLUG    = "reports"
+_DISCOURSE_REPORTS_CATEGORY_NAME    = "📄 Reports"
+_DISCOURSE_PROMPT_LAB_CATEGORY_ID   = 17
+_DISCOURSE_PROMPT_LAB_CATEGORY_SLUG = "prompt-lab"
+_DISCOURSE_PROMPT_LAB_CATEGORY_NAME = "🧪 Prompt Lab"
 
 
 # ── Low-level helpers ──────────────────────────────────────────────────────────
@@ -635,6 +638,8 @@ def discourse_manage() -> None:
             return f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={cat_id}]"
         if cat_id == _DISCOURSE_REPORTS_CATEGORY_ID:
             return f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={cat_id}]"
+        if cat_id == _DISCOURSE_PROMPT_LAB_CATEGORY_ID:
+            return f"{_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  [id={cat_id}]"
         if priv_id and cat_id == priv_id:
             return f"{p_slug or 'your-private'}  [id={cat_id}]"
         return f"[id={cat_id}]"
@@ -670,7 +675,8 @@ def discourse_manage() -> None:
         print(f"    1.  {priv_slug or 'your-private'}  (your private category)")
     print(f"    2.  {_DISCOURSE_TEST_CATEGORY_NAME}  — cleared daily, safe for testing")
     print(f"    3.  {_DISCOURSE_REPORTS_CATEGORY_NAME}  — your public portfolio")
-    print(f"    4.  Enter a category ID manually")
+    print(f"    4.  {_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  — share prompts and get community feedback")
+    print(f"    5.  Enter a category ID manually")
     print(f"\n  esc: Escape back to the previous menu")
     print()
 
@@ -698,6 +704,9 @@ def discourse_manage() -> None:
         new_cat_label = f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={new_cat_id}]"
         print(f"\n  Your public portfolio: {portfolio_url}")
     elif choice == "4":
+        new_cat_id    = _DISCOURSE_PROMPT_LAB_CATEGORY_ID
+        new_cat_label = f"{_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  [id={new_cat_id}]"
+    elif choice == "5":
         try:
             raw = input("  Category ID: ").strip()
         except (KeyboardInterrupt, EOFError):
@@ -843,6 +852,8 @@ def _discourse_select_category() -> None:
           f"— your public portfolio{_current(_DISCOURSE_REPORTS_CATEGORY_ID)}")
     if portfolio_url:
         print(f"         {portfolio_url}")
+    print(f"    4.  {_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  "
+          f"— share prompts, get community feedback{_current(_DISCOURSE_PROMPT_LAB_CATEGORY_ID)}")
     print(f"\n  esc: Go back")
 
     print(f"\n  Category> ", end="", flush=True)
@@ -860,6 +871,9 @@ def _discourse_select_category() -> None:
     elif choice == "3":
         new_cat_id    = _DISCOURSE_REPORTS_CATEGORY_ID
         new_cat_label = f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={new_cat_id}]"
+    elif choice == "4":
+        new_cat_id    = _DISCOURSE_PROMPT_LAB_CATEGORY_ID
+        new_cat_label = f"{_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  [id={new_cat_id}]"
     else:
         print("  ✗  Invalid choice.\n")
         return
