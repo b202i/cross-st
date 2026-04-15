@@ -46,7 +46,11 @@ def require_config() -> None:
     repo_env   = os.path.join(_PROJECT_ROOT, ".env")   # cross/.env  (dev layout)
     local_env2 = os.path.join(_CROSS_ST_DIR, ".env")   # cross_st/.env  (future)
     local_env  = os.path.join(os.getcwd(), ".env")
-    if not any(os.path.exists(p) for p in (crossenv, repo_env, local_env2, local_env)):
+    # Only count the dev-repo .env files when actually running inside the project
+    # venv — avoids false-positive "configured" result for pipx users whose
+    # editable install makes _PROJECT_ROOT point at the source tree.
+    dev_envs   = (repo_env, local_env2) if _in_project_venv() else ()
+    if not any(os.path.exists(p) for p in (crossenv, *dev_envs, local_env)):
         print(
             "\n  Cross is not configured.\n"
             "  Run 'st-admin --setup' to get started, or create ~/.crossenv with your API keys.\n"
@@ -170,6 +174,26 @@ def check_for_updates() -> None:
     _write_update_cache(cache)
 
 
+def _in_project_venv() -> bool:
+    """Return True when the running Python executable lives inside _PROJECT_ROOT.
+
+    This is the reliable signal that the developer has activated the project's
+    own virtualenv (e.g. ``source .venv/bin/activate``).  When cross-st is
+    installed via pipx the executable is in the pipx venv, which is *outside*
+    _PROJECT_ROOT even if an editable install points __file__ back at the
+    source tree — so this returns False and the dev .env is correctly skipped.
+
+    Implementation note: we use os.path.abspath (path normalisation only) rather
+    than os.path.realpath (full symlink resolution) because venv Python binaries
+    are typically symlinks to the base interpreter (e.g. .venv/bin/python →
+    python3.11 → /opt/homebrew/...).  realpath would escape the project tree and
+    give a false negative; abspath preserves the venv path as written.
+    """
+    project_prefix  = os.path.abspath(_PROJECT_ROOT) + os.sep
+    executable_norm = os.path.abspath(sys.executable)
+    return executable_norm.startswith(project_prefix)
+
+
 def load_cross_env() -> None:
     """Load Cross environment files in A1 four-layer order.
 
@@ -180,17 +204,22 @@ def load_cross_env() -> None:
     Layer order (later layers override earlier ones):
       1. ~/.crossenv                — global fallback / shared API keys (lowest priority)
       2. <project-root>/.env        — repo-local developer keys; overrides global
-      2b. <cross_st-dir>/.env       — co-located .env (pip install layout); overrides above
+                                      *** only loaded when the project venv is active ***
+                                      (sys.executable is inside _PROJECT_ROOT)
+                                      Skipped for pipx / system-Python installs so that
+                                      ~/.crossenv remains the sole config source there.
+      2b. <cross_st-dir>/.env       — co-located .env (pip install layout); same guard
       3. <CWD>/.env                 — per-project override, highest priority
 
-    Project-level .env always wins over ~/.crossenv so that per-repo settings
-    (DEFAULT_AI, model overrides, Discourse site, etc.) take effect without
-    having to edit the global file.
+    Project-level .env always wins over ~/.crossenv when the dev venv is active,
+    so that per-repo settings (DEFAULT_AI, model overrides, Discourse site, etc.)
+    take effect without editing the global file.
     """
     from dotenv import load_dotenv
     crossenv = os.path.expanduser("~/.crossenv")
     load_dotenv(crossenv)                                                       # 1. global fallback
-    load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=True)            # 2. repo root wins
-    load_dotenv(os.path.join(_CROSS_ST_DIR, ".env"), override=True)            # 2b. cross_st/
+    if _in_project_venv():
+        load_dotenv(os.path.join(_PROJECT_ROOT, ".env"), override=True)        # 2. repo root wins
+        load_dotenv(os.path.join(_CROSS_ST_DIR, ".env"), override=True)        # 2b. cross_st/
     load_dotenv(os.path.join(os.getcwd(), ".env"),    override=True)           # 3. CWD — highest
     check_for_updates()
