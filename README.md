@@ -15,6 +15,8 @@ and built for people who want to publish accurate content fast.
 
 > Cross-check before you publish.
 
+![st-cross pipeline](https://raw.githubusercontent.com/b202i/cross-st/main/docs/wiki/st-cross-pipeline.svg)
+
 ---
 
 ## Features
