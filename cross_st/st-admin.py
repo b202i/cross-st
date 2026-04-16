@@ -1274,6 +1274,7 @@ def setup_wizard() -> None:
 
 def settings_show_all() -> None:
     """Print a formatted summary of all current settings."""
+    import json
     from importlib.metadata import version as _pkg_ver, PackageNotFoundError as _PNF
     try:
         _installed_ver = _pkg_ver("cross-st")
@@ -1296,6 +1297,72 @@ def settings_show_all() -> None:
     print(f"  {'Default template':<{W}}  {settings_get_default_template()}")
     print(f"  {'Editor':<{W}}  {settings_get_editor()}")
     print(f"  {'Stones dir':<{W}}  {get_default_stones_dir()}")
+
+    # ── Discourse ─────────────────────────────────────────────────────────────
+    def _cat_label_str(cat_id, priv_id, p_slug) -> str:
+        if cat_id is None:
+            return "(not set)"
+        if cat_id == _DISCOURSE_TEST_CATEGORY_ID:
+            return f"{_DISCOURSE_TEST_CATEGORY_NAME}  [id={cat_id}]"
+        if cat_id == _DISCOURSE_REPORTS_CATEGORY_ID:
+            return f"{_DISCOURSE_REPORTS_CATEGORY_NAME}  [id={cat_id}]"
+        if cat_id == _DISCOURSE_PROMPT_LAB_CATEGORY_ID:
+            return f"{_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  [id={cat_id}]"
+        if priv_id and cat_id == priv_id:
+            return f"{p_slug or 'your-private'}  [id={cat_id}]"
+        return f"[id={cat_id}]"
+
+    disc_json_str  = _env_get("DISCOURSE", "")
+    disc_url_flat  = _env_get("DISCOURSE_URL", "")
+    disc_user_flat = _env_get("DISCOURSE_USERNAME", "")
+
+    print(f"\n  {'Discourse':<{W}}  Value")
+    print(f"  {'─' * W}  {'─' * 36}")
+
+    if disc_json_str:
+        try:
+            data  = json.loads(disc_json_str)
+            sites = data.get("sites", data) if isinstance(data, dict) else data
+            disc_site_key = _env_get("DISCOURSE_SITE", "")
+            for idx, site in enumerate(sites):
+                if idx > 0:
+                    print()
+                slug      = site.get("slug", "")
+                url       = site.get("url", "")
+                username  = site.get("username", "")
+                cat_id    = site.get("category_id")
+                priv_id   = site.get("private_category_id")
+                priv_slug = site.get("private_category_slug", "")
+                tos_ver   = site.get("tos_version", "")
+                tos_at    = site.get("tos_agreed_at", "")
+
+                is_active = (not disc_site_key and idx == 0) or (slug == disc_site_key)
+                site_label = slug or url.replace("https://", "").replace("http://", "").rstrip("/")
+                active_marker = "  ✓ active" if len(sites) > 1 and is_active else ""
+
+                print(f"  {'Site':<{W}}  {site_label}{active_marker}")
+                print(f"  {'URL':<{W}}  {url}")
+                print(f"  {'Username':<{W}}  {username}")
+                print(f"  {'Default category':<{W}}  {_cat_label_str(cat_id, priv_id, priv_slug)}")
+                if priv_id:
+                    print(f"  {'Private category':<{W}}  {priv_slug or 'your-private'}  [id={priv_id}]")
+                if tos_ver:
+                    tos_info = tos_ver
+                    if tos_at:
+                        tos_info += f"  (agreed {tos_at[:10]})"
+                    print(f"  {'TOS version':<{W}}  {tos_info}")
+        except Exception:
+            print(f"  {'Status':<{W}}  ✗ DISCOURSE JSON is malformed in ~/.crossenv")
+    elif disc_url_flat or disc_user_flat:
+        # Flat keys only (pre-DIS-3 migration)
+        disc_cat_flat = _env_get("DISCOURSE_CATEGORY_ID", "")
+        print(f"  {'URL':<{W}}  {disc_url_flat or '(not set)'}")
+        print(f"  {'Username':<{W}}  {disc_user_flat or '(not set)'}")
+        if disc_cat_flat:
+            print(f"  {'Category ID':<{W}}  {disc_cat_flat}")
+        print(f"  {'Note':<{W}}  Run: st-admin --discourse  (migrates to JSON config)")
+    else:
+        print(f"  {'Status':<{W}}  (not configured — run: st-admin --discourse-setup)")
 
     # ── Paths ──────────────────────────────────────────────────────────────────
     def _path_line(label: str, path: str) -> str:

@@ -1,0 +1,139 @@
+<svg width="800" height="305" viewBox="0 0 800 305" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr"  markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#9ca3af"/>
+    </marker>
+    <marker id="arrB" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrP" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrT" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#0d9488"/>
+    </marker>
+    <marker id="arrS" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- ── Title ─────────────────────────────────────────────────────── -->
+  <text x="400" y="16" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="13" font-weight="600" fill="#111827">
+    st-prep — from raw AI data to four presentation formats
+  </text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       INPUT CHAIN  (left side, vertically centred at y=150)
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- Box 1: st-gen (green) -->
+  <rect x="12"  y="116" width="120" height="68" rx="7" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+  <rect x="12"  y="116" width="120" height="25" rx="7" fill="#16a34a"/>
+  <rect x="12"  y="129" width="120" height="12"        fill="#16a34a"/>
+  <text x="72"  y="133" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-gen</text>
+  <text x="72"  y="153" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#14532d">Calls AI</text>
+  <text x="72"  y="168" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#166534">sends prompt · gets response</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="132" y1="150" x2="154" y2="150" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Box 2: Container (slate) -->
+  <rect x="156" y="116" width="138" height="68" rx="7" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <rect x="156" y="116" width="138" height="25" rx="7" fill="#475569"/>
+  <rect x="156" y="129" width="138" height="12"        fill="#475569"/>
+  <text x="225" y="133" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">Container</text>
+  <text x="225" y="153" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#1e293b">subject.json</text>
+  <text x="225" y="168" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#334155">stores raw AI response</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="294" y1="150" x2="317" y2="150" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Box 3: st-prep ⚙ (amber) -->
+  <rect x="319" y="116" width="132" height="68" rx="7" fill="#fef3c7" stroke="#fcd34d" stroke-width="1.5"/>
+  <rect x="319" y="116" width="132" height="25" rx="7" fill="#d97706"/>
+  <rect x="319" y="129" width="132" height="12"        fill="#d97706"/>
+  <text x="385" y="133" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-prep &#x2699;</text>
+  <text x="385" y="153" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#78350f">Processes data</text>
+  <text x="385" y="168" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#92400e">extracts &amp; formats output</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       FAN TREE  (trunk → spine → 4 branches)
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- Trunk: st-prep right edge (451) → spine (482) at y=150 -->
+  <line x1="451" y1="150" x2="482" y2="150" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- Vertical spine: top-output centre (54) → bottom-output centre (246) -->
+  <line x1="482" y1="54"  x2="482" y2="246" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- Coloured branches with arrowheads -->
+  <line x1="482" y1="54"  x2="503" y2="54"  stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrB)"/>
+  <line x1="482" y1="118" x2="503" y2="118" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#arrP)"/>
+  <line x1="482" y1="182" x2="503" y2="182" stroke="#0d9488" stroke-width="1.5" marker-end="url(#arrT)"/>
+  <line x1="482" y1="246" x2="503" y2="246" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrS)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       OUTPUT BOXES  (right side, x=505, w=275)
+       Centres: 54 · 118 · 182 · 246   (gap between boxes 2&3 = 145–155, trunk at y=150)
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- Output 1: Markdown (blue)   y=27..81, centre=54 -->
+  <rect x="505" y="27"  width="275" height="54" rx="7" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="505" y="27"  width="275" height="24" rx="7" fill="#3b82f6"/>
+  <rect x="505" y="39"  width="275" height="12"        fill="#3b82f6"/>
+  <text x="642" y="44"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">&#x1F4C4; Markdown</text>
+  <text x="642" y="62"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#1e3a8a">Formatted report text  ·  .md file</text>
+  <text x="642" y="74"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9"  fill="#1e40af">headings · emphasis · ready to publish</text>
+
+  <!-- Output 2: Report Title (purple)   y=91..145, centre=118 -->
+  <rect x="505" y="91"  width="275" height="54" rx="7" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1.5"/>
+  <rect x="505" y="91"  width="275" height="24" rx="7" fill="#7c3aed"/>
+  <rect x="505" y="103" width="275" height="12"        fill="#7c3aed"/>
+  <text x="642" y="108" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">&#x1F3F7; Report Title</text>
+  <text x="642" y="126" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#4c1d95">Extracted from the AI response</text>
+  <text x="642" y="138" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9"  fill="#5b21b6">used by st-post · st-speak · st-print</text>
+
+  <!-- Output 3: Spoken text / TTS (teal)   y=155..209, centre=182 -->
+  <rect x="505" y="155" width="275" height="54" rx="7" fill="#ccfbf1" stroke="#5eead4" stroke-width="1.5"/>
+  <rect x="505" y="155" width="275" height="24" rx="7" fill="#0d9488"/>
+  <rect x="505" y="167" width="275" height="12"        fill="#0d9488"/>
+  <text x="642" y="172" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">&#x1F50A; Spoken text</text>
+  <text x="642" y="190" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#134e4a">Natural-language text for audio</text>
+  <text x="642" y="202" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9"  fill="#115e59">renders to .mp3 via st-speak or --mp3</text>
+
+  <!-- Output 4: Plain text (slate)   y=219..273, centre=246 -->
+  <rect x="505" y="219" width="275" height="54" rx="7" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <rect x="505" y="219" width="275" height="24" rx="7" fill="#64748b"/>
+  <rect x="505" y="231" width="275" height="12"        fill="#64748b"/>
+  <text x="642" y="236" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">&#x1F4DD; Plain text</text>
+  <text x="642" y="254" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#1e293b">Clean readable text  ·  .txt file</text>
+  <text x="642" y="266" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9"  fill="#334155">no markup · easy to copy or share</text>
+
+  <!-- ── Footer ────────────────────────────────────────────────────── -->
+  <text x="400" y="292" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#6b7280">
+    called automatically by st-gen  ·  run with --all to export all four formats at once
+  </text>
+</svg>
+

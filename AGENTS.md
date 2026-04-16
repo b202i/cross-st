@@ -19,7 +19,7 @@ cross_st/st-find.py      ← Keyword search across .json containers and .prompt 
 cross_st/st-fix.py       ← Improve a story via fact-check feedback (modes: iterate [default] / patch / best-source / synthesize)
 cross_st/st-merge.py     ← Synthesize multiple AI stories (auto: simple mode or quality mode using fact scores)
 cross_st/st-man.py       ← Man-page viewer: local help from docstrings + --web opens GitHub Wiki
-cross_st/st-new.py       ← Create a new prompt from template/; opens editor; optionally launches st-bang
+cross_st/st-new.py       ← Create a new prompt from template/; opens editor; `-g`/`--gen` auto-runs st-gen+st-prep after editing; `--bang` runs st-bang (all AIs); `--ai` selects provider (defaults to `get_default_ai()`)
 cross_st/st-print.py     ← Convert a story to PDF; print to system printer or --save-pdf / --output file
 cross_st/st-heatmap.py   ← Cross-product fact-check score heatmap (evaluator vs target)
 cross_st/st-verdict.py   ← Verdict category bar chart (stacked per author AI)
@@ -31,13 +31,16 @@ cross_st/base_handler.py    ← Compatibility shim → cross_ai_core.ai_base
 cross_st/ai_url.py          ← X/Twitter + web URL fetch handler for st-fetch (AI_MAKE="url"; NOT in AI_HANDLER_REGISTRY)
 cross_st/mmd_*.py           ← Support modules: util, process_report, branding, plot, voice, for_speaking, single_key
 cross_st/mmd_data_analysis.py ← Flattened fact-check data helpers used by heatmap/verdict/analyze
-cross_st/mmd_startup.py     ← First-run detection: `require_config()` called near the top of every `st-*.py` (except `st-admin`, `st-man`)
+cross_st/mmd_startup.py     ← First-run detection: `require_config()` called near the top of every `st-*.py` (except `st-admin`, `st-man`); `load_cross_env()` also calls `check_for_updates()` (background PyPI poll, TTY-only, max once per 24 h)
 cross_st/mmd_web_server.py  ← Candidate Markdown preview server (currently unused; candidate to replace grip)
 cross_st/discourse.py       ← Discourse API client (MmdDiscourseClient wraps pydiscourse)
 cross_st/commands.py        ← Entry-point dispatch for pyproject.toml; maps `st_*` functions → `st-*.py` via runpy; also inserts `cross_st/` onto sys.path
 cross_st/cross_stones/                    ← Cross-Stones benchmark suite
 cross_st/cross_stones/cross-stones-10.json  ← Named benchmark set: locked params (n_claims, max_fact_score)
 cross_st/cross_stones/domains/            ← 10 standard domain prompts + result containers
+cross_st/data/              ← Package data directory (shipped with the package via VCS include)
+cross_st/data/discourse_tos.txt   ← T&C text displayed to new users during setup; top line is `# VERSION: <date>`
+cross_st/data/tos_versions.json   ← T&C version manifest: `{"tos_version": "...", "privacy_version": "...", "updated_at": "..."}`; `get_tos_versions()` falls back to hardcoded `2026-04-07` if file is missing
 cross_st/template/         ← Prompt templates for st-new; template/*.prompt files; default.prompt is the baseline
 api_cache/         ← MD5-keyed cached API responses (legacy local path; ~/.cross_api_cache/ for installed use)
 tmp/               ← Transient parallel coordination files
@@ -142,9 +145,9 @@ without touching the global file. `~/.crossenv` acts as a fallback for keys not 
 pytest                        # runs tests/ with config from pytest.ini
 pytest tests/test_mmd_process_report.py -v
 ```
-Tests live in `tests/` with fixtures in `tests/fixtures/` (e.g. `pizza_dough.json`). **Never call real AI APIs in tests** — use fixtures and mocks. Suite: **676 passing, 57 skipped** (as of COV-1).
+Tests live in `tests/` with fixtures in `tests/fixtures/` (e.g. `pizza_dough.json`). **Never call real AI APIs in tests** — use fixtures and mocks. Suite at v0.4.0: **676 passing, 57 skipped**. Current HEAD: **754 collected (695 passing, 57 skipped, 0 failing)** — `TestDiscourseManage` expanded to 36 tests with full DA-21 (Reports category) coverage.
 
-Current test files: `test_mmd_process_report.py`, `test_container_loading.py`, `test_st_admin.py`, `test_st_plot.py`, `test_st_speed.py`, `test_st_stones.py`, `test_dotenv_resolution.py`, `test_tts_stack.py`, `test_cache_timing_preservation.py`, `test_cli_help.py`, `test_imports.py`, `test_st_bang.py`, `test_st_verdict.py`, `test_mmd_util.py`, `test_ai_handler.py`, `test_mmd_data_analysis.py`.
+Current test files: `test_mmd_process_report.py`, `test_container_loading.py`, `test_st_admin.py`, `test_st_plot.py`, `test_st_speed.py`, `test_st_stones.py`, `test_dotenv_resolution.py`, `test_tts_stack.py`, `test_cache_timing_preservation.py`, `test_cli_help.py`, `test_imports.py`, `test_st_bang.py`, `test_st_verdict.py`, `test_mmd_util.py`, `test_ai_handler.py`, `test_mmd_data_analysis.py`, `test_ai_options.py`, `test_discourse_provision.py`.
 
 ## Cross-Stones Benchmark (`st-stones`)
 `cross_st/cross_stones/domains/` contains 10 benchmark domain prompts + result containers. `cross_st/cross_stones/cross-stones-10.json` is the **named benchmark set config** — it locks the domain list, `n_claims`, and `max_fact_score` so scores are directly comparable across runs over time. Do not add or remove domains from that file; create a new named set for variants.
@@ -273,6 +276,14 @@ Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–
 
 See `CHANGELOG.md [0.4.0]` for the full list. Key changes: `st-admin` 2-level menu, `st-post --category` default → `test` (sandbox), T&C versioning (TAP-1), @mention escaping, setup-wizard restructure, 122 new tests (suite 676 passing).
 
+### Post-0.4.0 (unreleased, HEAD → 0.5.0)
+
+- **DA-21** — `--category reports` added to `st-post` (id=16, "📄 Reports" — public portfolio at `crossai.dev/u/<username>/activity/topics`). The `st-admin` category quick-picker now has three named options: `1` private · `2` Test (cleared daily) · `3` 📄 Reports. `_DISCOURSE_REPORTS_CATEGORY_ID = 16` constant in `st-admin.py`.
+- **`st-speed --ai` fix** — `--ai` paired with `--ai-*` content flags now selects the generation provider only; performance display always shows all providers (`display_filter=None`). `--ai` alone still filters the display as before.
+- **`st-print` WeasyPrint errors** — catches `OSError` (missing native Pango/GObject libs) in addition to `ImportError`; `_print_weasyprint_install_hint()` prints platform-specific fix for macOS (`brew install pango`) and Linux (`apt-get libpango*`).
+- **`docs/wiki/st-speed.md` and `docs/wiki/st-heatmap.md` are now hand-authored** — `build_wiki.py` will not overwrite them. Four hand-authored pages total: `st-domain`, `st-fix`, `st-speed`, `st-heatmap`. All other wiki pages carry the `<!-- auto-generated by build_wiki.py -->` marker and are safe to regenerate.
+- **`build_wiki.py`** — scripts path fixed (`cross_st/` post-C1); wiki links no longer append `.md` (GitHub wiki uses bare page names).
+
 
 ---
 
@@ -296,14 +307,15 @@ See `CHANGELOG.md [0.4.0]` for the full list. Key changes: `st-admin` 2-level me
 | `cross_st/ai_handler.py` | Compatibility shim → `cross_ai_core.ai_handler`; exposes `process_prompt`, `get_default_ai`, `get_content_auto`, `put_content_auto`, etc. |
 | `cross_st/base_handler.py` | Compatibility shim → `cross_ai_core.ai_base.BaseAIHandler` |
 | `cross_st/ai_url.py` | X/Twitter fetch handler for `st-fetch`; uses `AI_MAKE="url"`, not registered in `AI_HANDLER_REGISTRY` |
-| `cross_st/mmd_startup.py` | `require_config()` — first-run guard; called near top of every `st-*.py` except `st-admin` and `st-man` |
+| `cross_st/mmd_startup.py` | `require_config()` — first-run guard; called near top of every `st-*.py` except `st-admin` and `st-man`; `load_cross_env()` calls `check_for_updates()` automatically (TTY-only nag, max once/24 h, cached in `~/.cross_api_cache/update_check.json`) |
 | `cross_st/mmd_util.py` | `tmp/` path helpers, block file protocol, `build_segments()` for fact-check units |
 | `cross_st/mmd_process_report.py` | Text pipeline helpers: `remove_markdown`, `extract_title`, `get_hashtags`, `clean_for_platform` |
 | `cross_st/mmd_data_analysis.py` | `get_flattened_fc_data()` — flattens fact[] into a DataFrame used by heatmap/verdict/analyze |
 | `cross_st/commands.py` | Entry-point dispatch: `runpy.run_path()` wrappers for every `st-*.py`; inserts `cross_st/` onto `sys.path`; target of `pyproject.toml [project.scripts]` |
 | `pyproject.toml` | Package metadata, `[project.scripts]` entry points (`cross_st.commands:*`), optional `[tts]` extras, package data declarations |
 | `cross_st/st-stones.py` | Cross-Stones scoring: `compute_domain_scores()`, `compute_cross_stone_scores()` |
-| `cross_st/st-print.py` | PDF export: Markdown → HTML → PDF via WeasyPrint; `--save-pdf` / `--output` / `--preview` / `--printer` |
+| `cross_st/st-speed.py` | AI performance/speed analysis. **`--ai` dual behavior (post-0.4.0):** when paired with an `--ai-*` content flag, `--ai` selects which provider *generates the content* but the performance table always shows all providers (`display_filter=None`). Without any `--ai-*` flag, `--ai` filters the display to one provider as before. |
+| `cross_st/st-print.py` | PDF export: Markdown → HTML → PDF via WeasyPrint; `--save-pdf` / `--output` / `--preview` / `--printer`; catches `OSError` (missing native Pango/GObject libs) with platform-specific install hints |
 | `README_stones.md` | Cross-Stones benchmark documentation: scoring formula, historical tracking, domain table |
 | `cross_st/cross_stones/cross-stones-10.json` | Named benchmark set: locked `n_claims`, `max_fact_score`, domain list |
 | `cross_st/template/default.prompt` | Baseline prompt template (1200–1500 word Markdown report); add files here for `st-new --template` |

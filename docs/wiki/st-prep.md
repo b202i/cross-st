@@ -1,8 +1,14 @@
-# st-prep — Prepare a raw AI response into a publishable story
+# st-prep — Process raw AI data into presentation formats
 
-Converts a raw AI response into a clean, structured story and appends it to the container. Extracts the title and hashtags, and optionally renders an MP3 audio file.
+Takes the raw AI response stored in the container by `st-gen` and processes it into four presentation formats: **Markdown** (formatted report text ready for publishing), a report **Title** (extracted from the AI text), **spoken-word text** (cleaned for text-to-speech, renders to .mp3 via `st-speak` or `--mp3`), and **plain text** (.txt). These outputs feed every downstream command — `st-fact`, `st-post`, `st-speak`, and `st-print`.
 
 **Run after:** `st-gen` · `st-fetch`  ·  **Run before:** `st-fact` · `st-post`
+
+---
+
+![st-prep workflow](st-prep-flow.svg)
+
+---
 
 ## Examples
 

@@ -1,0 +1,54 @@
+<svg width="700" height="148" viewBox="0 0 700 148" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#9ca3af"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="350" y="16" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="13" font-weight="600" fill="#111827">
+    st-gen workflow — create prompt, generate report, process output
+  </text>
+
+  <!-- ── Box 1: st-new ─────────────────────────────────────────────── -->
+  <rect x="70"  y="26" width="170" height="72" rx="7" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+  <rect x="70"  y="26" width="170" height="26" rx="7" fill="#16a34a"/>
+  <rect x="70"  y="40" width="170" height="12"        fill="#16a34a"/>
+  <text x="155" y="43" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-new</text>
+  <text x="155" y="65" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#14532d">Create prompt</text>
+  <text x="155" y="82" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10"                  fill="#166534">edit topic.prompt</text>
+
+  <!-- Arrow 1 → 2 -->
+  <line x1="240" y1="62" x2="258" y2="62" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── Box 2: st-gen ──────────────────────────────────────────────── -->
+  <rect x="260" y="26" width="180" height="72" rx="7" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="260" y="26" width="180" height="26" rx="7" fill="#3b82f6"/>
+  <rect x="260" y="40" width="180" height="12"        fill="#3b82f6"/>
+  <text x="350" y="43" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-gen</text>
+  <text x="350" y="65" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#1e3a8a">Generate report</text>
+  <text x="350" y="82" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10"                  fill="#1e40af">calls AI · writes data[]</text>
+
+  <!-- Arrow 2 → 3 -->
+  <line x1="440" y1="62" x2="458" y2="62" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── Box 3: st-prep ─────────────────────────────────────────────── -->
+  <rect x="460" y="26" width="170" height="72" rx="7" fill="#fef3c7" stroke="#fcd34d" stroke-width="1.5"/>
+  <rect x="460" y="26" width="170" height="26" rx="7" fill="#d97706"/>
+  <rect x="460" y="40" width="170" height="12"        fill="#d97706"/>
+  <text x="545" y="43" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">st-prep · auto</text>
+  <text x="545" y="65" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#78350f">Process output</text>
+  <text x="545" y="82" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10"                  fill="#92400e">story[] · title · text</text>
+
+  <!-- ── Footer: bracket showing the auto-called span ─────────────── -->
+  <line x1="440" y1="111" x2="630" y2="111" stroke="#9ca3af" stroke-width="1"/>
+  <line x1="440" y1="106" x2="440" y2="116" stroke="#9ca3af" stroke-width="1"/>
+  <line x1="630" y1="106" x2="630" y2="116" stroke="#9ca3af" stroke-width="1"/>
+  <text x="535" y="130" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#6b7280">
+    called automatically by st-gen — pass --no-prep to skip
+  </text>
+</svg>
+
