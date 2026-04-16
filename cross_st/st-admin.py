@@ -1408,24 +1408,34 @@ def upgrade_cross() -> None:
     except _im.PackageNotFoundError:
         current_ver = "unknown"
 
-    # ── Detect editable (dev) install ─────────────────────────────────────────
+    # ── Detect install type ───────────────────────────────────────────────────
+    # Priority order:
+    #   1. Is sys.executable inside a pipx venv?  → pipx install
+    #   2. Does direct_url.json say editable=true? → dev install
+    #   3. Otherwise                               → plain pip install
+    import pathlib
+
+    pipx_bin  = shutil.which("pipx")
+    using_pipx = False
     is_editable = False
+
+    exe_path  = pathlib.Path(sys.executable).resolve()
+    pipx_home = pathlib.Path(
+        os.environ.get("PIPX_HOME", os.path.expanduser("~/.local/pipx"))
+    )
     try:
-        dist = _im.Distribution.from_name("cross-st")
-        direct_url_text = dist.read_text("direct_url.json")
-        if direct_url_text and '"editable": true' in direct_url_text:
-            is_editable = True
-    except Exception:
+        exe_path.relative_to(pipx_home)
+        using_pipx = True          # running executable is inside the pipx venv
+    except ValueError:
         pass
 
-    # ── Detect pipx install ───────────────────────────────────────────────────
-    pipx_bin   = shutil.which("pipx")
-    using_pipx = False
-    if pipx_bin and not is_editable:
+    if not using_pipx:
+        # Only check for editable marker when NOT running from pipx
         try:
-            r = subprocess.run([pipx_bin, "list", "--short"],
-                               capture_output=True, text=True, timeout=10)
-            using_pipx = "cross-st" in r.stdout
+            dist = _im.Distribution.from_name("cross-st")
+            direct_url_text = dist.read_text("direct_url.json")
+            if direct_url_text and '"editable": true' in direct_url_text:
+                is_editable = True
         except Exception:
             pass
 
@@ -1434,11 +1444,31 @@ def upgrade_cross() -> None:
     print(f"  Installed : cross-st {current_ver}")
 
     if is_editable:
-        print(f"\n  ⚠️  Editable (dev) install detected — skipping PyPI upgrade.")
-        print(f"      Use  git pull  in your cross-st checkout to update instead.")
+        # Locate the dev checkout from the dist-info direct_url
+        dev_path = ""
+        try:
+            import json
+            dist = _im.Distribution.from_name("cross-st")
+            du = json.loads(dist.read_text("direct_url.json") or "{}")
+            dev_path = du.get("url", "").removeprefix("file://")
+        except Exception:
+            pass
+        print(f"\n  ⚠️  Dev (editable) install detected — skipping PyPI upgrade.")
+        if dev_path:
+            print(f"      Checkout : {dev_path}")
+        print(f"      To update:")
+        print(f"        cd {dev_path or '<your cross-st checkout>'}")
+        print(f"        git pull")
+        print(f"        pip install -e .")
     else:
         if using_pipx:
-            upgrade_cmd = [pipx_bin, "upgrade", "cross-st"]
+            if pipx_bin:
+                upgrade_cmd = [pipx_bin, "upgrade", "cross-st"]
+            else:
+                # pipx not on PATH but executable is inside its venv — find it
+                _pipx_guess = pathlib.Path(sys.executable).parent.parent.parent.parent.parent / "bin" / "pipx"
+                upgrade_cmd = [str(_pipx_guess) if _pipx_guess.exists()
+                               else "pipx", "upgrade", "cross-st"]
         else:
             upgrade_cmd = [sys.executable, "-m", "pip", "install", "--upgrade",
                            "cross-st"]

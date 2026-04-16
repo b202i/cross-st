@@ -7,6 +7,24 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.1] — 2026-04-16
+
+### Fixed
+- **`st-admin --upgrade` install-type detection** — pipx installs were falsely
+  reported as "Editable (dev) install" when the pipx venv had previously been
+  set up with `--editable`. Detection now checks whether `sys.executable` lives
+  inside the pipx home directory (`~/.local/pipx/` or `$PIPX_HOME`) **before**
+  consulting `direct_url.json`. This means:
+  - **pipx users** always get `pipx upgrade cross-st` — regardless of any stale
+    editable marker.
+  - **Dev-venv users** (editable install, `direct_url.json` present) get a clear
+    message with the checkout path and exact `git pull` + `pip install -e .`
+    instructions.
+  - **Plain pip users** (Homebrew Python, system Python, etc.) get
+    `pip install --upgrade cross-st` as before.
+
+---
+
 ## [0.5.0] — 2026-04-16
 
 ### Added
