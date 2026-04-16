@@ -65,8 +65,9 @@ st-fix --mode synthesize subject.json          # full synthesis
 | `-a` / `--ai <name>` | AI to use for rewriting (default: same AI that wrote the story) |
 | `--checker <name>` | AI to use for inline verification in iterate mode (default: original fact-checker) |
 | `--prep` | Run `st-prep` after fixing to refresh the title and hashtags |
-| `--no-cache` | Bypass API cache |
-| `-v` / `--verbose` | Show a diff of each change |
+ `--cache`  Enable API cache (default: enabled) 
+ `--no-cache`  Bypass API cache 
+ `-v` / `--verbose`  Show a diff of each change 
 | `-q` / `--quiet` | Minimal output |
 
 ---

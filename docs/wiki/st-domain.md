@@ -91,7 +91,7 @@ At the end:
 | `--set CONFIG.JSON` | Register the new domain in a named benchmark set config after saving. |
  `--no-cache`  Bypass the API cache — useful when retrying a smoke-test after editing. 
  `--cache`  Enable the API cache (default: on). 
- `-v`  Verbose: print raw AI responses. 
+ `-v` / `--verbose`  Verbose: print raw AI responses. 
 
 ### Adding to a benchmark set
 
