@@ -272,6 +272,10 @@ All API errors go through `ai_error_handler.handle_api_error()`. It distinguishe
 
 Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–A9, B1–B5, C1, C2, C3 are complete. `cross-st 0.5.0` is live at https://pypi.org/project/cross-st/0.5.0/.
 
+### ✅ cross-st 0.5.1 — released 2026-04-16
+
+See `CHANGELOG.md [0.5.1]` for details. **Bug fix**: `st-admin --upgrade` install-type detection — pipx installs were falsely reported as "Editable (dev) install" when the venv had previously been set up with `--editable`. Now detects by checking whether `sys.executable` lives inside `PIPX_HOME` first; editable check only runs for non-pipx installs. Dev installs now show checkout path + `git pull` / `pip install -e .` instructions.
+
 ### ✅ cross-st 0.5.0 — released 2026-04-16
 
 See `CHANGELOG.md [0.5.0]` for the full list. Key changes: `st-post --category reports` (DA-21), `st-speed --ai` dual behavior, progress feedback before every AI call (all tools), `st-print` WeasyPrint OSError handling, wiki 29/29 at 100%, `cross-ai-core ≥ 0.5.0` required (`process_prompt(model=)`, `<MAKE>_MODEL` env vars, `openai>=2.0.0`).
