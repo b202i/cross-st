@@ -7,6 +7,46 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0] — 2026-04-16
+
+### Added
+- **`st-post --category reports`** (DA-21) — post to the public "📄 Reports" portfolio category
+  (id=16, `crossai.dev/u/<username>/activity/topics`); `_DISCOURSE_REPORTS_CATEGORY_ID = 16`
+  constant in `st-admin.py`; `st-admin` category quick-picker (`c` key) now shows three options:
+  `1` private · `2` Test (cleared daily) · `3` 📄 Reports
+
+### Changed
+- **`st-speed --ai` dual behavior** — when `--ai` is paired with any `--ai-*` content flag
+  (`--ai-caption`, `--ai-short`, `--ai-title`, `--ai-summary`, `--ai-story`), `--ai` selects
+  which provider *generates the content* only; the performance display table always shows all
+  providers (`display_filter=None`). `--ai` alone (no `--ai-*` flag) still filters the display
+  to one provider as before.
+- **Progress feedback before every AI call** — all `st-*` scripts that call `process_prompt()`
+  now print `Generating {label} with {ai}…` immediately before the call (or before launching a
+  background thread), unless `--quiet` is active. Affected tools: `st-verdict`, `st-heatmap`,
+  `st-analyze`, `st-merge`, `st-plot` (complementing `st-speed` and `st-stones` which already
+  complied). Standard format: `print(f"  Generating {label} with {ai_make}…", flush=True)`.
+- **`cross-ai-core ≥ 0.5.0` required** — `process_prompt()` now accepts a `model=` keyword arg
+  for per-call model overrides; `get_ai_model(make)` checks `<MAKE_UPPER>_MODEL` env vars first
+  (e.g. `XAI_MODEL=grok-3-latest`, `ANTHROPIC_MODEL=claude-sonnet-4-5`); `openai>=2.0.0`
+  required (was `>=1.70.0`).
+
+### Fixed
+- **`st-print` WeasyPrint error handling** — catches `OSError` (missing native Pango/GObject
+  libs) in addition to `ImportError`; prints platform-specific install hint (macOS:
+  `brew install pango`; Linux: `apt-get install libpango*`).
+
+### Wiki
+- **29/29 wiki pages at 100% `--help` coverage** (Part B complete) — all 29 `st-*` command
+  pages updated with complete flag tables; four pages are hand-authored (`st-domain`, `st-fix`,
+  `st-speed`, `st-heatmap`) and will not be overwritten by `build_wiki.py`.
+- **`st-cross` pipeline graphic** — `st-cross-pipeline.svg` added to the `st-cross` wiki page
+  showing the N×N cross-product generation and fact-check workflow.
+- **`build_wiki.py` / `push_wiki.sh`** — script path fixed post-C1 (`cross_st/` subdirectory);
+  wiki links use bare page names (no `.md`); `push_wiki.sh` now copies `*.png` files.
+
+---
+
 ## [0.4.0] — 2026-04-12
 
 ### Added
