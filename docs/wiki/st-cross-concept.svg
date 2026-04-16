@@ -1,0 +1,215 @@
+<svg width="800" height="358" viewBox="0 0 800 358" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,1 L6,3.5 L0,6 Z" fill="#9ca3af"/>
+    </marker>
+  </defs>
+
+  <!-- ── Title ──────────────────────────────────────────────────────── -->
+  <text x="400" y="16" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="13" font-weight="600" fill="#111827">
+    st-cross — every AI writes a report · every AI fact-checks every report · N×N score grid
+  </text>
+
+  <!-- ── "FACT-CHECKERS →" column header label ─────────────────────── -->
+  <text x="490" y="31" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700"
+        fill="#7c3aed" letter-spacing="1">FACT-CHECKERS  →</text>
+
+  <!-- ── "GENERATORS ↓" row header label (rotated) ──────────────────── -->
+  <text x="20" y="190" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700"
+        fill="#1d4ed8" letter-spacing="1"
+        transform="rotate(-90,20,190)">GENERATORS  ↓</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       CORNER CELL — × operator
+       x=36, y=36, w=140, h=56
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="36" y="36" width="140" height="56" rx="6" fill="#ede9fe" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="106" y="69" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="32" font-weight="700" fill="#7c3aed">×</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       COLUMN HEADERS (fact-checkers)
+       col1 x=186, col2 x=356, col3 x=526
+       each w=160, h=56, y=36
+  ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Col 1: GPT-4o -->
+  <rect x="186" y="36" width="160" height="56" rx="6" fill="#fdf4ff" stroke="#e879f9" stroke-width="1.5"/>
+  <rect x="186" y="36" width="160" height="22" rx="6" fill="#a21caf"/>
+  <rect x="186" y="47" width="160" height="11"        fill="#a21caf"/>
+  <text x="266" y="51" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">GPT-4o</text>
+  <text x="266" y="80" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#701a75">checks every report</text>
+
+  <!-- Col 2: Claude -->
+  <rect x="356" y="36" width="160" height="56" rx="6" fill="#fdf4ff" stroke="#e879f9" stroke-width="1.5"/>
+  <rect x="356" y="36" width="160" height="22" rx="6" fill="#a21caf"/>
+  <rect x="356" y="47" width="160" height="11"        fill="#a21caf"/>
+  <text x="436" y="51" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">Claude</text>
+  <text x="436" y="80" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#701a75">checks every report</text>
+
+  <!-- Col 3: Gemini -->
+  <rect x="526" y="36" width="160" height="56" rx="6" fill="#fdf4ff" stroke="#e879f9" stroke-width="1.5"/>
+  <rect x="526" y="36" width="160" height="22" rx="6" fill="#a21caf"/>
+  <rect x="526" y="47" width="160" height="11"        fill="#a21caf"/>
+  <text x="606" y="51" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">Gemini</text>
+  <text x="606" y="80" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#701a75">checks every report</text>
+
+  <!-- Col "···" -->
+  <text x="718" y="66" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="700" fill="#a78bfa">···</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       ROW HEADERS (generators)
+       row1 y=100, row2 y=172, row3 y=244
+       each x=36, w=140, h=64
+  ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Row 1: GPT-4o -->
+  <rect x="36" y="100" width="140" height="64" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="36" y="100" width="140" height="22" rx="6" fill="#1d4ed8"/>
+  <rect x="36" y="111" width="140" height="11"        fill="#1d4ed8"/>
+  <text x="106" y="115" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">GPT-4o</text>
+  <text x="106" y="140" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#1e3a8a">writes report</text>
+
+  <!-- Row 2: Claude -->
+  <rect x="36" y="172" width="140" height="64" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="36" y="172" width="140" height="22" rx="6" fill="#1d4ed8"/>
+  <rect x="36" y="183" width="140" height="11"        fill="#1d4ed8"/>
+  <text x="106" y="187" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">Claude</text>
+  <text x="106" y="212" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#1e3a8a">writes report</text>
+
+  <!-- Row 3: Gemini -->
+  <rect x="36" y="244" width="140" height="64" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="36" y="244" width="140" height="22" rx="6" fill="#1d4ed8"/>
+  <rect x="36" y="255" width="140" height="11"        fill="#1d4ed8"/>
+  <text x="106" y="259" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="white">Gemini</text>
+  <text x="106" y="284" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#1e3a8a">writes report</text>
+
+  <!-- Row "···" -->
+  <text x="106" y="326" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="700" fill="#60a5fa">···</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       GRID CELLS  — 3 × 3
+       col x: 186, 356, 526   row y: 100, 172, 244   w=160, h=64
+  ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- ── Row 1 (GPT-4o reports) ─────────────────────────────────────── -->
+
+  <!-- [0,0] GPT-4o report ÷ GPT-4o check → 91%  green -->
+  <rect x="186" y="100" width="160" height="64" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="266" y="126" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#15803d">91%</text>
+  <!-- mini score bar -->
+  <rect x="216" y="138" width="100" height="8" rx="4" fill="#dcfce7"/>
+  <rect x="216" y="138" width="91"  height="8" rx="4" fill="#16a34a"/>
+  <text x="266" y="155" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#166534">fact score</text>
+
+  <!-- [0,1] GPT-4o report ÷ Claude check → 84%  amber -->
+  <rect x="356" y="100" width="160" height="64" rx="6" fill="#fefce8" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="436" y="126" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#92400e">84%</text>
+  <rect x="386" y="138" width="100" height="8" rx="4" fill="#fef9c3"/>
+  <rect x="386" y="138" width="84"  height="8" rx="4" fill="#d97706"/>
+  <text x="436" y="155" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#78350f">fact score</text>
+
+  <!-- [0,2] GPT-4o report ÷ Gemini check → 88%  green -->
+  <rect x="526" y="100" width="160" height="64" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="606" y="126" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#15803d">88%</text>
+  <rect x="556" y="138" width="100" height="8" rx="4" fill="#dcfce7"/>
+  <rect x="556" y="138" width="88"  height="8" rx="4" fill="#16a34a"/>
+  <text x="606" y="155" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#166534">fact score</text>
+
+  <!-- ── Row 2 (Claude reports) ─────────────────────────────────────── -->
+
+  <!-- [1,0] Claude report ÷ GPT-4o check → 79%  rose -->
+  <rect x="186" y="172" width="160" height="64" rx="6" fill="#fff1f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="266" y="198" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#b91c1c">79%</text>
+  <rect x="216" y="210" width="100" height="8" rx="4" fill="#ffe4e6"/>
+  <rect x="216" y="210" width="79"  height="8" rx="4" fill="#dc2626"/>
+  <text x="266" y="227" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#991b1b">fact score</text>
+
+  <!-- [1,1] Claude report ÷ Claude check → 93%  green -->
+  <rect x="356" y="172" width="160" height="64" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="436" y="198" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#15803d">93%</text>
+  <rect x="386" y="210" width="100" height="8" rx="4" fill="#dcfce7"/>
+  <rect x="386" y="210" width="93"  height="8" rx="4" fill="#16a34a"/>
+  <text x="436" y="227" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#166534">fact score</text>
+
+  <!-- [1,2] Claude report ÷ Gemini check → 86%  amber -->
+  <rect x="526" y="172" width="160" height="64" rx="6" fill="#fefce8" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="606" y="198" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#92400e">86%</text>
+  <rect x="556" y="210" width="100" height="8" rx="4" fill="#fef9c3"/>
+  <rect x="556" y="210" width="86"  height="8" rx="4" fill="#d97706"/>
+  <text x="606" y="227" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#78350f">fact score</text>
+
+  <!-- ── Row 3 (Gemini reports) ─────────────────────────────────────── -->
+
+  <!-- [2,0] Gemini report ÷ GPT-4o check → 87%  amber -->
+  <rect x="186" y="244" width="160" height="64" rx="6" fill="#fefce8" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="266" y="270" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#92400e">87%</text>
+  <rect x="216" y="282" width="100" height="8" rx="4" fill="#fef9c3"/>
+  <rect x="216" y="282" width="87"  height="8" rx="4" fill="#d97706"/>
+  <text x="266" y="299" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#78350f">fact score</text>
+
+  <!-- [2,1] Gemini report ÷ Claude check → 82%  amber -->
+  <rect x="356" y="244" width="160" height="64" rx="6" fill="#fefce8" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="436" y="270" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#92400e">82%</text>
+  <rect x="386" y="282" width="100" height="8" rx="4" fill="#fef9c3"/>
+  <rect x="386" y="282" width="82"  height="8" rx="4" fill="#d97706"/>
+  <text x="436" y="299" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#78350f">fact score</text>
+
+  <!-- [2,2] Gemini report ÷ Gemini check → 90%  green -->
+  <rect x="526" y="244" width="160" height="64" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="606" y="270" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#15803d">90%</text>
+  <rect x="556" y="282" width="100" height="8" rx="4" fill="#dcfce7"/>
+  <rect x="556" y="282" width="90"  height="8" rx="4" fill="#16a34a"/>
+  <text x="606" y="299" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="8" fill="#166534">fact score</text>
+
+  <!-- ── Dots row (implied more AIs) ──────────────────────────────── -->
+  <text x="266" y="326" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="700" fill="#9ca3af">···</text>
+  <text x="436" y="326" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="700" fill="#9ca3af">···</text>
+  <text x="606" y="326" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="18" font-weight="700" fill="#9ca3af">···</text>
+
+  <!-- ── Footer ────────────────────────────────────────────────────── -->
+  <text x="400" y="349" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#6b7280">
+    Step 1: st-gen runs per AI in parallel  ·  Step 2: st-fact runs for every report × every fact-checker  ·  all scores saved to subject.json
+  </text>
+</svg>
+
