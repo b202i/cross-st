@@ -1,10 +1,14 @@
 # st-cross — Run all AI providers and cross-check results
 
-Runs the full research pipeline in one command: generates a report from every AI provider, then has every AI fact-check every report. The result is an N×N score matrix saved into the container.
+uns the full research pipeline in one command: generates a report from every AI provider, then has every AI fact-check every report. The result is an N×N score matrix saved into the container.
 
 ![st-cross concept — N×N cross-product score grid](st-cross-concept.svg)
 
 Think of it as a classic cross product: the column of AI generators is multiplied by the column of AI fact-checkers to produce a grid of independent fact scores. Each cell shows how well one AI's report holds up under another AI's scrutiny. Run `st-heatmap` or `st-verdict` afterwards to visualise the results.
+
+![st-cross pipeline — tool associations](st-cross-pipeline.svg)
+
+`st-cross` is the orchestrator: it calls **[st-gen](st-gen)** to generate every report, then calls **[st-fact](st-fact)** to run every fact-check. The scores land in the Result column, ready for **[st-verdict](st-verdict)** to summarise.
 
 **Run after:** `st-new`    **Run before:** `st-merge`  `st-heatmap`  `st-verdict`  `st-analyze`
 

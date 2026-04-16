@@ -1,0 +1,105 @@
+<svg width="800" height="320" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ── Title ──────────────────────────────────────────────────────── -->
+  <text x="400" y="16" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="13" font-weight="600" fill="#111827">
+    st-cross — every AI writes a report · every AI fact-checks every report · N×N score grid
+  </text>
+
+  <!-- ── Tool labels above boxes ──────────────────────────────────── -->
+  <text x="142" y="34" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="#1d4ed8">st-gen</text>
+  <text x="369" y="34" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="#7c3aed">st-fact</text>
+  <text x="624" y="34" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" font-weight="700" fill="#15803d">st-verdict</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 1 — Report AI  (blue)   x=48, y=40, w=188, h=198
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="48"  y="40"  width="188" height="198" rx="7" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="48"  y="40"  width="188" height="28"  rx="7" fill="#1d4ed8"/>
+  <rect x="48"  y="56"  width="188" height="12"         fill="#1d4ed8"/>
+  <text x="142" y="59"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="700" fill="white">Report AI</text>
+  <line x1="48"  y1="102" x2="236" y2="102" stroke="#bfdbfe" stroke-width="1"/>
+  <line x1="48"  y1="136" x2="236" y2="136" stroke="#bfdbfe" stroke-width="1"/>
+  <line x1="48"  y1="170" x2="236" y2="170" stroke="#bfdbfe" stroke-width="1"/>
+  <line x1="48"  y1="204" x2="236" y2="204" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="142" y="86"  text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#1e3a8a">Anthropic</text>
+  <text x="142" y="120" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#1e3a8a">Gemini</text>
+  <text x="142" y="154" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#1e3a8a">OpenAI</text>
+  <text x="142" y="188" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#1e3a8a">Perplexity</text>
+  <text x="142" y="222" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#1e3a8a">xAI</text>
+
+  <!-- ── × operator ───────────────────────────────────────────────── -->
+  <text x="256" y="147" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="36" font-weight="700" fill="#7c3aed">×</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 2 — Fact Check AI  (purple)   x=275, y=40, w=188, h=198
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="275" y="40"  width="188" height="198" rx="7" fill="#fdf4ff" stroke="#d8b4fe" stroke-width="1.5"/>
+  <rect x="275" y="40"  width="188" height="28"  rx="7" fill="#7c3aed"/>
+  <rect x="275" y="56"  width="188" height="12"         fill="#7c3aed"/>
+  <text x="369" y="59"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="700" fill="white">Fact Check AI</text>
+  <line x1="275" y1="102" x2="463" y2="102" stroke="#e9d5ff" stroke-width="1"/>
+  <line x1="275" y1="136" x2="463" y2="136" stroke="#e9d5ff" stroke-width="1"/>
+  <line x1="275" y1="170" x2="463" y2="170" stroke="#e9d5ff" stroke-width="1"/>
+  <line x1="275" y1="204" x2="463" y2="204" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="369" y="86"  text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#581c87">Anthropic</text>
+  <text x="369" y="120" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#581c87">Gemini</text>
+  <text x="369" y="154" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#581c87">OpenAI</text>
+  <text x="369" y="188" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#581c87">Perplexity</text>
+  <text x="369" y="222" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#581c87">xAI</text>
+
+  <!-- ── = operator ───────────────────────────────────────────────── -->
+  <text x="484" y="147" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="36" font-weight="700" fill="#374151">=</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       BOX 3 — Result  (green)   x=503, y=40, w=242, h=198
+  ══════════════════════════════════════════════════════════════════ -->
+  <rect x="503" y="40"  width="242" height="198" rx="7" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <rect x="503" y="40"  width="242" height="28"  rx="7" fill="#15803d"/>
+  <rect x="503" y="56"  width="242" height="12"         fill="#15803d"/>
+  <text x="624" y="59"  text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="700" fill="white">Result</text>
+  <text x="624" y="113" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="600" fill="#14532d">5 AI reports</text>
+  <line x1="523" y1="126" x2="725" y2="126" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="624" y="150" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="600" fill="#14532d">25 AI fact-check reports</text>
+  <text x="624" y="167" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#166534">(5 reports × 5 fact-checkers)</text>
+  <line x1="523" y1="178" x2="725" y2="178" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="624" y="203" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="600" fill="#14532d">Fact-check score</text>
+  <text x="624" y="219" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#166534">per report · per AI · saved to JSON</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       st-cross bracket under Box 1 + Box 2
+       bracket from x=48 to x=463, y=248 → label at y=264
+  ══════════════════════════════════════════════════════════════════ -->
+  <!-- bracket: left foot, top bar, right foot -->
+  <polyline points="48,244 48,252 255,252 255,244"
+            fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round"/>
+  <polyline points="463,244 463,252 255,252"
+            fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- tick down from centre -->
+  <line x1="255" y1="252" x2="255" y2="260" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="255" y="274" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="700" fill="#4338ca">st-cross</text>
+  <text x="255" y="288" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#6366f1">orchestrates both steps</text>
+
+  <!-- ── Footer ────────────────────────────────────────────────────── -->
+  <text x="400" y="310" text-anchor="middle"
+        font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#6b7280">
+    st-cross runs st-gen + st-fact automatically  ·  view scores with st-heatmap · st-analyze · st-merge
+  </text>
+</svg>
+
