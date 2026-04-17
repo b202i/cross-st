@@ -24,7 +24,7 @@ from statistics import mean, median, stdev
 from tabulate import tabulate
 
 # Import AI handler for caption generation
-from ai_handler import process_prompt, get_content, get_default_ai
+from ai_handler import process_prompt, get_content_auto, get_default_ai
 
 
 def load_container(file_path):
@@ -549,7 +549,7 @@ def generate_ai_content(gen_summary, fact_summary, ai_make, content_type="captio
         gen_payload, client, response, ai_model = result
         
         # Extract content text
-        content = get_content(ai_make, response)
+        content = get_content_auto(response)
         content = content.strip()
         
         # Validate content quality
