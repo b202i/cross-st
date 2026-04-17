@@ -30,7 +30,7 @@ import sys
 import threading
 import time
 from mmd_startup import require_config, load_cross_env
-from ai_handler import process_prompt, get_ai_list, get_content, get_ai_make, get_ai_model, \
+from ai_handler import process_prompt, get_ai_list, get_content_auto, get_ai_make, get_ai_model, \
     get_default_ai, get_usage
 from collections import Counter
 from tabulate import tabulate
@@ -527,7 +527,7 @@ def main():
                     print(f"  Error on segment {n + 1}/{total_para}: {e}, skipping.")
                 continue
 
-            fact_check_text = get_content(args.ai, response) + "  "
+            fact_check_text = get_content_auto(response) + "  "
 
             valid_words = ["True", "False", "Partially_true", "Partially_false", "Opinion"]
             if not any(word in fact_check_text for word in valid_words):
@@ -902,7 +902,7 @@ def _run_ai_review(args, container):
         try:
             result  = process_prompt(review_ai, prompt, use_cache=args.cache, retry_budget=_retry_budget)
             _, _, response, _ = result
-            content = get_content(review_ai, response).strip()
+            content = get_content_auto(response).strip()
             print(content)
         except Exception as e:
             print(f"  Generation failed ({ctype}): {e}")

@@ -30,7 +30,7 @@ from pathlib import Path
 # Load .env before importing ai_handler so API keys are available.
 load_cross_env()
 
-from ai_handler import get_content, get_default_ai, process_prompt  # noqa: E402
+from ai_handler import get_content_auto, get_default_ai, process_prompt  # noqa: E402
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
 RESET  = "\033[0m"
@@ -181,7 +181,7 @@ def suggest_aspects(display_name: str, topic_description: str, n_claims: int,
         n_claims=n_claims,
     )
     result   = process_prompt(ai_make, prompt, verbose=verbose, use_cache=use_cache)
-    raw_text = get_content(ai_make, result[2]).strip()
+    raw_text = get_content_auto(result[2]).strip()
 
     lines   = [_strip_list_prefix(ln) for ln in raw_text.splitlines() if ln.strip()]
     aspects = [ln for ln in lines if ln][:5]
@@ -225,7 +225,7 @@ def build_prompt_text(display_name: str, topic_description: str,
 def smoke_test(prompt_text: str, ai_make: str, use_cache: bool, verbose: bool) -> str:
     """Send the assembled prompt to one AI and return the raw claims text."""
     result = process_prompt(ai_make, prompt_text, verbose=verbose, use_cache=use_cache)
-    return get_content(ai_make, result[2]).strip()
+    return get_content_auto(result[2]).strip()
 
 
 def _count_numbered_claims(text: str) -> int:

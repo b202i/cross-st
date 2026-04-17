@@ -213,7 +213,7 @@ import difflib
 import threading
 import time
 
-from ai_handler import get_ai_list, get_default_ai, process_prompt, get_content, get_content_auto, put_content, put_content_auto
+from ai_handler import get_ai_list, get_default_ai, process_prompt, get_content_auto, put_content, put_content_auto
 from mmd_process_report import remove_markdown
 
 
@@ -1493,7 +1493,7 @@ Modes:
             print(f"  Try again later, or specify a different AI with --ai")
             sys.exit(1)
 
-        revised = get_content(active_ai, gen_response)
+        revised = get_content_auto(gen_response)
 
         if args.verbose:
             print_diff(primary_text, revised)
@@ -1740,7 +1740,7 @@ Modes:
                                  quiet=args.quiet):
                         gen_payload, _, gen_response, fc_ai_model = process_prompt(
                             writer_ai, fix_prompt, verbose=args.verbose, use_cache=args.cache)
-                    candidate = get_content(writer_ai, gen_response).strip()
+                    candidate = get_content_auto(gen_response).strip()
 
                     # Strip surrounding quotes the AI sometimes adds
                     candidate = candidate.strip('"\'')
@@ -1758,7 +1758,7 @@ Modes:
                                  quiet=args.quiet):
                         _, _, check_response, _ = process_prompt(
                             checker_ai, check_prompt, verbose=args.verbose, use_cache=args.cache)
-                    check_text = get_content(checker_ai, check_response).strip()
+                    check_text = get_content_auto(check_response).strip()
 
                     # Parse verdict from checker response
                     new_verdict = _parse_inline_verdict(check_text)
@@ -1839,7 +1839,7 @@ Modes:
             prompt  = get_patch_prompt(revised, batch)
             gen_payload, client, gen_response, fc_ai_model = _call_ai_with_retry(
                 label, args.ai, prompt)
-            raw = get_content(args.ai, gen_response)
+            raw = get_content_auto(gen_response)
 
             # Parse the JSON substitution pairs the AI returned
             subs = _parse_substitutions(raw)
@@ -1910,7 +1910,7 @@ Modes:
                 prompt = get_best_source_prompt(revised, batch, alternates)
             gen_payload, client, gen_response, fc_ai_model = _call_ai_with_retry(
                 label, args.ai, prompt)
-            raw  = get_content(args.ai, gen_response)
+            raw  = get_content_auto(gen_response)
             subs = _parse_substitutions(raw)
 
             if subs:

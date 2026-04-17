@@ -46,7 +46,7 @@ import json
 import os
 import subprocess
 import sys
-from ai_handler import process_prompt, get_ai_list, get_content, get_ai_model, \
+from ai_handler import process_prompt, get_ai_list, get_content_auto, get_ai_model, \
     get_default_ai
 from mmd_branding import get_speaking_tagline, get_tagline_for_reading, get_app_tag, get_ai_make_model
 from mmd_for_speaking import for_speaking
@@ -252,7 +252,7 @@ return exactly: NO_ALTERNATIVE
 """
     try:
         _, _, response, _ = process_prompt(synthesizer_ai, prompt.strip(), verbose=verbose, use_cache=use_cache)
-        result = get_content(synthesizer_ai, response).strip()
+        result = get_content_auto(response).strip()
         if result == "NO_ALTERNATIVE" or not result:
             return None
         return result
@@ -469,7 +469,7 @@ def _run_story_ai_content(args, story_text: str, story_title: str, ai_make: str)
         try:
             result  = process_prompt(ai_make, prompt, use_cache=args.cache)
             _, _, response, _ = result
-            content = get_content(ai_make, response).strip()
+            content = get_content_auto(response).strip()
             if not args.quiet:
                 print(f"\n{label}:")
                 print("─" * 70)
@@ -788,7 +788,7 @@ def main():
             print("  Duplicate data item — not added")
 
     # ── Build story entry ─────────────────────────────────────────────────────
-    all_raw_story_text = get_content(args.ai, response)
+    all_raw_story_text = get_content_auto(response)
     make = args.ai
     model = get_ai_model(make)
 

@@ -157,7 +157,7 @@ class TestRunStoryAiContent:
     def test_ai_title_calls_process_prompt(self, capsys):
         args = _args(ai_title=True)
         with patch.object(st_analyze, "process_prompt") as mock_pp, \
-             patch.object(st_analyze, "get_content", return_value="My Title"):
+             patch.object(st_analyze, "get_content_auto", return_value="My Title"):
             mock_pp.return_value = (None, None, MagicMock(), "model")
             st_analyze._run_story_ai_content(args, self.STORY_TEXT, self.STORY_TITLE, "xai")
         mock_pp.assert_called_once()
@@ -165,7 +165,7 @@ class TestRunStoryAiContent:
     def test_ai_title_printed_to_stdout(self, capsys):
         args = _args(ai_title=True)
         with patch.object(st_analyze, "process_prompt") as mock_pp, \
-             patch.object(st_analyze, "get_content", return_value="My Title"):
+             patch.object(st_analyze, "get_content_auto", return_value="My Title"):
             mock_pp.return_value = (None, None, MagicMock(), "model")
             st_analyze._run_story_ai_content(args, self.STORY_TEXT, self.STORY_TITLE, "xai")
         captured = capsys.readouterr()
@@ -174,7 +174,7 @@ class TestRunStoryAiContent:
     def test_multiple_flags_multiple_calls(self):
         args = _args(ai_title=True, ai_short=True, ai_caption=True)
         with patch.object(st_analyze, "process_prompt") as mock_pp, \
-             patch.object(st_analyze, "get_content", return_value="text"):
+             patch.object(st_analyze, "get_content_auto", return_value="text"):
             mock_pp.return_value = (None, None, MagicMock(), "model")
             st_analyze._run_story_ai_content(args, self.STORY_TEXT, self.STORY_TITLE, "xai")
         assert mock_pp.call_count == 3
@@ -182,7 +182,7 @@ class TestRunStoryAiContent:
     def test_labels_printed_when_not_quiet(self, capsys):
         args = _args(ai_caption=True)
         with patch.object(st_analyze, "process_prompt") as mock_pp, \
-             patch.object(st_analyze, "get_content", return_value="cap text"):
+             patch.object(st_analyze, "get_content_auto", return_value="cap text"):
             mock_pp.return_value = (None, None, MagicMock(), "model")
             st_analyze._run_story_ai_content(args, self.STORY_TEXT, self.STORY_TITLE, "xai")
         out = capsys.readouterr().out
@@ -192,7 +192,7 @@ class TestRunStoryAiContent:
     def test_quiet_suppresses_labels(self, capsys):
         args = _args(ai_short=True, quiet=True)
         with patch.object(st_analyze, "process_prompt") as mock_pp, \
-             patch.object(st_analyze, "get_content", return_value="short text"):
+             patch.object(st_analyze, "get_content_auto", return_value="short text"):
             mock_pp.return_value = (None, None, MagicMock(), "model")
             st_analyze._run_story_ai_content(args, self.STORY_TEXT, self.STORY_TITLE, "xai")
         out = capsys.readouterr().out
@@ -211,7 +211,7 @@ class TestRunStoryAiContent:
     def test_cache_flag_forwarded(self):
         args = _args(ai_title=True, cache=False)
         with patch.object(st_analyze, "process_prompt") as mock_pp, \
-             patch.object(st_analyze, "get_content", return_value="t"):
+             patch.object(st_analyze, "get_content_auto", return_value="t"):
             mock_pp.return_value = (None, None, MagicMock(), "model")
             st_analyze._run_story_ai_content(args, self.STORY_TEXT, self.STORY_TITLE, "xai")
         _, kwargs = mock_pp.call_args

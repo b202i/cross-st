@@ -21,7 +21,7 @@ import threading
 import time
 from mmd_startup import require_config, load_cross_env
 import pandas as pd
-from ai_handler import process_prompt, get_ai_list, get_content, get_ai_model, \
+from ai_handler import process_prompt, get_ai_list, get_content_auto, get_ai_model, \
     get_default_ai
 from dotenv import load_dotenv
 from mmd_data_analysis import get_flattened_fc_data
@@ -236,7 +236,7 @@ def _run_story_ai_content(args, story_text: str, story_title: str, ai_make: str)
         try:
             result  = process_prompt(ai_make, prompt, use_cache=args.cache)
             _, _, response, _ = result
-            content = get_content(ai_make, response).strip()
+            content = get_content_auto(response).strip()
             if not args.quiet:
                 print(f"\n{label}:")
                 print("─" * 70)
@@ -424,7 +424,7 @@ def main():
         if not args.quiet:
             print("Added new analysis data")
 
-    all_raw_story_text = get_content(args.ai, response)
+    all_raw_story_text = get_content_auto(response)
     make = args.ai
     model = get_ai_model(make)
 

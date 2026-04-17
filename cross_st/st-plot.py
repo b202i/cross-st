@@ -33,7 +33,7 @@ Options: --plot  --file  --path  --display  --file_kv
 """
 
 from mmd_data_analysis import get_flattened_fc_data, analysis_plots
-from ai_handler import process_prompt, get_content, get_default_ai
+from ai_handler import process_prompt, get_content_auto, get_default_ai
 from pathlib import Path
 from scipy import stats
 import argparse
@@ -204,7 +204,7 @@ def _generate_plot_content(df, ai_make: str, content_type: str,
             print(f"  Calling {ai_make} for {content_type} ({len(prompt)} chars)…")
         result = process_prompt(ai_make, prompt, verbose=False, use_cache=use_cache)
         _, _, response, _ = result
-        content = get_content(ai_make, response).strip()
+        content = get_content_auto(response).strip()
         if verbose:
             print(f"  Generated {len(content.split())} words")
         return content

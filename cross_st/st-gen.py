@@ -29,7 +29,7 @@ import sys
 import time
 from mmd_startup import require_config, load_cross_env
 
-from ai_handler import process_prompt, get_ai_list, get_default_ai, get_usage, check_api_key, get_content
+from ai_handler import process_prompt, get_ai_list, get_default_ai, get_usage, check_api_key, get_content_auto
 
 from mmd_util import create_block_file, tmp_safe_name, get_tmp_dir
 
@@ -90,7 +90,7 @@ Plain text with ## headers."""
 
 def _run_story_ai_content(args, story_text: str, story_title: str, ai_make: str):
     """Generate and print AI content from a story. Dispatches over enabled flags."""
-    from ai_handler import process_prompt, get_content
+    from ai_handler import process_prompt, get_content_auto
     context = f"ARTICLE TITLE: {story_title}\n\nARTICLE TEXT:\n{story_text}"
     content_type_map = [
         (args.ai_title,   "title",   "Title"),
@@ -109,7 +109,7 @@ def _run_story_ai_content(args, story_text: str, story_title: str, ai_make: str)
         try:
             result  = process_prompt(ai_make, prompt, use_cache=args.cache)
             _, _, response, _ = result
-            content = get_content(ai_make, response).strip()
+            content = get_content_auto(response).strip()
             print(content)
         except Exception as e:
             print(f"  Generation failed ({ctype}): {e}")
@@ -219,7 +219,7 @@ def main():
     elapsed_seconds = end_time - start_time
 
     # Guard against empty responses — these can be cached and silently replayed
-    content_check = get_content(args.ai, gen_response)
+    content_check = get_content_auto(gen_response)
     if not content_check or not content_check.strip():
         print(f"Error: {args.ai} returned an empty response — nothing saved.", file=sys.stderr)
         if was_cached:

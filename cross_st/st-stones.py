@@ -60,7 +60,7 @@ from typing import Optional
 
 from tabulate import tabulate
 
-from ai_handler import process_prompt, get_content, get_default_ai
+from ai_handler import process_prompt, get_content_auto, get_default_ai
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 DEFAULT_W1        = 0.7    # accuracy weight
@@ -1423,7 +1423,7 @@ def main():
             baseline_date=baseline_date,
         )
         result  = process_prompt(ai_make, prompt, verbose=False, use_cache=args.cache)
-        content = get_content(ai_make, result[2]).strip()
+        content = get_content_auto(result[2]).strip()
         is_valid, word_count, error_msg = validate_ai_content(content, content_type)
         if not is_valid:
             print(f"  Warning: {error_msg}", file=sys.stderr)
