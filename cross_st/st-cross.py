@@ -676,8 +676,11 @@ def _get_provider_semaphore(make: str, max_override, sequential: bool) -> thread
             return
 
         cell = cells[(si, fi)]
-        cell["status"]     = ST_RUNNING
+        # Write start_time BEFORE status so any concurrent reader that sees
+        # status == ST_RUNNING is guaranteed to see a non-None start_time
+        # (otherwise _draw_cross_table's elapsed calculation reads None).
         cell["start_time"] = time.time()
+        cell["status"]     = ST_RUNNING
 
         fc_make = ai_list[fi]
         cmd = [
@@ -693,6 +696,10 @@ def _get_provider_semaphore(make: str, max_override, sequential: bool) -> thread
         sem = _get_provider_semaphore(fc_make, args.max_concurrency, not args.parallel)
         if args.verbose and not args.quiet:
             print(f"  Generating fact-check: {ai_list[si]} -> {fc_make}...", flush=True)
+        # Defer the terminal status assignment to the finally block so it
+        # always lands AFTER end_time — readers that see DONE/FAILED/CANCELLED
+        # are then guaranteed to also see a populated end_time.
+        final_status = ST_FAILED
         try:
             with sem:
                 result = subprocess.run(
@@ -702,24 +709,24 @@ def _get_provider_semaphore(make: str, max_override, sequential: bool) -> thread
                     timeout=args.timeout if args.timeout > 0 else None,
                 )
             if result.returncode == 0:
-                cell["status"] = ST_DONE
+                final_status = ST_DONE
             else:
-                cell["status"] = ST_FAILED
+                final_status = ST_FAILED
                 err = result.stderr.decode(errors="replace").strip()
                 if err:
                     cell_errors[(si, fi)] = err
         except subprocess.TimeoutExpired:
-            cell["status"] = ST_FAILED
+            final_status = ST_FAILED
             cell_errors[(si, fi)] = "timeout"
         except KeyboardInterrupt:
             cancelled.set()
-            cell["status"] = ST_CANCELLED
+            final_status = ST_CANCELLED
         except Exception as e:
-            cell["status"] = ST_FAILED
+            final_status = ST_FAILED
             cell_errors[(si, fi)] = str(e)
         finally:
-            if cell["end_time"] is None:
-                cell["end_time"] = time.time()
+            cell["end_time"] = time.time()
+            cell["status"]   = final_status
 
     # N×N threads — one per cell — for full parallelism.
     # st-fact uses fcntl.flock internally to serialise the JSON write,
