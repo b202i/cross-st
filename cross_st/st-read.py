@@ -24,7 +24,6 @@ import json
 import os
 import sys
 from mmd_startup import require_config
-import textstat
 from tabulate import tabulate
 
 
@@ -67,6 +66,13 @@ def main():
     if "story" not in main_container or len(main_container["story"]) == 0:
         print("story list empty")
     else:
+        try:
+            import textstat
+        except ImportError:
+            print("  textstat not installed — installing now (one-time, ~1 MB)…", flush=True)
+            import subprocess as _sp
+            _sp.run([sys.executable, "-m", "pip", "install", "--quiet", "textstat"], check=True)
+            import textstat  # noqa: F811
         table_data = []
         for i, story in enumerate(main_container["story"], start=1):
             test_data = story.get("text")
