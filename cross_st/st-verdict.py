@@ -39,7 +39,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ai_handler import get_content, get_default_ai, process_prompt
+from ai_handler import get_content_auto, get_default_ai, process_prompt
 from mmd_data_analysis import get_flattened_fc_data_simple
 from mmd_plot import show_plot
 
@@ -246,7 +246,7 @@ def generate_ai_content(df, story_titles, ai_make, content_type, verbose=False, 
     try:
         result = process_prompt(ai_make, prompt, verbose=False, use_cache=use_cache)
         _, _, response, _ = result
-        content = get_content(ai_make, response).strip()
+        content = get_content_auto(response).strip()
         return content
     except Exception as e:
         print(f"  Caption generation failed: {e}")
