@@ -239,6 +239,22 @@ def _draw_cross_table(cells: dict, ai_list: list, file_prefix: str,
 
 # ── Segment pre-build helper ─────────────────────────────────────────────────
 
+def _stories_complete(json_path: str, ai_list: list) -> bool:
+    """Return True if *json_path* has a story entry for every AI make in *ai_list*.
+
+    Used to auto-skip Step 1 when all N stories already exist in the container.
+    Missing file or malformed JSON → False (start fresh).
+    """
+    try:
+        with open(json_path) as f:
+            c = json.load(f)
+        existing_makes = {s.get("make") for s in c.get("story", [])}
+        needed_makes   = {get_ai_make(a) for a in ai_list}
+        return needed_makes.issubset(existing_makes)
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
 def _ensure_segments(file_json: str, n_stories: int, quiet: bool = False) -> None:
     """
     For each of the first n_stories stories in file_json, build and store
@@ -337,18 +353,7 @@ def main():
     # ── Auto-detect whether all N stories already exist ───────────────────────
     # If the container has a story entry for every AI make, skip Step 1.
     # --skip-gen forces this; without it we check the container automatically.
-    def _stories_complete(json_path: str) -> bool:
-        """Return True if json_path has a story for every AI in ai_list."""
-        try:
-            with open(json_path) as f:
-                c = json.load(f)
-            existing_makes = {s.get("make") for s in c.get("story", [])}
-            needed_makes   = {get_ai_make(a) for a in ai_list}
-            return needed_makes.issubset(existing_makes)
-        except (OSError, json.JSONDecodeError):
-            return False
-
-    skip_gen = args.skip_gen or _stories_complete(file_json)
+    skip_gen = args.skip_gen or _stories_complete(file_json, ai_list)
 
     if not skip_gen and not os.path.isfile(file_prompt):
         print(f"Error: prompt file not found: {file_prompt}", file=sys.stderr)
@@ -375,7 +380,7 @@ def main():
     gen_jobs = []
     if skip_gen:
         if not args.quiet:
-            reason = "all stories already present" if _stories_complete(file_json) else "--skip-gen"
+            reason = "all stories already present" if _stories_complete(file_json, ai_list) else "--skip-gen"
             print(f"\n  {_clr('Step 1 — Skipped', BOLD)} ({reason})\n")
     else:
         base = Path(file_prefix).name
