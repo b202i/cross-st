@@ -4,9 +4,11 @@ st-cross — Run all AI providers and cross-check results
 
 Step 1: Generate N stories, one per AI (via st-gen --prep), in parallel.
 Step 2: Fact-check all N stories with all N AIs — N×N jobs.
-        Each column (fact-check AI) runs as a separate thread, serializing
-        its calls per-story to avoid concurrent writes to the same JSON file.
-        This gives N-way parallelism while keeping file writes safe.
+        Every cell (story × fact-checker) runs in its own daemon thread,
+        invoking `st-fact` as a subprocess for crash isolation. A per-provider
+        semaphore (see `--max-concurrency` and `get_rate_limit_concurrency()`)
+        caps simultaneous calls to any single AI provider to respect rate
+        limits. Subprocess isolation keeps JSON writes safe across cells.
 
 Result: an N×N cross-product table saved into the .json container.
 
