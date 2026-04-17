@@ -7,6 +7,36 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] — unreleased
+
+### Added
+- **PAR-1 — `st-cross` per-provider rate limiting + flag surface.**
+  `st-cross` has always run its N×N matrix in parallel (one thread per cell);
+  PAR-1 adds a per-provider concurrency cap so the wide-open fan-out can no
+  longer trip rate limits on free / starter API tiers.
+  - New flags: `--parallel` / `-p` (default), `--sequential`,
+    `--max-concurrency N`, `--retry-budget SECONDS` (default 45).
+  - Per-provider semaphore sized via `cross_ai_core.get_rate_limit_concurrency()`
+    (xai=3, anthropic=2, openai=3, perplexity=2, gemini=5).
+  - `--retry-budget` is plumbed through to `st-fact` → `process_prompt(retry_budget=…)`
+    so a single transient 503 can no longer park the matrix on a 105 s tail.
+  - Removed dead `_run_column()` helper from `st-cross.py`.
+- **`st-fact --retry-budget SECONDS`** — passes through to
+  `process_prompt(retry_budget=…)`. `0` = unlimited (pre-PAR-1 behaviour, default).
+- **`get_rate_limit_concurrency` re-exported** from the `cross_st.ai_handler` shim.
+
+### Changed
+- **`cross-ai-core` floor bumped to `>=0.6.0`** (PAR-1 needs `get_rate_limit_concurrency`
+  + `process_prompt(retry_budget=…)` from `cross-ai-core` 0.6.0).
+
+### Tests
+- New `tests/test_st_cross.py` — 13 PAR-1 unit tests covering the semaphore
+  registry, rate-limit enforcement (real `threading.Semaphore` race), CLI
+  surface, and `--parallel/--sequential` mutual exclusion.
+- Suite: 696 → **709 passing** (57 skipped, 0 failing).
+
+---
+
 ## [0.5.1] — 2026-04-16
 
 ### Fixed

@@ -29,7 +29,7 @@ import time
 from mmd_startup import require_config
 from pathlib import Path
 
-from ai_handler import get_ai_list, get_ai_make, get_ai_model
+from ai_handler import get_ai_list, get_ai_make, get_ai_model, get_rate_limit_concurrency
 from mmd_util import get_tmp_dir, tmp_safe_name, build_segments
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
@@ -303,6 +303,25 @@ def main():
                         help="Enable verbose output.")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="Suppress live table (minimal output).")
+
+    # ── PAR-1: parallelism + per-provider rate limiting ──────────────────────
+    parallel_group = parser.add_mutually_exclusive_group()
+    parallel_group.add_argument("-p", "--parallel", dest="parallel",
+                                action="store_true", default=True,
+                                help="Run cells in parallel, gated by per-provider "
+                                     "rate-limit semaphores (default).")
+    parallel_group.add_argument("--sequential", dest="parallel", action="store_false",
+                                help="Run cells one at a time. Useful for debugging "
+                                     "or very low-quota accounts.")
+    parser.add_argument("--max-concurrency", type=int, default=None, metavar="N",
+                        help="Override the per-provider concurrency cap. Default: "
+                             "uses cross_ai_core.get_rate_limit_concurrency() per make "
+                             "(xai=3, anthropic=2, openai=3, perplexity=2, gemini=5).")
+    parser.add_argument("--retry-budget", type=int, default=45, metavar="SECONDS",
+                        help="Per-cell retry budget passed through to st-fact "
+                             "(default: 45 = one ~15+30 s backoff cycle). "
+                             "0 = unlimited; matches pre-PAR-1 behaviour.")
+
     args = parser.parse_args()
 
     file_prefix = args.json_file.rsplit(".", 1)[0]
@@ -610,6 +629,38 @@ def main():
         _hide_cursor()
         _redraw_cross(first=True)
 
+# ── PAR-1: per-provider concurrency cap ───────────────────────────────────────
+# A semaphore per fact-checker make caps the number of concurrent st-fact
+# spawns hitting that provider's API. Sized by cross_ai_core.get_rate_limit_concurrency
+# (CAC-5) unless overridden by --max-concurrency, or pinned to 1 by --sequential.
+#
+# Note: subprocess.run() blocks the calling thread, so capping spawn = capping
+# in-flight subprocess count = capping concurrent API calls to that provider.
+_provider_semaphores: dict[str, threading.Semaphore] = {}
+_semaphores_lock = threading.Lock()
+_sequential_semaphore = threading.Semaphore(1)
+
+
+def _get_provider_semaphore(make: str, max_override, sequential: bool) -> threading.Semaphore:
+    """Return the semaphore that gates spawns for *make*.
+
+    * --sequential   --> single global Semaphore(1) shared across every provider.
+    * --max-concurrency N --> Semaphore(N), per provider.
+    * default        --> Semaphore(get_rate_limit_concurrency(make)).
+    """
+    if sequential:
+        return _sequential_semaphore
+
+    key = f"{make}:{max_override}" if max_override is not None else make
+    with _semaphores_lock:
+        sem = _provider_semaphores.get(key)
+        if sem is None:
+            size = max_override if max_override is not None else get_rate_limit_concurrency(make)
+            sem = threading.Semaphore(size)
+            _provider_semaphores[key] = sem
+        return sem
+
+
     # All 25 cells run fully in parallel. st-fact uses fcntl.flock internally
     # to serialise the final JSON read-modify-write, so no locking is needed here.
     cell_errors: dict = {}
@@ -626,22 +677,28 @@ def main():
         cell["status"]     = ST_RUNNING
         cell["start_time"] = time.time()
 
+        fc_make = ai_list[fi]
         cmd = [
             "st-fact",
             "--silent",
-            "--ai", ai_list[fi],
+            "--ai", fc_make,
             "--story", str(si + 1),
             "--timeout", str(args.timeout),
+            "--retry-budget", str(args.retry_budget),
             cache_flag,
             file_json,
         ]
+        sem = _get_provider_semaphore(fc_make, args.max_concurrency, not args.parallel)
+        if args.verbose and not args.quiet:
+            print(f"  Generating fact-check: {ai_list[si]} -> {fc_make}...", flush=True)
         try:
-            result = subprocess.run(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                timeout=args.timeout if args.timeout > 0 else None,
-            )
+            with sem:
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    timeout=args.timeout if args.timeout > 0 else None,
+                )
             if result.returncode == 0:
                 cell["status"] = ST_DONE
             else:
@@ -661,11 +718,6 @@ def main():
         finally:
             if cell["end_time"] is None:
                 cell["end_time"] = time.time()
-
-    def _run_column(fi: int):
-        """Submit all N stories for fact-checker column fi, in story order."""
-        for si in range(N):
-            _run_cell(si, fi)
 
     # N×N threads — one per cell — for full parallelism.
     # st-fact uses fcntl.flock internally to serialise the JSON write,

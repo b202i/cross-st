@@ -142,8 +142,26 @@ def main():
     if item=="fact":
         fact_select = f":{args.fact}"  # When item="fact", title "fact:n"
     editor_was_active = False
+
+    # Resolve grip binary — auto-install on first use if not present
+    import shutil as _shutil
+    import subprocess as _sp_grip
+    _grip_bin = _shutil.which("grip") or os.path.join(os.path.dirname(sys.executable), "grip")
+    if not os.path.isfile(_grip_bin):
+        print("  grip not installed — installing now (one-time, ~2 MB)…", flush=True)
+        _install = _sp_grip.run(
+            [sys.executable, "-m", "pip", "install", "--quiet", "grip"],
+            capture_output=True, text=True
+        )
+        if _install.returncode != 0:
+            print("Error: auto-install of grip failed.")
+            print(_install.stderr[-400:].strip() if _install.stderr else "(no output)")
+            sys.exit(1)
+        _grip_bin = _shutil.which("grip") or os.path.join(os.path.dirname(sys.executable), "grip")
+        print("  grip installed. ✓", flush=True)
+
     cmd = [
-        "grip", "--browser", "--quiet",
+        _grip_bin, "--browser", "--quiet",
         f"--title={file_json} s:{args.story} {item}{fact_select} {ai_tag}",
         temp_path,
         "0",   # address "0" = OS assigns a free port — avoids conflicts on rapid re-use
@@ -205,8 +223,7 @@ def main():
                     stderr=subprocess.STDOUT,   # merge stdout+stderr → single stream
                 )
             except FileNotFoundError:
-                return None, None, ["grip is not installed or not on PATH.",
-                                    "Install with: pip install grip"]
+                return None, None, ["grip binary not found after install — please report this bug."]
             except OSError as e:
                 return None, None, [f"Failed to start grip: {e}"]
         else:
@@ -218,8 +235,7 @@ def main():
                     stderr=subprocess.STDOUT,   # merge stdout+stderr → single stream
                 )
             except FileNotFoundError:
-                return None, None, ["grip is not installed or not on PATH.",
-                                    "Install with: pip install grip"]
+                return None, None, ["grip binary not found after install — please report this bug."]
             except OSError as e:
                 return None, None, [f"Failed to start grip: {e}"]
 

@@ -1,6 +1,6 @@
 import os
 import sys
-from dotenv import load_dotenv
+
 from discourse import get_discourse_site, MmdDiscourseClient
 
 # Define specific plots, in a single place
@@ -60,12 +60,8 @@ def post_plot(site_slug, file_kv, verbose=True):
     :return: upload_kv (k is the plot_type, v =s the url)
     """
 
-    # Use realpath to get the actual path of the script
-    _basedir  = os.path.dirname(os.path.realpath(__file__))
-    _CROSSENV = os.path.expanduser("~/.crossenv")
-    load_dotenv(_CROSSENV)                                    # 1. global ~/.crossenv
-    load_dotenv(os.path.join(_basedir, ".env"))               # 2. repo-local .env (developer keys)
-    load_dotenv(".env", override=True)                        # 3. CWD .env overrides both
+    from mmd_startup import load_cross_env
+    load_cross_env()  # four-layer A1 order; layer 2 only loaded in dev venv (R3-safe)
 
     from discourse import get_discourse_slugs_sites
     _, sites = get_discourse_slugs_sites()

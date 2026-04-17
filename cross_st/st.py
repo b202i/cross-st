@@ -19,7 +19,6 @@ import os
 import subprocess
 import sys
 
-from dotenv import load_dotenv
 from mmd_startup import load_cross_env
 from ai_handler import get_ai_list, get_default_ai
 from discourse import get_discourse_slugs_sites
@@ -112,11 +111,7 @@ fact_sel = None
 main_container = {}
 cmd = ""
 
-# Settings — resolved at startup, writable back to .env
-_CROSSENV = os.path.expanduser("~/.crossenv")
-load_dotenv(_CROSSENV)                                    # 1. global ~/.crossenv
-load_dotenv(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".env"))  # 2. repo-local
-load_dotenv(".env", override=True)                        # 3. CWD .env overrides both
+# Settings — resolved at startup; env is already loaded at line 27 above
 
 # Pick the user-configured default AI now that .env is loaded
 _default_ai = get_default_ai()

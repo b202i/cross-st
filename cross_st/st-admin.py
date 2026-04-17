@@ -1063,8 +1063,8 @@ def setup_wizard() -> None:
         optional_hints.append(("aspell (spell check in st-new)", cmd))
 
     if not grip_ok:
-        optional_hints.append(("grip (browser preview in st-edit)",
-                                "pip install grip"))
+        grip_cmd = 'pipx inject cross-st grip' if using_pipx else 'pip install grip'
+        optional_hints.append(("grip (browser preview in st-edit — auto-installs on first use)", grip_cmd))
 
     if not tts_ok:
         tts_cmd = ('pipx install "cross-ai[tts]"' if pipx_ok

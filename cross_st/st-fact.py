@@ -353,7 +353,16 @@ def main():
                         help='Timeout value: with --ai all, sets per-job limit in minutes '
                              '(default: 20). In single-AI mode, sets per-paragraph limit '
                              'in seconds (default: 0 = no timeout).')
+    parser.add_argument('--retry-budget', type=int, default=0, metavar='SECONDS',
+                        help='Total retry budget in seconds passed through to '
+                             'process_prompt() (default: 0 = unlimited). When set, '
+                             'transient errors are retried only until the budget is '
+                             'exhausted; useful for parallel runs (st-cross --parallel) '
+                             'where a single 105 s tail would stall the matrix.')
     args = parser.parse_args()
+
+    # Translate 0 = unlimited -> None for cross-ai-core retry_budget kwarg.
+    _retry_budget = args.retry_budget if args.retry_budget > 0 else None
 
     # ── Validate --ai choice ──────────────────────────────────────────────────
     ai_list = get_ai_list()
@@ -484,13 +493,14 @@ def main():
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
                         future = ex.submit(
                             process_prompt, args.ai, prompt,
-                            verbose=args.verbose, use_cache=args.cache
+                            verbose=args.verbose, use_cache=args.cache,
+                            retry_budget=_retry_budget,
                         )
                         result = future.result(timeout=args.timeout)
                         gen_payload, client, response, ai_model = result
                         was_cached = result.was_cached
                 else:
-                    result = process_prompt(args.ai, prompt, verbose=args.verbose, use_cache=args.cache)
+                    result = process_prompt(args.ai, prompt, verbose=args.verbose, use_cache=args.cache, retry_budget=_retry_budget)
                     gen_payload, client, response, ai_model = result
                     was_cached = result.was_cached
                 
@@ -890,7 +900,7 @@ def _run_ai_review(args, container):
             print("─" * 70)
         prompt = _build_review_prompt(context, ctype)
         try:
-            result  = process_prompt(review_ai, prompt, use_cache=args.cache)
+            result  = process_prompt(review_ai, prompt, use_cache=args.cache, retry_budget=_retry_budget)
             _, _, response, _ = result
             content = get_content(review_ai, response).strip()
             print(content)

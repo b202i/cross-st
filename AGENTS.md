@@ -268,6 +268,93 @@ Test: `tests/test_dotenv_resolution.py::TestDotenvResolution::test_layer2_overri
 ## Error Handling Convention
 All API errors go through `ai_error_handler.handle_api_error()`. It distinguishes quota/billing errors (permanent — exit) from rate-limit/503 errors (transient — retry). Import from `ai_error_handler` rather than catching raw exceptions per-script.
 
+## Lazy-Import Convention (optional heavy dependencies)
+
+Some `st-*` scripts lazy-import optional libraries so the base `cross-st` install stays lightweight. The guiding principle is **zero friction for the user** — if a feature needs an extra package, install it automatically on first use rather than throwing an error and asking the user to run a separate command.
+
+### Policy: auto-install on first use
+
+Any optional Python package that is **fully self-contained** (install it → feature works immediately) must use the auto-install pattern:
+
+```python
+try:
+    import some_package
+except ImportError:
+    print("  Feature X not installed — installing now (one-time, ~N MB)…", flush=True)
+    import subprocess as _sp
+    result = _sp.run(
+        [sys.executable, "-m", "pip", "install", "--quiet", "some_package"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print("Error: auto-install failed.")
+        print(result.stderr[-400:].strip() if result.stderr else "(no output)")
+        sys.exit(1)
+    import some_package  # noqa: F811
+    print("  Feature X installed. ✓", flush=True)
+```
+
+**Why `sys.executable -m pip install`?** It always targets the correct environment — pipx venv, regular venv, system Python — with no environment detection needed. The package persists; subsequent runs import it directly at zero cost.
+
+**When NOT to auto-install:**
+- **TTS** (`yakyak`, etc.) — requires a running Wyoming Piper server; auto-installing the Python package alone leaves a broken experience. Use the `[tts]` extras pattern with a clear error pointing to setup docs.
+- **Native OS libraries** (Pango/GObject for WeasyPrint) — `pip install` cannot provide these; platform-specific OS hints are the only option.
+- **Module-level imports** — auto-install requires the import to be inside a function so it can be retried after install.
+
+**Size communication rule:** If the install will take more than a few seconds (anything over ~5 MB), print the approximate size so the user knows what's happening:
+```
+  PDF support not installed — installing now (one-time, ~22 MB)…
+```
+Small packages (<2 MB) can use a generic message without the size.
+
+### Current lazy-install inventory
+
+| Script | Feature | Package(s) | Size | Treatment |
+|--------|---------|-----------|------|-----------|
+| `st-fetch.py` | PDF `--file` | `pymupdf4llm` (+ `pymupdf`) | ~22 MB | **Auto-install** ✅ |
+| `st-fetch.py` | Web `--url` | `beautifulsoup4` | ~1 MB | **Auto-install** ✅ |
+| `st-edit.py` | Browser preview | `grip` | ~2 MB | **Auto-install** ✅ |
+| `st-print.py` | Markdown → PDF | `weasyprint` | core dep | Native OS libs required — platform hints |
+| `st-speak.py` `st-voice.py` `st-prep.py` | TTS audio | `yakyak` + 5 others | varies | Server required — `[tts]` extras + error message |
+
+### Rule for new optional dependencies
+
+1. Import inside the function that needs it, inside `try/except ImportError`.
+2. Apply the auto-install pattern if the package is self-contained.
+3. Print the size in the "installing now" message if > ~5 MB.
+4. Add a row to the inventory table above.
+5. If the package has a hard external dependency (server, native libs, etc.), use the extras pattern and document the full setup path instead.
+
+## pipx vs dev install — UX differences
+
+This section records all known behavioural differences between a `pipx install cross-st` user install and the `pip install -e .` developer checkout. Knowing these prevents surprises when testing or writing new code.
+
+### ✅ Handled correctly (no action needed)
+
+| Area | pipx behaviour | dev behaviour | How it's handled |
+|------|----------------|---------------|------------------|
+| **Env loading (layer 2)** | Repo `.env` is **skipped** — only `~/.crossenv` and CWD `.env` apply | Repo `.env` loaded with `override=True` | `load_cross_env()` wraps layer 2 in `_in_project_venv()` guard |
+| **`st-admin --upgrade`** | Runs `pipx upgrade cross-st` | Runs `git pull && pip install -e .` | `--upgrade` logic detects pipx via `pathlib.relative_to(pipx_home)` |
+| **Lazy-import auto-install** | Packages auto-install into the pipx venv on first use via `sys.executable -m pip install` | Same behaviour | Works correctly in both contexts |
+| **`st-admin` grip hint** | Shows `pipx inject cross-st grip` | Shows `pip install grip` | Uses existing `using_pipx` flag |
+| **Data files** (`data/`, `template/`, `cross_stones/`) | Served from `site-packages/cross_st/` | Served from repo checkout | `__file__`-relative paths work correctly in both contexts because scripts are installed as `.py` files in both |
+| **`st-man` source parsing** | Reads `.py` files from `site-packages/cross_st/` | Reads from repo checkout | `_HERE = dirname(__file__)` resolves correctly in both |
+| **Update notice** | Compares installed version vs PyPI; shows nag if behind | Same — but local version is typically ≥ PyPI so nag is suppressed | `check_for_updates()` uses `importlib.metadata`; suppressed in non-TTY |
+
+### ⚠️ Fixed issues (previously wrong)
+
+| Area | Bug | Fix |
+|------|-----|-----|
+| **`st.py` env loading (R3)** | Had bare `load_dotenv(__file__/'.env')` without `override=True` — `~/.crossenv` silently won over repo `.env` in dev | Removed the redundant manual calls; env is already loaded by the `load_cross_env()` at line 27 |
+| **`mmd_plot.py` env loading (R3)** | Same pattern — bare `load_dotenv` without `override=True` for layer 2 | Replaced with `load_cross_env()` |
+| **`st-gen.py` error message** | Showed a `__file__`-relative `.env` path that doesn't exist in a pipx install | Removed from the `check_api_key` path list; only `~/.crossenv` and CWD `.env` shown |
+
+### Developer-only behaviours (intentional, not bugs)
+
+- **`DEFAULT_AI`, model overrides, `DISCOURSE` settings in repo `.env`** — only take effect when the dev venv is active. pipx users must put these in `~/.crossenv`.
+- **`st-admin --upgrade` prints a `git pull` hint** — only in editable install mode.
+- **`CROSS_NO_CACHE=1` and `XAI_MODEL=...` in repo `.env`** — same: dev-only. Document any per-project settings in `~/.crossenv` for user testing.
+
 ## Active Sprint
 
 Sprint tracking has moved to `cross-internal/SPRINT_CURRENT.md` (private). A1–A9, B1–B5, C1, C2, C3 are complete. `cross-st 0.5.0` is live at https://pypi.org/project/cross-st/0.5.0/.

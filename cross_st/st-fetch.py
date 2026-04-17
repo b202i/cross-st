@@ -13,13 +13,14 @@ Each fetched entry records its origin in make/model:
 
 Sources supported:
   tweet_id    Fetch a post from X (Twitter) by numeric tweet ID
-  --file      Import a plain text or markdown file from disk
+  --file      Import a plain text, markdown, or PDF file from disk
   --url       Fetch a web page by URL (scrapes visible text)
   --clipboard Paste text directly from the system clipboard
 
 ```
 st-fetch <tweet_id> file.json            # fetch X post by tweet ID
 st-fetch --file report.md file.json      # import a local .txt or .md file
+st-fetch --file report.pdf file.json     # import a PDF (requires pymupdf4llm)
 st-fetch --url https://... file.json     # fetch a web page
 st-fetch --clipboard file.json           # import text from clipboard
 st-fetch --file report.md file.json --no-prep   # store raw data entry only
@@ -37,6 +38,10 @@ Requirements:
   X_COM_BEARER_TOKEN=<bearer token>  in .env   (tweet_id source only)
 
 Options: --file  --url  --clipboard  --no-prep  --no-cache  -v  -q
+
+PDF import uses pymupdf4llm (lazy import — only required when fetching PDFs):
+  pip install pymupdf4llm          # venv / plain pip install
+  pipx inject cross-st pymupdf4llm # pipx install
 """
 
 import argparse
@@ -61,11 +66,101 @@ def _fetch_tweet(tweet_id, verbose, use_cache):
     return title, text, response
 
 
+def _extract_pdf(filepath, verbose):
+    """Extract content from a PDF file. Returns (title, text, markdown, response).
+
+    Uses pymupdf4llm for Markdown-quality extraction. Falls back gracefully for
+    scanned/image-only PDFs by warning the user. Lazy-imports the library so that
+    users who never use PDF import don't need it installed.
+    """
+    try:
+        import pymupdf4llm
+        import pymupdf  # bundled with pymupdf4llm
+    except ImportError:
+        print("  PDF support not installed — installing now (one-time, ~22 MB)…", flush=True)
+        import subprocess as _sp
+        result = _sp.run(
+            [sys.executable, "-m", "pip", "install", "--quiet", "pymupdf4llm"],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            print("Error: automatic install of pymupdf4llm failed.")
+            print(result.stderr[-600:].strip() if result.stderr else "(no output)")
+            print()
+            print("Install manually and re-run:")
+            if "pipx" in sys.executable:
+                print('  pipx install --force "cross-st[pdf]"')
+                print("  or: pipx inject cross-st pymupdf4llm")
+            else:
+                print('  pip install "cross-st[pdf]"')
+            sys.exit(1)
+        # Retry imports after successful install
+        import pymupdf4llm  # noqa: F811
+        import pymupdf      # noqa: F811
+        print("  PDF support installed. ✓", flush=True)
+
+    # Open document to grab metadata and page count
+    doc = pymupdf.open(filepath)
+    num_pages = len(doc)
+    meta = doc.metadata or {}
+
+    # Extract Markdown via pymupdf4llm
+    md = pymupdf4llm.to_markdown(filepath)
+
+    # Warn if extraction looks empty (likely scanned PDF)
+    plain_chars = len(md.strip())
+    if plain_chars < 50:
+        print(f"  Warning: very little text extracted ({plain_chars} chars) — "
+              "PDF may be scanned/image-based. Try OCR first (tesseract, Adobe Acrobat).")
+
+    # Determine title: PDF metadata → first # heading → first non-empty line → filename
+    title = (meta.get("title") or "").strip()
+    if not title:
+        for line in md.splitlines():
+            stripped = line.strip().lstrip('#').strip()
+            if stripped:
+                title = stripped[:120]
+                break
+    title = title or os.path.basename(filepath)
+
+    text = remove_markdown(md)
+
+    response = {
+        "source": "file",
+        "filepath": filepath,
+        "format": "pdf",
+        "pages": num_pages,
+        "raw": md,
+    }
+    if verbose:
+        print(f"  Extracted {plain_chars} chars ({num_pages} pages) from {filepath}")
+    return title, text, md, response
+
+
+def _is_pdf(filepath):
+    """Return True if filepath is a PDF (extension OR magic bytes)."""
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == '.pdf':
+        return True
+    try:
+        with open(filepath, 'rb') as f:
+            return f.read(4) == b'%PDF'
+    except OSError:
+        return False
+
+
 def _fetch_file(filepath, verbose):
-    """Import a plain text or markdown file from disk. Returns (title, text, raw_response)."""
+    """Import a plain text, markdown, or PDF file from disk. Returns (title, text, raw_response)."""
     if not os.path.isfile(filepath):
         print(f"Error: file not found: {filepath}")
         sys.exit(1)
+
+    if _is_pdf(filepath):
+        title, text, md, response = _extract_pdf(filepath, verbose)
+        # markdown field gets rich MD; text is plain; source_model hint returned via response
+        response["_source_model"] = "pdf"
+        return title, text, response
+
     with open(filepath, 'r', encoding='utf-8') as f:
         raw = f.read()
     # Use first non-empty line as title candidate; strip markdown heading markers
@@ -89,9 +184,19 @@ def _fetch_url(url, verbose):
         import requests
         from bs4 import BeautifulSoup
     except ImportError:
-        print("Error: 'requests' and 'beautifulsoup4' are required for --url.")
-        print("  pip install requests beautifulsoup4")
-        sys.exit(1)
+        print("  Web scraping support not installed — installing now (one-time, ~1 MB)…", flush=True)
+        import subprocess as _sp
+        result = _sp.run(
+            [sys.executable, "-m", "pip", "install", "--quiet", "beautifulsoup4"],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            print("Error: auto-install of beautifulsoup4 failed.")
+            print(result.stderr[-400:].strip() if result.stderr else "(no output)")
+            sys.exit(1)
+        import requests          # noqa: F811
+        from bs4 import BeautifulSoup  # noqa: F811
+        print("  Web scraping support installed. ✓", flush=True)
 
     if verbose:
         print(f"  Fetching URL: {url}")
@@ -200,7 +305,7 @@ def main():
     # Source — mutually exclusive: tweet_id positional, --file, --url, or --clipboard
     source_group = parser.add_mutually_exclusive_group()
     source_group.add_argument('--file', type=str, metavar='PATH',
-                               help='Import a plain text or markdown file from disk')
+                               help='Import a plain text, markdown, or PDF file from disk')
     source_group.add_argument('--url', type=str, metavar='URL',
                                help='Fetch a web page and extract its text')
     source_group.add_argument('--clipboard', action='store_true',
@@ -242,7 +347,7 @@ def main():
         if not args.quiet:
             print(f"  Importing file: {args.file}…", end='', flush=True)
         title, text, response = _fetch_file(args.file, args.verbose)
-        source_model = "file"
+        source_model = response.pop("_source_model", "file")
         if not args.quiet:
             print(" ✓")
 
@@ -312,12 +417,15 @@ def main():
 
     # ── Build data entry ──────────────────────────────────────────────────────
     ai_tag = get_app_tag() + f"{source_make}:{source_model}"
+    # For PDF imports, response["raw"] holds the Markdown output; for other
+    # file sources it holds the original raw text. Fall back to plain text.
+    markdown_content = response.get("raw", text) if source_model in ("file", "pdf") else text
     data = {
         "make":         source_make,
         "model":        source_model,
         "title":        title,
         "text":         text,
-        "markdown":     text,   # raw — st-prep will format properly
+        "markdown":     markdown_content,
         "tag":          ai_tag,
         "gen_response": response,
     }

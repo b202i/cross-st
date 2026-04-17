@@ -40,7 +40,7 @@ classifiers = [
 # ─────────────────────────────────────────────────────────────────────────────
 dependencies = [
     # AI stack (providers, cache, error handling)
-    "cross-ai-core[all]>=0.5.0",
+    "cross-ai-core[all]>=0.6.0",
     # Discourse posting
     "pydiscourse>=1.7.0",
     "requests>=2.32.4",           # CVE-2024-47081
@@ -83,6 +83,19 @@ tts = [
     "websockets>=15.0.1",
     "wyoming>=1.8.0",
     "yakyak>=1.7.0",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Optional PDF import dependency
+# pymupdf is a ~22 MB native binary — excluded from the base install so users
+# who never import PDFs don't pay the download cost.
+#
+# Install with:  pipx install "cross-st[pdf]"
+#   or upgrade:  pipx install --force "cross-st[pdf]"
+#   or inject:   pipx inject cross-st pymupdf4llm
+# ─────────────────────────────────────────────────────────────────────────────
+pdf = [
+    "pymupdf4llm>=0.0.17",
 ]
 
 

@@ -178,7 +178,6 @@ def main():
     load_cross_env()
 
     _paths_checked = [os.path.expanduser("~/.crossenv"),
-                      os.path.join(os.path.dirname(os.path.realpath(__file__)), ".env"),
                       os.path.join(os.getcwd(), ".env")]
     if not check_api_key(args.ai, _paths_checked):
         sys.exit(1)
