@@ -312,7 +312,11 @@ def main():
     parser.add_argument("--no-cache", dest="cache", action="store_false",
                         help="Disable API cache")
     parser.add_argument("--timeout", type=int, default=1800,
-                        help="Per-job timeout in seconds (default: 1800 = 30 min). 0 = no timeout.")
+                        help="Per-cell wall-clock timeout in seconds (default: 1800 = "
+                             "30 min). 0 = no timeout. Applies to the whole st-fact "
+                             "subprocess for one (story, fact-checker) pair; must be "
+                             "large enough to cover all segments plus any retries "
+                             "(see --retry-budget).")
     parser.add_argument("--skip-gen", action="store_true",
                         help="Skip Step 1 (story generation). Normally auto-detected: "
                              "if all AI stories already exist in the container, "
@@ -336,9 +340,12 @@ def main():
                              "uses cross_ai_core.get_rate_limit_concurrency() per make "
                              "(xai=3, anthropic=2, openai=3, perplexity=2, gemini=5).")
     parser.add_argument("--retry-budget", type=int, default=45, metavar="SECONDS",
-                        help="Per-cell retry budget passed through to st-fact "
+                        help="Per-segment retry budget passed through to st-fact "
                              "(default: 45 = one ~15+30 s backoff cycle). "
-                             "0 = unlimited; matches pre-PAR-1 behaviour.")
+                             "0 = unlimited; matches pre-PAR-1 behaviour. "
+                             "Independent of --timeout: --retry-budget caps how long "
+                             "one API call spends on transient-error retries, while "
+                             "--timeout caps the entire cell's wall clock.")
 
     args = parser.parse_args()
 

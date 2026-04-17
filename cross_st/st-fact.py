@@ -358,7 +358,9 @@ def main():
                              'process_prompt() (default: 0 = unlimited). When set, '
                              'transient errors are retried only until the budget is '
                              'exhausted; useful for parallel runs (st-cross --parallel) '
-                             'where a single 105 s tail would stall the matrix.')
+                             'where a single 105 s tail would stall the matrix. '
+                             'Independent of --timeout: --retry-budget is per API '
+                             'call (per segment), --timeout is per subprocess.')
     args = parser.parse_args()
 
     # Translate 0 = unlimited -> None for cross-ai-core retry_budget kwarg.
