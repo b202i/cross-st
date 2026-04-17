@@ -294,7 +294,7 @@ def _ensure_segments(file_json: str, n_stories: int, quiet: bool = False) -> Non
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
-def main():
+def main() -> None:
     require_config()
     parser = argparse.ArgumentParser(
         prog='st-cross',
@@ -387,7 +387,7 @@ def main():
     cancelled = threading.Event()
     _table_lock = threading.Lock()   # protect cursor movement
 
-    def _cancel_all(signum=None, frame=None):
+    def _cancel_all(signum=None, frame=None) -> None:
         cancelled.set()
 
     signal.signal(signal.SIGINT, _cancel_all)
@@ -680,7 +680,7 @@ def main():
 
     cross_row_count = [0]   # mutable so threads can update it
 
-    def _redraw_cross(first: bool = False):
+    def _redraw_cross(first: bool = False) -> None:
         with _table_lock:
             cross_row_count[0] = _draw_cross_table(
                 cells, ai_list, file_prefix, first_draw=first,
@@ -731,7 +731,7 @@ def _get_provider_semaphore(make: str, max_override, sequential: bool) -> thread
     # to serialise the final JSON read-modify-write, so no locking is needed here.
     cell_errors: dict = {}
 
-    def _run_cell(si: int, fi: int):
+    def _run_cell(si: int, fi: int) -> None:
         """Run one fact-check cell; serialised per story-row through story_locks."""
         if cancelled.is_set():
             cells[(si, fi)]["status"] = ST_CANCELLED

@@ -417,6 +417,16 @@ def main():
 
     load_cross_env()
 
+    # Reuse a single worker thread across every segment of every story.
+    # A per-segment ThreadPoolExecutor would create/destroy up to ~50 pools
+    # per fact-check run (1,250 per 5×5 st-cross matrix). max_workers=1 is
+    # sufficient because the executor is only used to enforce the per-call
+    # wall-clock timeout on a single synchronous API call.
+    _timeout_executor = (
+        concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="st-fact-timeout")
+        if args.timeout > 0 else None
+    )
+
     for story_index, story in enumerate(main_container["story"], start=1):
         if args.story is not None and args.story != story_index:
             continue
@@ -490,15 +500,14 @@ def main():
             seg_start_time = time.time()
             try:
                 if args.timeout > 0:
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                        future = ex.submit(
-                            process_prompt, args.ai, prompt,
-                            verbose=args.verbose, use_cache=args.cache,
-                            retry_budget=_retry_budget,
-                        )
-                        result = future.result(timeout=args.timeout)
-                        gen_payload, client, response, ai_model = result
-                        was_cached = result.was_cached
+                    future = _timeout_executor.submit(
+                        process_prompt, args.ai, prompt,
+                        verbose=args.verbose, use_cache=args.cache,
+                        retry_budget=_retry_budget,
+                    )
+                    result = future.result(timeout=args.timeout)
+                    gen_payload, client, response, ai_model = result
+                    was_cached = result.was_cached
                 else:
                     result = process_prompt(args.ai, prompt, verbose=args.verbose, use_cache=args.cache, retry_budget=_retry_budget)
                     gen_payload, client, response, ai_model = result
@@ -706,6 +715,9 @@ def main():
                 os.remove(progress_file)
             except OSError:
                 pass
+
+    if _timeout_executor is not None:
+        _timeout_executor.shutdown(wait=False, cancel_futures=True)
 
 
 # ── AI Review ────────────────────────────────────────────────────────────────
