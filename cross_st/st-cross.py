@@ -592,11 +592,15 @@ def main() -> None:
             cmd = ["st-prep", "-d", str(d_idx), "--quiet", file_json]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+        # Count stories outside the quiet guard so the n_stories == 0 check
+        # below always has the variable available (avoids NameError with --quiet).
+        with open(file_json) as f:
+            final = json.load(f)
+        n_stories = len(final.get("story", []))
         if not args.quiet:
-            with open(file_json) as f:
-                final = json.load(f)
-            n_stories = len(final.get("story", []))
-            print(f"  Stories prepared: {_clr(n_stories, GREEN, BOLD)}/{n_data}\n")
+            # denominator is N (number of AI providers), not n_data (all
+            # accumulated data[] entries which grows with every re-run).
+            print(f"  Stories prepared: {_clr(n_stories, GREEN, BOLD)}/{N}\n")
 
         if n_stories == 0:
             print(_clr("  No stories generated — aborting cross-product.", RED, BOLD),
@@ -694,6 +698,14 @@ def main() -> None:
         print()
         _hide_cursor()
         _redraw_cross(first=True)
+    elif not args.quiet:
+        # --verbose: no live table, but still announce Step 2 so the user
+        # knows fact-checking has started. Per-cell "Generating fact-check:"
+        # lines follow from _run_cell.
+        timeout_str = f"  (timeout {_fmt(args.timeout)}/cell)" if args.timeout > 0 else ""
+        print(f"\n  {_clr('Step 2 — Cross-product fact-checking', BOLD)}{_clr(timeout_str, DIM)}")
+        print(f"  {_clr('─' * 77, DIM)}")
+        print(f"  {N}×{N} matrix — {N * N} cells, verbose mode (no live table)\n")
 
 # ── PAR-1: per-provider concurrency cap ───────────────────────────────────────
 # A semaphore per fact-checker make caps the number of concurrent st-fact
