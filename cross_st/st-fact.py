@@ -38,7 +38,7 @@ from tqdm import tqdm
 
 from mmd_branding import get_ai_tag_mini
 from mmd_process_report import remove_markdown
-from mmd_util import get_tmp_dir, tmp_safe_name, build_segments
+from mmd_util import get_tmp_dir, tmp_safe_name, build_segments, progress_file_path
 
 
 def get_fact_check_prompt(paragraph):
@@ -134,7 +134,6 @@ def _run_all_parallel(args, ai_list):
     job_timeout = (args.timeout * 60) if args.timeout > 0 else 1200
 
     file_prefix = args.json_file.rsplit('.', 1)[0]
-    safe        = tmp_safe_name(file_prefix)
     story_index = args.story if args.story else 1
 
     ST_TIMEOUT  = "timed out"
@@ -151,7 +150,7 @@ def _run_all_parallel(args, ai_list):
             "elapsed":       0.0,
             "proc":          None,
             "progress":      "",          # "n/total" string read from .progress file
-            "progress_file": str(get_tmp_dir() / f"{safe}_s{story_index}_{ai}.progress"),
+            "progress_file": str(progress_file_path(file_prefix, story_index, ai)),
         }
 
     lock = threading.Lock()
@@ -452,8 +451,7 @@ def main():
         # Lives in project-root tmp/  e.g. tmp/story__shang__yubikey_2fa_s1_openai.progress
         progress_file = None
         if args.silent:
-            safe = tmp_safe_name(file_prefix)
-            progress_file = str(get_tmp_dir() / f"{safe}_s{story_index}_{args.ai}.progress")
+            progress_file = str(progress_file_path(file_prefix, story_index, args.ai))
 
         overall_tally = Counter()
         structured_claims: list[dict] = []   # populated per-segment, stored in fact["claims"]

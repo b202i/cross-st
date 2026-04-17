@@ -196,6 +196,19 @@ class TestCLISurface:
         assert result.returncode != 0
         assert "not allowed with" in result.stderr or "mutually exclusive" in result.stderr.lower()
 
+    def test_dry_run_in_help(self):
+        out = self._run_help()
+        assert "--dry-run" in out
+        # Help text mentions the key behaviour.
+        assert "Implies --skip-gen" in " ".join(out.split())
+
+    def test_verbose_help_mentions_table_suppression(self):
+        out = self._run_help()
+        # The verbose flag help should warn that the live table is suppressed
+        # to avoid interleaving (Finding 12).
+        normalised = " ".join(out.split())
+        assert "no live table" in normalised or "live table" in normalised
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # st-fact --retry-budget surface
@@ -211,6 +224,33 @@ class TestStFactRetryBudgetCLI:
         )
         assert "--retry-budget" in result.stdout
         assert "0 = unlimited" in " ".join(result.stdout.split())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# progress_file_path (mmd_util) — shared naming helper (Finding 7)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProgressFilePath:
+    """The naming helper is the single source of truth used by st-cross
+    (_read_progress) and st-fact (write side). Test the contract directly."""
+
+    def test_basic_shape(self, st_cross_mod, tmp_path, monkeypatch):
+        import mmd_util
+        monkeypatch.setattr(mmd_util, "get_tmp_dir", lambda: tmp_path)
+        path = mmd_util.progress_file_path("myprefix", 1, "openai")
+        assert path.parent == tmp_path
+        # tmp_safe_name of a bare prefix under cwd falls back to basename.
+        assert path.name.endswith("_s1_openai.progress")
+
+    def test_st_cross_and_st_fact_agree(self, st_cross_mod, tmp_path, monkeypatch):
+        """st-cross.py _read_progress and the helper must target the same
+        file. This closes Finding 7 (path construction was duplicated)."""
+        import mmd_util
+        monkeypatch.setattr(mmd_util, "get_tmp_dir", lambda: tmp_path)
+        # Write via the helper (st-fact side).
+        mmd_util.progress_file_path("pfx", 4, "gemini").write_text("9/12")
+        # Read via st-cross side — si=3 because _read_progress adds +1.
+        assert st_cross_mod._read_progress("pfx", 3, "gemini") == "9/12"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -396,19 +436,23 @@ class TestEnsureSegments:
 
 class TestReadProgress:
     def test_missing_file_returns_empty(self, st_cross_mod, tmp_path, monkeypatch):
-        # Redirect get_tmp_dir() so no file exists.
-        monkeypatch.setattr(st_cross_mod, "get_tmp_dir", lambda: tmp_path)
+        # Redirect get_tmp_dir() in mmd_util (progress_file_path resolves it
+        # from there, not from st_cross_mod's own namespace).
+        import mmd_util
+        monkeypatch.setattr(mmd_util, "get_tmp_dir", lambda: tmp_path)
         assert st_cross_mod._read_progress("nope", 0, "openai") == ""
 
     def test_reads_and_strips_value(self, st_cross_mod, tmp_path, monkeypatch):
-        monkeypatch.setattr(st_cross_mod, "get_tmp_dir", lambda: tmp_path)
+        import mmd_util
+        monkeypatch.setattr(mmd_util, "get_tmp_dir", lambda: tmp_path)
         safe = st_cross_mod.tmp_safe_name("myprefix")
         (tmp_path / f"{safe}_s1_openai.progress").write_text("  17/47  \n")
         assert st_cross_mod._read_progress("myprefix", 0, "openai") == "17/47"
 
     def test_story_index_is_one_based_in_filename(self, st_cross_mod, tmp_path, monkeypatch):
         """si=2 must read the file named with s3 (si+1)."""
-        monkeypatch.setattr(st_cross_mod, "get_tmp_dir", lambda: tmp_path)
+        import mmd_util
+        monkeypatch.setattr(mmd_util, "get_tmp_dir", lambda: tmp_path)
         safe = st_cross_mod.tmp_safe_name("pfx")
         (tmp_path / f"{safe}_s3_xai.progress").write_text("5/10")
         assert st_cross_mod._read_progress("pfx", 2, "xai") == "5/10"

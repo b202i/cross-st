@@ -32,7 +32,7 @@ from mmd_startup import require_config
 from pathlib import Path
 
 from ai_handler import get_ai_list, get_ai_make, get_ai_model, get_rate_limit_concurrency
-from mmd_util import get_tmp_dir, tmp_safe_name, build_segments
+from mmd_util import get_tmp_dir, tmp_safe_name, build_segments, progress_file_path
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
 RESET  = "\033[0m"
@@ -119,8 +119,7 @@ def _draw_gen_table(gen_jobs: list, first_draw: bool, row_count: int) -> int:
 def _read_progress(file_prefix: str, si: int, fc_ai: str) -> str:
     """Read n/total from a progress file written by st-fact --silent.
     Returns 'n/total' string or '' if not available."""
-    safe = tmp_safe_name(file_prefix)
-    path = get_tmp_dir() / f"{safe}_s{si + 1}_{fc_ai}.progress"
+    path = progress_file_path(file_prefix, si + 1, fc_ai)
     try:
         with open(path) as f:
             return f.read().strip()
@@ -322,9 +321,17 @@ def main():
                              "if all AI stories already exist in the container, "
                              "Step 1 is skipped automatically without this flag.")
     parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Enable verbose output.")
+                        help="Enable verbose output. Implies no live table in "
+                             "Step 2 — per-cell 'Generating fact-check: …' lines "
+                             "would otherwise interleave with the live redraw. "
+                             "Step 1 (generation) still shows its live table.")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="Suppress live table (minimal output).")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Preview the Step 2 matrix without running anything. "
+                             "Shows pending vs already-complete cells, a per-row and "
+                             "per-column summary, and exits. Useful before committing "
+                             "30+ minutes to a full N×N run. Implies --skip-gen.")
 
     # ── PAR-1: parallelism + per-provider rate limiting ──────────────────────
     parallel_group = parser.add_mutually_exclusive_group()
@@ -356,6 +363,13 @@ def main():
 
     ai_list = get_ai_list()
     N       = len(ai_list)
+
+    # --dry-run implies --skip-gen: we only preview the Step 2 matrix, and
+    # previewing Step 1 doesn't make sense (nothing to inspect until st-gen
+    # has run). If stories don't yet exist the dry-run block below surfaces
+    # that fact to the user.
+    if args.dry_run:
+        args.skip_gen = True
 
     # ── Auto-detect whether all N stories already exist ───────────────────────
     # If the container has a story entry for every AI make, skip Step 1.
@@ -630,6 +644,40 @@ def main():
     if not args.quiet and n_preloaded:
         print(f"  Resuming: {_clr(n_preloaded, GREEN, BOLD)} cell(s) already complete in {file_json}")
 
+    # ── --dry-run: preview and exit ──────────────────────────────────────────
+    # Print the planned Step 2 matrix (one row per story-AI, one column per
+    # fact-checker AI), then exit without launching any cells. Cells that
+    # the pre-scan marked ST_DONE show as ✓; cells still to run show as ·.
+    if args.dry_run:
+        _draw_cross_table(cells, ai_list, file_prefix,
+                          first_draw=True, row_count=0, timeout=args.timeout)
+        total_cells  = N * N
+        pending      = total_cells - n_preloaded
+        # Per-row (story AI) and per-column (fact-checker AI) pending counts.
+        row_pending = [sum(1 for fi in range(N) if cells[(si, fi)]["status"] == ST_PENDING)
+                       for si in range(N)]
+        col_pending = [sum(1 for si in range(N) if cells[(si, fi)]["status"] == ST_PENDING)
+                       for fi in range(N)]
+        print()
+        print(f"  {_clr('Dry run', BOLD, CYAN)} — {total_cells} cells total: "
+              f"{_clr(pending, YELLOW, BOLD)} pending, "
+              f"{_clr(n_preloaded, GREEN, BOLD)} already complete.")
+        if pending:
+            row_detail = "  ".join(
+                f"{get_ai_make(ai_list[si])[:10]}={row_pending[si]}" for si in range(N)
+                if row_pending[si])
+            col_detail = "  ".join(
+                f"{get_ai_make(ai_list[fi])[:10]}={col_pending[fi]}" for fi in range(N)
+                if col_pending[fi])
+            if row_detail:
+                print(f"  Pending by story AI:        {row_detail}")
+            if col_detail:
+                print(f"  Pending by fact-checker AI: {col_detail}")
+        else:
+            print(f"  {_clr('Nothing to do', DIM)} — all cells already present in {file_json}.")
+        print(f"\n  {_clr('No cells executed', DIM)} — re-run without --dry-run to proceed.\n")
+        sys.exit(0)
+
     cross_row_count = [0]   # mutable so threads can update it
 
     def _redraw_cross(first: bool = False):
@@ -638,7 +686,11 @@ def main():
                 cells, ai_list, file_prefix, first_draw=first,
                 row_count=cross_row_count[0], timeout=args.timeout)
 
-    if not args.quiet:
+    # Step 2 live table is suppressed under --quiet (global) AND under
+    # --verbose (per-cell prints would interleave with ANSI redraws). See
+    # Finding 12 in cross-internal/st-speed/REFACTORING_PRE_PAR1.md.
+    _show_live_table = not args.quiet and not args.verbose
+    if _show_live_table:
         print()
         _hide_cursor()
         _redraw_cross(first=True)
@@ -754,7 +806,7 @@ def _get_provider_semaphore(make: str, max_override, sequential: bool) -> thread
     # Poll and redraw table while threads are running
     try:
         while True:
-            if not args.quiet:
+            if _show_live_table:
                 _redraw_cross()
 
             if not any(t.is_alive() for t in threads):
@@ -781,7 +833,7 @@ def _get_provider_semaphore(make: str, max_override, sequential: bool) -> thread
             t.join(timeout=2.0)
 
         # Final redraw after all threads finish
-        if not args.quiet:
+        if _show_live_table:
             _redraw_cross()
             _show_cursor()
             print()

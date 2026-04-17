@@ -46,6 +46,33 @@ def block_file_path(safe_name: str) -> Path:
     return get_tmp_dir() / f"{safe_name}.block"
 
 
+def progress_file_path(file_prefix: str, story_index: int, ai: str) -> Path:
+    """Return the path of the `.progress` file that `st-fact --silent` writes
+    and `st-cross` reads to display per-cell `n/total` segment counters.
+
+    Parameters
+    ----------
+    file_prefix : str
+        The JSON container file prefix (no extension), e.g. `"story/shang/yubikey_2fa"`.
+        Will be normalised via :func:`tmp_safe_name`.
+    story_index : int
+        1-based story index as it appears in the progress filename (``_s{N}_``).
+        Callers using 0-based indices must pass ``si + 1``.
+    ai : str
+        Fact-checker AI make, e.g. ``"openai"``.
+
+    Example
+    -------
+    >>> progress_file_path("story/shang/yubikey_2fa", 1, "openai")  # doctest: +SKIP
+    PosixPath('.../tmp/story__shang__yubikey_2fa_s1_openai.progress')
+
+    Single source of truth for the naming scheme: if the scheme changes, this
+    function is the only place that needs updating.
+    """
+    safe = tmp_safe_name(file_prefix)
+    return get_tmp_dir() / f"{safe}_s{story_index}_{ai}.progress"
+
+
 def create_block_file(safe_name: str, verbose: bool = False) -> None:
     """Touch the block file for `safe_name` in the project-root tmp/ dir."""
     path = block_file_path(safe_name)

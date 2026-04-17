@@ -22,6 +22,7 @@ st-cross --skip-gen subject.json        # skip generation — only run fact-chec
 st-cross --timeout 3600 subject.json    # set a 60-minute per-cell timeout
 st-cross --sequential subject.json      # run cells one at a time (debug / low-quota)
 st-cross --max-concurrency 1 subject.json   # cap every provider to 1 in-flight cell
+st-cross --dry-run subject.json         # preview the Step 2 matrix and exit
 st-cross -q subject.json                # minimal output (suppress live table)
 ```
 
@@ -33,6 +34,7 @@ st-cross -q subject.json                # minimal output (suppress live table)
 | `--cache` | Enable API cache (default: enabled) |
 | `--no-cache` | Disable API cache — always call AI live |
 | `--skip-gen` | Skip Step 1 (story generation). Auto-detected if all stories already exist. |
+| `--dry-run` | Preview the Step 2 matrix (pending vs complete cells) and exit without running anything. Implies `--skip-gen`. |
 | `--timeout SECONDS` | Per-cell wall-clock timeout (default: 1800 = 30 min). `0` = no timeout. |
 | `-p`, `--parallel` | Run cells in parallel, gated by per-provider rate-limit semaphores (default). |
 | `--sequential` | Run cells one at a time. Useful for debugging or very low-quota accounts. |
