@@ -293,6 +293,38 @@ def _ensure_segments(file_json: str, n_stories: int, quiet: bool = False) -> Non
         print(f"  Segments built for {_clr(built, GREEN, BOLD)} stories.")
 
 
+# ── PAR-1: per-provider concurrency cap ───────────────────────────────────────
+# A semaphore per fact-checker make caps the number of concurrent st-fact
+# spawns hitting that provider's API. Sized by cross_ai_core.get_rate_limit_concurrency
+# (CAC-5) unless overridden by --max-concurrency, or pinned to 1 by --sequential.
+#
+# Note: subprocess.run() blocks the calling thread, so capping spawn = capping
+# in-flight subprocess count = capping concurrent API calls to that provider.
+_provider_semaphores: dict[str, threading.Semaphore] = {}
+_semaphores_lock = threading.Lock()
+_sequential_semaphore = threading.Semaphore(1)
+
+
+def _get_provider_semaphore(make: str, max_override, sequential: bool) -> threading.Semaphore:
+    """Return the semaphore that gates spawns for *make*.
+
+    * --sequential       --> single global Semaphore(1) shared across every provider.
+    * --max-concurrency N --> Semaphore(N), per provider.
+    * default            --> Semaphore(get_rate_limit_concurrency(make)).
+    """
+    if sequential:
+        return _sequential_semaphore
+
+    key = f"{make}:{max_override}" if max_override is not None else make
+    with _semaphores_lock:
+        sem = _provider_semaphores.get(key)
+        if sem is None:
+            size = max_override if max_override is not None else get_rate_limit_concurrency(make)
+            sem = threading.Semaphore(size)
+            _provider_semaphores[key] = sem
+        return sem
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
     require_config()
@@ -707,39 +739,8 @@ def main() -> None:
         print(f"  {_clr('─' * 77, DIM)}")
         print(f"  {N}×{N} matrix — {N * N} cells, verbose mode (no live table)\n")
 
-# ── PAR-1: per-provider concurrency cap ───────────────────────────────────────
-# A semaphore per fact-checker make caps the number of concurrent st-fact
-# spawns hitting that provider's API. Sized by cross_ai_core.get_rate_limit_concurrency
-# (CAC-5) unless overridden by --max-concurrency, or pinned to 1 by --sequential.
-#
-# Note: subprocess.run() blocks the calling thread, so capping spawn = capping
-# in-flight subprocess count = capping concurrent API calls to that provider.
-_provider_semaphores: dict[str, threading.Semaphore] = {}
-_semaphores_lock = threading.Lock()
-_sequential_semaphore = threading.Semaphore(1)
-
-
-def _get_provider_semaphore(make: str, max_override, sequential: bool) -> threading.Semaphore:
-    """Return the semaphore that gates spawns for *make*.
-
-    * --sequential   --> single global Semaphore(1) shared across every provider.
-    * --max-concurrency N --> Semaphore(N), per provider.
-    * default        --> Semaphore(get_rate_limit_concurrency(make)).
-    """
-    if sequential:
-        return _sequential_semaphore
-
-    key = f"{make}:{max_override}" if max_override is not None else make
-    with _semaphores_lock:
-        sem = _provider_semaphores.get(key)
-        if sem is None:
-            size = max_override if max_override is not None else get_rate_limit_concurrency(make)
-            sem = threading.Semaphore(size)
-            _provider_semaphores[key] = sem
-        return sem
-
-
-    # All 25 cells run fully in parallel. st-fact uses fcntl.flock internally
+    # ── Launch Step 2 cells ───────────────────────────────────────────────────
+    # All N×N cells run fully in parallel. st-fact uses fcntl.flock internally
     # to serialise the final JSON read-modify-write, so no locking is needed here.
     cell_errors: dict = {}
 

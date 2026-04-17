@@ -1,14 +1,39 @@
 """
 tests/conftest.py — shared pytest configuration and fixtures.
 
-Slow-test gate
---------------
-Tests marked @pytest.mark.slow spawn real subprocesses and are skipped by
-default.  Pass --slow to opt in:
+Test tiers
+----------
 
-    pytest              # fast unit tests only  (~2 s)
-    pytest --slow       # also runs slow subprocess/integration tests
-    pytest -m slow      # slow tests only
+  Unit (default)
+      Pure function / module tests.  No subprocesses.  No AI calls.  Fast.
+      Run with: pytest
+
+  Slow  (@pytest.mark.slow)
+      Spawn real subprocesses but make NO AI calls (use fixture JSON or
+      --help / --dry-run patterns).  Catches CLI-level structural bugs that
+      unit tests miss (e.g. NameError in main(), argparse misconfiguration,
+      broken imports through commands.py).  ~10-30 s.
+      Run with: pytest --slow   or   pytest -m slow
+
+  Live  (@pytest.mark.live)
+      Spawn real subprocesses AND make real AI calls — but always with
+      --cache enabled.  First run costs real money and populates the on-disk
+      cache (~/.cross_api_cache/).  Every subsequent run is free and fast
+      because responses are served from cache.
+      Run with: pytest --live   or   pytest -m live
+
+      Practical workflow:
+        1. Run once on a machine with valid API keys:
+               pytest --live          # populates cache
+        2. Commit nothing extra — cache lives in ~/.cross_api_cache/.
+        3. On any future run (CI, re-test, colleague's machine with same
+           cache): pytest --live runs in <5 s per test, $0 cost.
+
+      Use the pizza_dough or cross-stones fixtures so the prompts are
+      short and deterministic.
+
+Running all tiers at once:
+    pytest --slow --live
 """
 import sys
 from pathlib import Path
@@ -31,18 +56,28 @@ def pytest_addoption(parser):
         "--slow",
         action="store_true",
         default=False,
-        help="also run @pytest.mark.slow tests (subprocess / integration)",
+        help="also run @pytest.mark.slow tests (subprocess / integration, no AI)",
+    )
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="also run @pytest.mark.live tests (real AI calls, cache-friendly)",
     )
 
 
 def pytest_collection_modifyitems(config, items):
-    # Don't add skip if the user explicitly opted in via --slow or -m slow
-    if config.getoption("--slow"):
-        return
+    run_slow = config.getoption("--slow")
+    run_live = config.getoption("--live")
     markexpr = getattr(config.option, "markexpr", "") or ""
-    if "slow" in markexpr:
-        return
-    skip = pytest.mark.skip(reason="slow test — run with --slow to include")
+
+    skip_slow = pytest.mark.skip(reason="slow test — run with --slow to include")
+    skip_live = pytest.mark.skip(reason="live AI test — run with --live to include")
+
     for item in items:
         if "slow" in item.keywords:
-            item.add_marker(skip)
+            if not run_slow and "slow" not in markexpr:
+                item.add_marker(skip_slow)
+        if "live" in item.keywords:
+            if not run_live and "live" not in markexpr:
+                item.add_marker(skip_live)
