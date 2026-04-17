@@ -184,16 +184,27 @@ class TestStSpeedLive:
 class TestStHeatmapLive:
 
     def test_heatmap_on_fixture(self, pizza):
-        result = _run(["st-heatmap", str(pizza)])
+        # --display is required; use MPLBACKEND=Agg to suppress GUI window
+        env = os.environ.copy()
+        env["MPLBACKEND"] = "Agg"
+        result = subprocess.run(
+            ["st-heatmap", "--display", str(pizza)],
+            capture_output=True, text=True, timeout=120,
+            env=env,
+        )
         _no_traceback(result)
-        assert result.returncode == 0, f"st-heatmap failed:\n{result.stderr}"
+        assert result.returncode == 0, f"st-heatmap failed:\n{result.stdout}\n{result.stderr}"
 
 
 @pytest.mark.live
 class TestStAnalyzeLive:
 
     def test_analyze_on_fixture(self, pizza):
-        result = _run(["st-analyze", str(pizza)])
+        # st-analyze requires a .prompt file alongside the .json
+        # Use xai (reliable, fast) with --cache so re-runs are free
+        prompt = pizza.with_suffix(".prompt")
+        prompt.write_text("What are the best practices in software development?")
+        result = _run(["st-analyze", "--ai", "xai", "--cache", str(pizza)])
         _no_traceback(result)
         assert result.returncode == 0, f"st-analyze failed:\n{result.stderr}"
 

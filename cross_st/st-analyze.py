@@ -451,7 +451,24 @@ def main():
         capture_output=True,
         text=True
     )
-    file_kv = json.loads(result.stdout)
+    file_kv = {}
+    if result.returncode == 0 and result.stdout.strip():
+        try:
+            file_kv = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            if not args.quiet:
+                print(f"  Warning: st-plot returned non-JSON output — skipping plots.")
+    else:
+        if not args.quiet:
+            # Print only non-traceback lines so the warning is clean
+            err_lines = [
+                ln for ln in result.stderr.strip().splitlines()
+                if not ln.startswith("Traceback") and "File " not in ln
+            ]
+            if err_lines:
+                print(f"  Warning: st-plot failed — skipping plots: {err_lines[0]}")
+            else:
+                print(f"  Warning: st-plot failed (exit {result.returncode}) — skipping plots.")
     if not args.quiet:
         print(f"Plots created: {file_kv.keys()}")
     # 2. Upload plots to discourse, save url_kv for insertion into the report
