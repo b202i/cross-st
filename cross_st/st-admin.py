@@ -543,6 +543,197 @@ def check_tos_flag() -> None:
         pass
 
 
+def _get_active_discourse_slug() -> str:
+    """Return the slug of the currently-active Discourse site, or "" if none.
+
+    Used by the interactive menu to render a live label such as
+    "Site manager  (crossai.dev)" so the user always sees which site they
+    are about to edit.  Falls back to the first site if DISCOURSE_SITE is
+    unset; returns "" if no DISCOURSE config exists at all.
+    """
+    import json
+    raw = _env_get("DISCOURSE", "")
+    if not raw:
+        return ""
+    try:
+        data  = json.loads(raw)
+        sites = data.get("sites", data) if isinstance(data, dict) else data
+        if not sites:
+            return ""
+        active = _env_get("DISCOURSE_SITE", "")
+        if active:
+            for s in sites:
+                if s.get("slug") == active:
+                    return active
+        return sites[0].get("slug", "") or ""
+    except (ValueError, AttributeError, TypeError):
+        return ""
+
+
+def _discourse_manage_sites() -> None:
+    """Add or delete a Discourse site stored in the DISCOURSE JSON.
+
+    Shows the list of currently-configured sites with a (current) marker,
+    then offers two actions:
+
+      a — Add a new site:  prompts for slug, URL, username, API key and
+                           default category ID.  Writes the new site dict
+                           to the DISCOURSE JSON in ~/.crossenv.  If this
+                           is the first site, also sets it as the default
+                           (DISCOURSE_SITE).
+      d — Delete a site:   prompts for the site index, removes it after
+                           confirmation, and repoints DISCOURSE_SITE if
+                           the deleted site was the active one.
+
+    Called from interactive_menu() by pressing s in the Discourse submenu.
+    Use the m key (Site manager) to change category / username on an
+    existing site instead.
+    """
+    import json
+    from mmd_single_key import get_single_key
+
+    disc_json_str = _env_get("DISCOURSE", "")
+    sites: list = []
+    if disc_json_str.strip():
+        try:
+            data  = json.loads(disc_json_str)
+            sites = data.get("sites", data) if isinstance(data, dict) else data
+            if not isinstance(sites, list):
+                sites = []
+        except (ValueError, AttributeError):
+            print("\n  ✗  DISCOURSE JSON in ~/.crossenv is malformed.")
+            print("  Run:  st-admin --discourse-setup  to reconfigure.\n")
+            return
+
+    active_slug = _env_get("DISCOURSE_SITE", "")
+    if not active_slug and sites:
+        active_slug = sites[0].get("slug", "")
+
+    # ── Display ──────────────────────────────────────────────────────────
+    print(f"\n  Discourse Sites")
+    print(f"  {'─' * 40}")
+    if sites:
+        for i, s in enumerate(sites, 1):
+            slug   = s.get("slug", "?")
+            url    = s.get("url",  "")
+            user   = s.get("username", "")
+            marker = "  (current)" if slug == active_slug else ""
+            print(f"    {i}.  {slug}  ({url})  user: {user}{marker}")
+    else:
+        print("    (none configured)")
+    print()
+    print("  a: Add a new site")
+    if sites:
+        print("  d: Delete a site")
+    print("  esc: Go back")
+    print()
+
+    print(f"  Choice> ", end="", flush=True)
+    try:
+        choice = get_single_key()
+        print(choice)
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return
+
+    # ── Add ──────────────────────────────────────────────────────────────
+    if choice in ("a", "A"):
+        try:
+            slug = input("  Site slug (short name, e.g. crossai.dev): ").strip()
+            if not slug:
+                print("  Cancelled.\n")
+                return
+            if any(s.get("slug") == slug for s in sites):
+                print(f"  ✗  A site with slug {slug!r} already exists.\n")
+                return
+            url = input("  Site URL (e.g. https://crossai.dev): ").strip()
+            if not url:
+                print("  Cancelled.\n")
+                return
+            if not url.startswith(("http://", "https://")):
+                url = "https://" + url
+            user = input("  Username on this site: ").strip()
+            api  = input("  API key (leave blank to add later): ").strip()
+            cat_raw = input("  Default posting category ID [1]: ").strip() or "1"
+            cat_id  = int(cat_raw) if cat_raw.isdigit() else 1
+        except (KeyboardInterrupt, EOFError):
+            print("\n  Cancelled.\n")
+            return
+
+        sites.append({
+            "slug":        slug,
+            "url":         url.rstrip("/"),
+            "username":    user,
+            "api_key":     api,
+            "category_id": cat_id,
+        })
+        _env_set("DISCOURSE", json.dumps({"sites": sites}))
+        print(f"\n  ✓  Added site: {slug}  ({url})")
+        if len(sites) == 1:
+            _env_set("DISCOURSE_SITE", slug)
+            print(f"  ✓  Set as default site (DISCOURSE_SITE={slug}).")
+        else:
+            print(f"  Use 'd' in the Discourse menu to make it the default.")
+        print()
+        return
+
+    # ── Delete ───────────────────────────────────────────────────────────
+    if choice in ("d", "D"):
+        if not sites:
+            print("  No sites to delete.\n")
+            return
+        try:
+            raw = input(
+                f"  Index of site to delete (1-{len(sites)}, blank to cancel): "
+            ).strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\n  Cancelled.\n")
+            return
+        if not raw:
+            print("  Cancelled.\n")
+            return
+        if not raw.isdigit() or not (1 <= int(raw) <= len(sites)):
+            print(f"  ✗  Invalid index — must be 1..{len(sites)}.\n")
+            return
+        idx = int(raw) - 1
+        victim = sites[idx]
+        try:
+            confirm = input(
+                f"  Really delete site {victim.get('slug', '?')!r} "
+                f"({victim.get('url', '')})? [y/N]: "
+            ).strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            confirm = "n"
+        if confirm != "y":
+            print("  Cancelled.\n")
+            return
+        deleted_slug = victim.get("slug", "")
+        sites.pop(idx)
+        _env_set("DISCOURSE", json.dumps({"sites": sites}))
+        # Repoint DISCOURSE_SITE if we just deleted the active site
+        if deleted_slug and deleted_slug == active_slug:
+            new_active = sites[0].get("slug", "") if sites else ""
+            _env_set("DISCOURSE_SITE", new_active)
+            if new_active:
+                print(
+                    f"\n  ✓  Deleted {deleted_slug}.  "
+                    f"Active site is now: {new_active}\n"
+                )
+            else:
+                print(
+                    f"\n  ✓  Deleted {deleted_slug}.  No sites remain — "
+                    f"re-run st-admin --discourse-setup to add one.\n"
+                )
+        else:
+            print(f"\n  ✓  Deleted {deleted_slug}.\n")
+        return
+
+    if choice in ("ESC", "q", "RETURN", ""):
+        return
+
+    print(f"  ✗  Invalid choice: {choice!r}\n")
+
+
 def discourse_manage() -> None:
     """
     Interactive Discourse site manager.
@@ -677,6 +868,7 @@ def discourse_manage() -> None:
     print(f"    3.  {_DISCOURSE_REPORTS_CATEGORY_NAME}  — your public portfolio")
     print(f"    4.  {_DISCOURSE_PROMPT_LAB_CATEGORY_NAME}  — share prompts and get community feedback")
     print(f"    5.  Enter a category ID manually")
+    print(f"    u.  Change username for this site  (currently: {username})")
     print(f"\n  esc: Escape back to the previous menu")
     print()
 
@@ -692,6 +884,41 @@ def discourse_manage() -> None:
     new_cat_label = ""
 
     if choice in ("ESC", "q", "RETURN", ""):
+        return
+    elif choice in ("u", "U"):
+        # ── Change username for the active site ───────────────────────────────
+        # Useful when the user has more than one Discourse account on the same
+        # site (e.g. personal + work) and wants to switch between them.
+        try:
+            new_user = input(
+                f"  New username (current: {username}, blank to cancel): "
+            ).strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return
+        if not new_user:
+            print("  Cancelled.\n")
+            return
+        if new_user == username:
+            print("  ✓  Username unchanged.\n")
+            return
+        site["username"] = new_user
+        # Recompute the auto-generated <username>-private slug if applicable.
+        old_priv_slug = site.get("private_category_slug", "")
+        if old_priv_slug == f"{username}-private":
+            site["private_category_slug"] = f"{new_user}-private"
+        _env_set("DISCOURSE", json.dumps({"sites": sites}))
+        # Keep the legacy flat key in sync for tools that still read it.
+        if _env_get("DISCOURSE_USERNAME", ""):
+            _env_set("DISCOURSE_USERNAME", new_user)
+        print(
+            f"\n  ✓  Username for {site_slug} changed: "
+            f"{username} → {new_user}\n"
+        )
+        new_portfolio = (
+            f"{site_url.rstrip('/')}/u/{new_user}/activity/topics"
+        )
+        print(f"     Public portfolio: {new_portfolio}\n")
         return
     elif choice == "1" and private_id:
         new_cat_id    = private_id
@@ -1629,7 +1856,8 @@ _MENU = {
     "d": ("Discourse", {
         "d": "Select default site",
         "c": "Select posting category  (private | test-cleared-daily)",
-        "m": "Full site manager",
+        "m": lambda: f"Site manager  ({_get_active_discourse_slug() or 'no site configured'})",
+        "s": "Manage sites  (add / delete)",
         "o": "Community onboarding / re-accept T&C",
     }),
     "c": ("Cache", {
@@ -1646,6 +1874,13 @@ def _print_menu(menu: dict, title: str) -> None:
     print(f"\n=== {title} ===")
     for key, value in menu.items():
         label = value[0] if isinstance(value, tuple) else value
+        # Allow callable labels so menu items can show live state (e.g. the
+        # currently-selected Discourse site in the "Site manager" line).
+        if callable(label):
+            try:
+                label = label()
+            except Exception:
+                label = "(error)"
         print(f"  {key}: {label}")
     print()
     print("  esc: Escape back to the previous menu")
@@ -1789,6 +2024,9 @@ def interactive_menu() -> None:
 
                     case ("Discourse", "m"):
                         discourse_manage()
+
+                    case ("Discourse", "s"):
+                        _discourse_manage_sites()
 
                     case ("Discourse", "o"):
                         _run_discourse_setup()
