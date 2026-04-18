@@ -570,6 +570,101 @@ def _get_active_discourse_slug() -> str:
         return ""
 
 
+def _fetch_discourse_categories(url: str, api_key: str, username: str) -> list:
+    """Fetch the list of categories visible to ``username`` on the Discourse
+    site at ``url``.
+
+    Returns a list of dicts ``[{"id": int, "name": str, "slug": str,
+    "parent_id": int|None}, ...]`` sorted with parent categories first,
+    each followed by its subcategories.  Returns ``[]`` on any error
+    (network failure, 403, malformed JSON) — the caller is expected to
+    fall back to manual ID entry.
+
+    Uses ``/site.json`` which returns every category the API user can see
+    in a single request, including subcategories.
+    """
+    try:
+        import requests  # type: ignore
+    except ImportError:
+        return []
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["Api-Key"]      = api_key
+        headers["Api-Username"] = username or "system"
+    try:
+        r = requests.get(f"{url.rstrip('/')}/site.json", headers=headers, timeout=10)
+        if r.status_code != 200:
+            return []
+        cats = r.json().get("categories", [])
+    except Exception:
+        return []
+    if not isinstance(cats, list):
+        return []
+    # Build parent-first, subcategory-after ordering
+    by_parent: dict = {}
+    for c in cats:
+        by_parent.setdefault(c.get("parent_category_id"), []).append(c)
+    ordered: list = []
+    for top in sorted(by_parent.get(None, []), key=lambda c: c.get("position", 0)):
+        ordered.append({
+            "id":        top.get("id"),
+            "name":      top.get("name", ""),
+            "slug":      top.get("slug", ""),
+            "parent_id": None,
+        })
+        for sub in sorted(by_parent.get(top.get("id"), []),
+                          key=lambda c: c.get("position", 0)):
+            ordered.append({
+                "id":        sub.get("id"),
+                "name":      sub.get("name", ""),
+                "slug":      sub.get("slug", ""),
+                "parent_id": top.get("id"),
+            })
+    return ordered
+
+
+def _pick_discourse_category(url: str, api_key: str, username: str) -> int:
+    """Interactive category picker for the Add-a-site flow.
+
+    Tries to fetch the visible categories from the Discourse site; if that
+    succeeds, presents a numbered list and lets the user pick by index.
+    If the fetch fails (no API key, network error, 403) it falls back to
+    asking for a numeric category ID directly.
+
+    Returns the selected category ID as an int (defaults to 1 if the
+    user enters nothing in the manual fallback).
+    """
+    cats = _fetch_discourse_categories(url, api_key, username)
+    if not cats:
+        print("  (could not fetch categories from site — enter ID manually)")
+        cat_raw = input("  Default posting category ID [1]: ").strip() or "1"
+        return int(cat_raw) if cat_raw.lstrip("-").isdigit() else 1
+
+    print()
+    print(f"  Categories visible to {username or 'this API key'}:")
+    for i, c in enumerate(cats, 1):
+        indent = "    " if c["parent_id"] else "  "
+        print(f"  {i:>3}. {indent}{c['name']}  (id={c['id']})")
+    print()
+    while True:
+        try:
+            raw = input(
+                f"  Default posting category — pick 1-{len(cats)}, "
+                f"or enter a numeric ID directly [1]: "
+            ).strip()
+        except (KeyboardInterrupt, EOFError):
+            return 1
+        if not raw:
+            return cats[0]["id"]
+        if raw.isdigit():
+            n = int(raw)
+            if 1 <= n <= len(cats):
+                return cats[n - 1]["id"]
+            # Numeric value outside menu range — treat as a raw category ID
+            return n
+        print(f"  ✗  Invalid choice — enter 1-{len(cats)} or a category ID.")
+
+
 def _discourse_manage_sites() -> None:
     """Add or delete a Discourse site stored in the DISCOURSE JSON.
 
@@ -654,8 +749,7 @@ def _discourse_manage_sites() -> None:
                 url = "https://" + url
             user = input("  Username on this site: ").strip()
             api  = input("  API key (leave blank to add later): ").strip()
-            cat_raw = input("  Default posting category ID [1]: ").strip() or "1"
-            cat_id  = int(cat_raw) if cat_raw.isdigit() else 1
+            cat_id = _pick_discourse_category(url, api, user)
         except (KeyboardInterrupt, EOFError):
             print("\n  Cancelled.\n")
             return
