@@ -119,3 +119,4 @@ api_cache/
 *.bak
 tmp/
 story/
+.env.bak.*
