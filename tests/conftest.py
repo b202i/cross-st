@@ -81,3 +81,31 @@ def pytest_collection_modifyitems(config, items):
         if "live" in item.keywords:
             if not run_live and "live" not in markexpr:
                 item.add_marker(skip_live)
+
+
+def pytest_configure(config):
+    """Force a headless matplotlib backend whenever --slow or --live is active.
+
+    Several `st-*` commands (st-verdict, st-heatmap, st-plot) call
+    ``matplotlib.pyplot.show()`` at the end of a successful run.  On a developer
+    machine with a display, that opens a Tk/Qt/Cocoa window and the subprocess
+    blocks indefinitely until a human closes the window — which causes pytest
+    to hang or time out.
+
+    Setting MPLBACKEND=Agg here (in the *parent* pytest process's environment)
+    means every subprocess that does ``env = os.environ.copy()`` inherits it.
+    The Agg backend has no GUI; ``plt.show()`` becomes a no-op and the
+    subprocess exits cleanly.
+
+    We do not unset it on teardown — pytest exits anyway, and unit-tier tests
+    don't care about the backend.
+
+    NOTE: st-verdict in particular renders a stacked-bar chart and starts a
+    canvas timer inside ``plt.show()``'s event loop to flush AI captions.
+    With Agg, the timer never fires (no event loop) but the subprocess still
+    exits 0 — exactly what the live test asserts on.
+    """
+    import os
+    if config.getoption("--slow") or config.getoption("--live"):
+        os.environ.setdefault("MPLBACKEND", "Agg")
+

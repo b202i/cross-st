@@ -585,8 +585,8 @@ def _discourse_manage_sites() -> None:
                            confirmation, and repoints DISCOURSE_SITE if
                            the deleted site was the active one.
 
-    Called from interactive_menu() by pressing s in the Discourse submenu.
-    Use the m key (Site manager) to change category / username on an
+    Called from interactive_menu() by pressing m in the Discourse submenu.
+    Use the s key (Site manager) to change category / username on an
     existing site instead.
     """
     import json
@@ -1856,8 +1856,8 @@ _MENU = {
     "d": ("Discourse", {
         "d": "Select default site",
         "c": "Select posting category  (private | test-cleared-daily)",
-        "m": lambda: f"Site manager  ({_get_active_discourse_slug() or 'no site configured'})",
-        "s": "Manage sites  (add / delete)",
+        "s": lambda: f"Site manager  ({_get_active_discourse_slug() or 'no site configured'})",
+        "m": "Manage sites  (add / delete)",
         "o": "Community onboarding / re-accept T&C",
     }),
     "c": ("Cache", {
@@ -2022,10 +2022,10 @@ def interactive_menu() -> None:
                     case ("Discourse", "c"):
                         _discourse_select_category()
 
-                    case ("Discourse", "m"):
+                    case ("Discourse", "s"):
                         discourse_manage()
 
-                    case ("Discourse", "s"):
+                    case ("Discourse", "m"):
                         _discourse_manage_sites()
 
                     case ("Discourse", "o"):

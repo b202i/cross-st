@@ -128,32 +128,46 @@ class TestStCrossIntegration:
 
     @pytest.mark.slow
     def test_step2_launches_with_all_preloaded(self, pizza):
-        """When all 25 cells are pre-loaded, Step 2 should report 25 done and exit.
+        """When all 25 cells are pre-loaded, main() must NOT silently return.
 
-        This is the canonical regression test for the 'main() silently returns'
-        bug: if Step 2 never executes, the summary line ('Cross-product:') will
-        not appear in output.
+        Originally this test asserted that the live-table Step 2 summary
+        ("Cross-product: …") appeared.  As of the "already complete" early-exit
+        (cross-internal/distribution/IMPLEMENTATION_st_cross_already_complete.md),
+        a fully-preloaded container instead exits with a friendly status banner
+        — but the underlying regression we guard against is the same: `main()`
+        must produce SOME visible non-empty signal that it noticed the cells
+        and didn't silently return mid-flow.
         """
         result = _run(["st-cross", "--skip-gen", str(pizza)], timeout=60)
         assert result.returncode == 0, f"stderr:\n{result.stderr}"
         _no_traceback(result)
         combined = result.stdout + result.stderr
-        # The summary line must appear — if main() exited early it won't
-        assert "Cross-product:" in combined, (
-            "Step 2 summary missing — main() may have exited before threads launched.\n"
+        # Either the new "already complete" banner OR the legacy Step 2 summary
+        # is acceptable — both prove main() ran past the pre-scan.
+        assert (
+            "Cross-product fact-check already complete" in combined
+            or "Cross-product:" in combined
+        ), (
+            "Neither the 'already complete' banner nor the Step 2 summary "
+            "appeared — main() may have exited before the pre-scan finished.\n"
             f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
-        assert "25 done" in combined or "done" in combined
 
     @pytest.mark.slow
     def test_verbose_step2_banner(self, pizza):
-        """--verbose should print the Step 2 header even when all cells are pre-loaded."""
+        """--verbose on a fully-preloaded container shows the friendly
+        'already complete' banner (the legacy 'Step 2' header is now skipped
+        entirely when there is nothing to do)."""
         result = _run(["st-cross", "--verbose", "--skip-gen", str(pizza)], timeout=60)
         assert result.returncode == 0, f"stderr:\n{result.stderr}"
         _no_traceback(result)
-        assert "Step 2" in result.stdout, (
-            "--verbose mode did not print Step 2 banner"
+        assert "Cross-product fact-check already complete" in result.stdout, (
+            "--verbose mode did not print the 'already complete' banner.\n"
+            f"stdout:\n{result.stdout}"
         )
+        # Sanity: the banner block also surfaces "Last updated:" + "Next:" hints.
+        assert "Last updated:" in result.stdout
+        assert "Next:" in result.stdout
 
     @pytest.mark.slow
     def test_quiet_produces_no_output(self, pizza):

@@ -145,9 +145,11 @@ class TestStCrossLive:
     def test_cross_skip_gen_all_cached(self, pizza):
         """Run st-cross --skip-gen on the fully-populated fixture.
 
-        All 25 cells are already complete — Step 2 should detect this, report
-        25 done, and exit quickly without making any AI calls.
-        This validates that Step 2 actually executes and produces a summary.
+        All 25 cells are already complete — the "already complete" early-exit
+        (cross-internal/distribution/IMPLEMENTATION_st_cross_already_complete.md)
+        prints a friendly status banner and exits without launching Step 2 or
+        making any AI calls.  This validates that the early-exit path runs
+        cleanly end-to-end.
         """
         result = _run(
             ["st-cross", "--skip-gen", "--cache", str(pizza)],
@@ -156,8 +158,8 @@ class TestStCrossLive:
         _no_traceback(result)
         assert result.returncode == 0, f"st-cross failed:\n{result.stderr}"
         combined = result.stdout + result.stderr
-        assert "Cross-product:" in combined, (
-            "Step 2 summary line missing — Step 2 may not have executed.\n"
+        assert "Cross-product fact-check already complete" in combined, (
+            "Early-exit banner missing — Step 2 may have unexpectedly launched.\n"
             f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
 
@@ -166,7 +168,19 @@ class TestStCrossLive:
 class TestStVerdictLive:
 
     def test_verdict_on_fixture(self, pizza):
-        result = _run(["st-verdict", "--cache", str(pizza)])
+        # st-verdict ends with plt.show() which would block on a GUI window.
+        # MPLBACKEND=Agg makes plt.show() a no-op so the subprocess exits cleanly.
+        # The conftest also sets this globally for --live, but we set it here
+        # too so the test stands alone (e.g. `pytest -k verdict --live`).
+        # A short timeout (60 s) ensures we fail loudly rather than hang
+        # indefinitely if the suppression ever breaks.
+        env = os.environ.copy()
+        env["MPLBACKEND"] = "Agg"
+        result = subprocess.run(
+            ["st-verdict", "--cache", str(pizza)],
+            capture_output=True, text=True, timeout=60,
+            env=env,
+        )
         _no_traceback(result)
         assert result.returncode == 0, f"st-verdict failed:\n{result.stderr}"
 

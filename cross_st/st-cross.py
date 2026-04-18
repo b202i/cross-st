@@ -714,6 +714,67 @@ def main() -> None:
         print(f"\n  {_clr('No cells executed', DIM)} — re-run without --dry-run to proceed.\n")
         sys.exit(0)
 
+    # ── All cells already complete: print a friendly status & exit ───────────
+    # Without this, a re-run on a fully-complete container would silently fall
+    # through Step 2's launch loop (0 threads), then print "Cross-product: 25
+    # done … wall time 00:00" — which looks confusingly like work just
+    # happened.  Better: tell the user what's already in the file, when it
+    # was last updated, and what to do next.
+    if n_preloaded == N * N:
+        # Find the most recent fact-check completion timestamp across all cells.
+        latest_ts = 0.0
+        for story in existing.get("story", [])[:N]:
+            for fact in story.get("fact", []):
+                ts = (fact.get("timing") or {}).get("end_time", 0) or 0
+                if ts > latest_ts:
+                    latest_ts = float(ts)
+        # Fall back to file mtime if no per-fact timing recorded.
+        if latest_ts <= 0:
+            try:
+                latest_ts = os.path.getmtime(file_json)
+            except OSError:
+                latest_ts = 0.0
+
+        def _humanise_age(seconds: float) -> str:
+            if seconds < 60:        return "just now"
+            if seconds < 3600:      return f"{int(seconds // 60)} min ago"
+            if seconds < 86400:     return f"{int(seconds // 3600)} hr ago"
+            if seconds < 86400 * 2: return "yesterday"
+            return f"{int(seconds // 86400)} days ago"
+
+        if latest_ts > 0:
+            from datetime import datetime
+            ts_str = datetime.fromtimestamp(latest_ts).strftime("%Y-%m-%d %H:%M:%S")
+            age_str = _humanise_age(time.time() - latest_ts)
+            ts_line = f"{ts_str}  {_clr(f'({age_str})', DIM)}"
+        else:
+            ts_line = _clr("(no timestamp recorded)", DIM)
+
+        story_ai_str = ", ".join(get_ai_make(a) for a in ai_list)
+
+        if not args.quiet:
+            # Pad labels to the longest one so values line up in a clean column.
+            # Pad the plain text BEFORE wrapping in ANSI codes — _clr() would
+            # otherwise count the escape bytes against the column width.
+            rows = [
+                ("Container:",    file_json),
+                ("Matrix:",       f"{N}×{N}  ({N * N} cells)"),
+                ("Story AIs:",    story_ai_str),
+                ("Last updated:", ts_line),
+            ]
+            label_w = max(len(lbl) for lbl, _ in rows)
+            print()
+            print(f"  {_clr('✓ Cross-product fact-check already complete', GREEN, BOLD)}")
+            for lbl, val in rows:
+                print(f"    {_clr(lbl.ljust(label_w), DIM)}  {val}")
+            print()
+            print(f"  {_clr('Next:', DIM)} "
+                  f"{_clr('st-verdict', BOLD)} {file_json}  "
+                  f"{_clr('to view results, or', DIM)} "
+                  f"{_clr('--no-cache', BOLD)} {_clr('to refresh.', DIM)}")
+            print()
+        sys.exit(0)
+
     cross_row_count = [0]   # mutable so threads can update it
 
     def _redraw_cross(first: bool = False) -> None:
@@ -740,9 +801,26 @@ def main() -> None:
         print(f"  {N}×{N} matrix — {N * N} cells, verbose mode (no live table)\n")
 
     # ── Launch Step 2 cells ───────────────────────────────────────────────────
-    # All N×N cells run fully in parallel. st-fact uses fcntl.flock internally
+    # All NN cells run fully in parallel. st-fact uses fcntl.flock internally
     # to serialise the final JSON read-modify-write, so no locking is needed here.
     cell_errors: dict = {}
+
+    # Verbose-mode progress counters.  Without these the user sees 25
+    # "Generating fact-check…" lines fire in microseconds (one per launched
+    # thread) and then total silence for up to `timeout` per cell while
+    # nothing prints — looks indistinguishable from a stalled process.
+    _verbose_progress = args.verbose and not args.quiet
+    _total_to_run = sum(
+        1 for si in range(N) for fi in range(N)
+        if cells[(si, fi)]["status"] != ST_DONE
+    )
+    _completed_count = [0]                # mutable container — closure rebind
+    _completed_lock  = threading.Lock()
+
+    def _idx_prefix(n: int) -> str:
+        # Width matches total digits so columns line up: e.g. "[ 7/25]".
+        w = len(str(_total_to_run))
+        return f"[{n:>{w}}/{_total_to_run}]"
 
     def _run_cell(si: int, fi: int) -> None:
         """Run one fact-check cell; serialised per story-row through story_locks."""
@@ -771,8 +849,12 @@ def main() -> None:
             file_json,
         ]
         sem = _get_provider_semaphore(fc_make, args.max_concurrency, not args.parallel)
-        if args.verbose and not args.quiet:
-            print(f"  Generating fact-check: {ai_list[si]} -> {fc_make}...", flush=True)
+        # NOTE: the per-cell "Starting" line is printed by the LAUNCH loop
+        # below, not here.  Doing it here would race across all NN worker
+        # threads and the user would see all NN lines in microseconds —
+        # giving no sense of progress.  Doing it in the launch loop instead
+        # serialises the start prints and pairs each one with a numeric
+        # [n/total] prefix.
         # Defer the terminal status assignment to the finally block so it
         # always lands AFTER end_time — readers that see DONE/FAILED/CANCELLED
         # are then guaranteed to also see a populated end_time.
@@ -805,22 +887,81 @@ def main() -> None:
             cell["end_time"] = time.time()
             cell["status"]   = final_status
 
-    # N×N threads — one per cell — for full parallelism.
+            # Verbose-mode completion line.  Prints as each cell finishes —
+            # gives the user a steady drip of progress instead of 30 minutes
+            # of silence.  print() is atomic for a single call so concurrent
+            # worker threads don't interleave their output.
+            if _verbose_progress:
+                with _completed_lock:
+                    _completed_count[0] += 1
+                    n_done_so_far = _completed_count[0]
+                elapsed = cell["end_time"] - cell["start_time"]
+                if final_status == ST_DONE:
+                    mark, color = "✓", GREEN
+                elif final_status == ST_CANCELLED:
+                    mark, color = "⊘", DIM
+                else:
+                    mark, color = "✗", YELLOW
+                print(
+                    f"  {_idx_prefix(n_done_so_far)} "
+                    f"{_clr(mark, color)} "
+                    f"{ai_list[si]} → {fc_make}  "
+                    f"{_clr(f'({_fmt(elapsed)})', DIM)}",
+                    flush=True,
+                )
+
+    # NN threads — one per cell — for full parallelism.
     # st-fact uses fcntl.flock internally to serialise the JSON write,
     # so concurrent calls on the same file are safe.
-    threads = [
-        threading.Thread(target=_run_cell, args=(si, fi), daemon=True)
+    threads_with_idx = [
+        (si, fi, threading.Thread(target=_run_cell, args=(si, fi), daemon=True))
         for si in range(N) for fi in range(N)
         if cells[(si, fi)]["status"] != ST_DONE   # skip already-done cells
     ]
-    for t in threads:
+    threads = [t for _, _, t in threads_with_idx]
+    for n, (si, fi, t) in enumerate(threads_with_idx, start=1):
+        # Verbose-mode launch line — printed by the main thread as each
+        # worker is started, so the [n/total] counter sequences correctly.
+        # All NN launches still happen in microseconds, but at least the
+        # numbering communicates that the matrix dispatch is finite.
+        if _verbose_progress:
+            print(
+                f"  {_idx_prefix(n)} "
+                f"{_clr('▸', DIM)} "
+                f"{_clr('Starting', DIM)}: {ai_list[si]} → {ai_list[fi]}…",
+                flush=True,
+            )
         t.start()
+
+    # Verbose-mode heartbeat — emit a "still working" line every
+    # _HEARTBEAT_SECS so the user sees confirmation of liveness even when no
+    # cell has completed in a while.  The slowest provider can take many
+    # minutes per cell; without this the screen looks frozen.
+    _HEARTBEAT_SECS = 15
+    _step2_started  = time.time()
+    _last_heartbeat = _step2_started
 
     # Poll and redraw table while threads are running
     try:
         while True:
             if _show_live_table:
                 _redraw_cross()
+            elif _verbose_progress:
+                now = time.time()
+                if now - _last_heartbeat >= _HEARTBEAT_SECS:
+                    with _completed_lock:
+                        n_done_so_far = _completed_count[0]
+                    n_running = sum(
+                        1 for c in cells.values() if c["status"] == ST_RUNNING
+                    )
+                    print(
+                        f"  {_clr('…', DIM)} {_clr('still working', DIM)}: "
+                        f"{n_done_so_far}/{_total_to_run} done, "
+                        f"{n_running} running  "
+                        f"{_clr(f'(elapsed {_fmt(now - _step2_started)})', DIM)}",
+                        flush=True,
+                    )
+                    _last_heartbeat = now
 
             if not any(t.is_alive() for t in threads):
                 break
