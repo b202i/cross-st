@@ -7,7 +7,7 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.6.0] — unreleased
+## [0.6.0] — 2026-04-17
 
 ### Added
 - **PAR-1 — `st-cross` per-provider rate limiting + flag surface.**
@@ -29,11 +29,32 @@ Cross uses [Semantic Versioning](https://semver.org/).
 - **`cross-ai-core` floor bumped to `>=0.6.0`** (PAR-1 needs `get_rate_limit_concurrency`
   + `process_prompt(retry_budget=…)` from `cross-ai-core` 0.6.0).
 
+### Fixed
+- **`discourse.py` — hand-rolled `load_dotenv` chain removed.**
+  `get_discourse_slugs_sites()` was rolling its own four-layer `load_dotenv`
+  without the `_in_project_venv()` guard, so the dev checkout's `.env` was
+  loaded with `override=True` for all users, silently shadowing `~/.crossenv`.
+  Symptom: `st-admin --discourse m a` added a site that never appeared in `st`'s
+  post-menu. Fix: delegate to `mmd_startup.load_cross_env()` so the venv guard
+  is respected by every code path.
+- **`st-admin` — writes to the profile-correct settings file.**
+  `_env_set()` now resolves `_TARGET_ENV` at startup:
+  developer venv (`_in_project_venv()=True`) → `<project>/.env`;
+  pipx / system-Python user → `~/.crossenv`.
+  `interactive_menu()` prints a banner showing the active file on entry.
+- **`st-admin` — `_warn_if_shadowed()` guardrail.**
+  After every `_env_set()` write, any higher-priority `.env` file that defines
+  the same key triggers a visible `⚠️ Warning` naming the file.
+
 ### Tests
 - New `tests/test_st_cross.py` — 13 PAR-1 unit tests covering the semaphore
   registry, rate-limit enforcement (real `threading.Semaphore` race), CLI
   surface, and `--parallel/--sequential` mutual exclusion.
-- Suite: 696 → **709 passing** (57 skipped, 0 failing).
+- `tests/test_st_admin.py` `tmp_settings` fixture now patches `_TARGET_ENV` —
+  fully isolates tests from `~/.crossenv`.
+- `tests/test_dotenv_resolution.py::TestDiscoursePathResolution` — R1/R3 guards
+  rewritten to assert `discourse.py` delegates to `load_cross_env()`.
+- Suite: 696 → **746 passing** (105 skipped, 0 failing).
 
 ---
 

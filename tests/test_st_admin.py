@@ -65,6 +65,7 @@ def tmp_settings(tmp_path, monkeypatch):
     env_file.write_text("")   # set_key requires file to exist
 
     monkeypatch.setattr(st_admin, "_CROSSENV",    str(env_file))
+    monkeypatch.setattr(st_admin, "_TARGET_ENV",  str(env_file))
     monkeypatch.setattr(st_admin, "_models_path", str(models_file))
 
     return {"env": env_file, "models": models_file}

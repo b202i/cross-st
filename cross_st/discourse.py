@@ -72,17 +72,14 @@ client.create_post(post_body, topic_id=123)
 
 
 def get_discourse_slugs_sites():
-    # Discourse site authentication details remain private in .env
-    # Return a list of sites and slug identifier for each site
-
-    # Use realpath to get the actual path of the script
-    _cross_st_dir = os.path.dirname(os.path.realpath(__file__))
-    _project_root = os.path.dirname(_cross_st_dir)   # parent of cross_st/ = repo root
-    _CROSSENV     = os.path.expanduser("~/.crossenv")
-    load_dotenv(_CROSSENV)                                                       # 1. global fallback
-    load_dotenv(os.path.join(_project_root, ".env"), override=True)             # 2. repo root wins
-    load_dotenv(os.path.join(_cross_st_dir, ".env"), override=True)             # 2b. cross_st/
-    load_dotenv(os.path.join(os.getcwd(), ".env"),   override=True)             # 3. CWD — highest
+    # Discourse site authentication details remain private in .env.
+    # Delegate env-loading to the canonical loader so the venv-guarded layer-2
+    # behaviour (skip dev .env for pipx / system-Python installs) is honoured —
+    # otherwise this module silently shadows ~/.crossenv with a stale dev .env
+    # even for non-developer users. See R1/R3 in cross-st AGENTS.md and the
+    # "Two user types" section in cross-internal/AGENTS.md.
+    from mmd_startup import load_cross_env
+    load_cross_env()
 
     string = os.getenv("DISCOURSE")
     if not string:

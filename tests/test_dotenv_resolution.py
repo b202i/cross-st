@@ -270,7 +270,14 @@ class TestDiscoursePathResolution:
     """
 
     def test_discourse_project_root_is_parent_of_cross_st(self):
-        """_project_root in discourse.py must be the parent of cross_st/."""
+        """discourse.py must delegate env loading to mmd_startup.load_cross_env().
+
+        R1/R3 guard: discourse.py used to maintain its own 4-layer load_dotenv
+        chain that ignored the venv guard in `_in_project_venv()`, so it
+        silently shadowed ~/.crossenv with a stale dev .env even for pipx and
+        system-Python users.  The fix is to delegate to the canonical loader.
+        See `cross-internal/st-admin/BUGFIX_discourse_add_site_shadowed.md`.
+        """
         import ast
         src = (_CROSS_ST / "discourse.py").read_text()
         tree = ast.parse(src)
@@ -280,28 +287,29 @@ class TestDiscoursePathResolution:
                 func_src = ast.get_source_segment(src, node)
                 break
         assert func_src is not None, "get_discourse_slugs_sites() not found in discourse.py"
-        assert "_project_root" in func_src, (
-            "discourse.py must compute _project_root = os.path.dirname(_cross_st_dir). "
-            "Using only _basedir = os.path.dirname(__file__) points to cross_st/, not the "
-            "project root, and .env will never be found when CWD != repo root (R1)."
-        )
-        assert "os.path.dirname(_cross_st_dir)" in func_src or \
-               "dirname(_cross_st_dir)" in func_src, (
-            "discourse.py must derive _project_root by calling dirname on _cross_st_dir."
+        assert "load_cross_env" in func_src, (
+            "discourse.py must call mmd_startup.load_cross_env() rather than "
+            "rolling its own load_dotenv chain — otherwise the venv guard is "
+            "bypassed and the dev .env shadows ~/.crossenv for non-dev users."
         )
 
     def test_discourse_uses_override_true_for_project_env(self):
-        """discourse.py must load project-root .env with override=True (R3 guard)."""
+        """discourse.py must NOT contain an unguarded load_dotenv override chain.
+
+        R3 guard: any direct ``load_dotenv(..., override=True)`` here would
+        re-introduce the silent-shadow bug because it would skip the
+        `_in_project_venv()` check that mmd_startup applies.  All env loading
+        must go through `load_cross_env()`.
+        """
         src = (_CROSS_ST / "discourse.py").read_text()
-        # Find the line that loads _project_root .env
-        lines = src.splitlines()
-        project_root_lines = [l for l in lines if "_project_root" in l and "load_dotenv" in l]
-        assert project_root_lines, (
-            "No load_dotenv(_project_root, ...) call found in discourse.py"
-        )
-        assert any("override=True" in l for l in project_root_lines), (
-            "discourse.py must use override=True when loading _project_root .env "
-            "so project settings win over ~/.crossenv (R3)."
+        offending = [
+            l for l in src.splitlines()
+            if "load_dotenv" in l and "override=True" in l
+        ]
+        assert not offending, (
+            "discourse.py must not call load_dotenv(..., override=True) directly; "
+            "delegate to mmd_startup.load_cross_env() instead.  Offending lines:\n  "
+            + "\n  ".join(offending)
         )
 
     def test_load_cross_env_uses_override_true_for_project_layers(self):

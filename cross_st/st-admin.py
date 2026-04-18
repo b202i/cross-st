@@ -59,7 +59,7 @@ from dotenv import load_dotenv, set_key
 
 from ai_handler import get_ai_list, AI_HANDLER_REGISTRY
 from base_handler import _get_cache_dir
-from mmd_startup import load_cross_env, _PROJECT_ROOT
+from mmd_startup import load_cross_env, _PROJECT_ROOT, _in_project_venv
 from mmd_util import (seed_user_templates, _USER_TEMPLATES_DIR, _BUNDLED_TEMPLATES_DIR,
                       seed_stones_domains, _DEFAULT_USER_STONES_DIR, get_default_stones_dir)
 
@@ -67,6 +67,21 @@ from mmd_util import (seed_user_templates, _USER_TEMPLATES_DIR, _BUNDLED_TEMPLAT
 # ── Paths ──────────────────────────────────────────────────────────────────────
 _CROSSENV    = os.path.expanduser("~/.crossenv")
 _models_path = os.path.join(_PROJECT_ROOT, ".ai_models")  # repo root, not cross_st/
+
+# Where st-admin reads-and-writes settings.
+#
+# Profile          | _TARGET_ENV
+# -----------------|------------------------------------------------
+# pipx user        | ~/.crossenv (the only file that exists)
+# Developer        | <project-root>/.env (layer 2, wins via override=True)
+#
+# Picking the file that actually has the highest priority for the running
+# profile prevents the silent-shadow bug where st-admin wrote to ~/.crossenv
+# but a dev project-root .env immediately overrode it on next load.
+# See `cross-internal/st-admin/BUGFIX_discourse_add_site_shadowed.md` and the
+# "Two user types" section in `cross-internal/AGENTS.md`.
+_DEV_MODE   = _in_project_venv()
+_TARGET_ENV = os.path.join(_PROJECT_ROOT, ".env") if _DEV_MODE else _CROSSENV
 
 load_cross_env()
 
@@ -89,9 +104,77 @@ def _env_get(key: str, default: str = "") -> str:
 
 
 def _env_set(key: str, value: str):
-    """Write a key to .env and update the running process environment."""
-    set_key(_CROSSENV, key, value)
+    """Write a key to the active settings file and update os.environ.
+
+    The active file (`_TARGET_ENV`) is chosen at startup based on profile:
+      • pipx-installed user → `~/.crossenv`
+      • developer (sys.executable inside the project tree) → `<project>/.env`
+
+    Picking the file that already has the highest priority for the loader
+    avoids the silent-shadow bug where writes to `~/.crossenv` were
+    immediately overridden by the dev project-root `.env` on the next load.
+    `_warn_if_shadowed()` still flags any *other* file (e.g. CWD `.env`)
+    that overrides our write.
+    """
+    set_key(_TARGET_ENV, key, value)
     os.environ[key] = value
+    _warn_if_shadowed(key)
+
+
+def _warn_if_shadowed(key: str) -> None:
+    """Warn when another .env in the loader chain overrides our write.
+
+    The loader order in mmd_startup.load_cross_env() is:
+      1. ~/.crossenv
+      2. <project-root>/.env       (override=True; dev checkout only)
+      2b. <cross_st-dir>/.env      (override=True; pip-install layout)
+      3. <CWD>/.env                (override=True; highest priority)
+
+    A file is "shadowing" only if it is loaded *after* `_TARGET_ENV` and
+    contains the same key. The file we just wrote to is excluded.
+    """
+    try:
+        from dotenv import dotenv_values
+        from mmd_startup import _PROJECT_ROOT, _CROSS_ST_DIR  # type: ignore
+    except Exception:
+        return
+
+    # Loader order (later wins). Skip layers 2/2b for non-dev profiles
+    # because load_cross_env() skips them too.
+    chain = [_CROSSENV]
+    if _DEV_MODE:
+        chain.append(os.path.join(_PROJECT_ROOT, ".env"))
+        chain.append(os.path.join(_CROSS_ST_DIR, ".env"))
+    chain.append(os.path.join(os.getcwd(), ".env"))
+
+    target_real = os.path.realpath(_TARGET_ENV)
+    try:
+        target_index = next(
+            i for i, p in enumerate(chain)
+            if os.path.realpath(p) == target_real
+        )
+    except StopIteration:
+        target_index = -1  # _TARGET_ENV isn't in the chain (shouldn't happen)
+
+    shadowing = []
+    for path in chain[target_index + 1:]:
+        if not os.path.isfile(path) or os.path.realpath(path) == target_real:
+            continue
+        try:
+            vals = dotenv_values(path)
+        except Exception:
+            continue
+        if key in vals:
+            shadowing.append(path)
+
+    if shadowing:
+        print()
+        print(f"  ⚠️  Warning: {key} was written to {_TARGET_ENV},")
+        print(f"      but the following file(s) shadow it (override=True wins):")
+        for path in shadowing:
+            print(f"        • {path}")
+        print(f"      Remove the {key}= line from those file(s) for the new value to take effect.")
+        print()
 
 
 # ── Settings readers / writers ─────────────────────────────────────────────────
@@ -538,7 +621,7 @@ def check_tos_flag() -> None:
                 s["privacy_version"] = manifest_priv
                 s["tos_agreed_at"]   = tos_agreed_at
         _env_set("DISCOURSE", json.dumps({"sites": sites}))
-        print(f"  ✓  TOS version updated to {manifest_tos} in {_CROSSENV}\n")
+        print(f"  ✓  TOS version updated to {manifest_tos} in {_TARGET_ENV}\n")
     except Exception:
         pass
 
@@ -1291,6 +1374,7 @@ def setup_wizard() -> None:
         _sf = None  # noqa: F841
 
     crossenv_exists = os.path.exists(_CROSSENV)
+    target_exists   = os.path.exists(_TARGET_ENV)
 
     # ── Print checklist ───────────────────────────────────────────────────────
     print(f"\n  Cross Setup Wizard")
@@ -1342,10 +1426,12 @@ def setup_wizard() -> None:
     else:
         _row("⚠️", "TTS packages", "not installed", "optional: st-speak, st-voice")
 
-    if crossenv_exists:
-        _row("✅", _CROSSENV, "exists — will update")
+    if target_exists:
+        _row("✅", _TARGET_ENV, "exists — will update")
     else:
-        _row("⚠️", _CROSSENV, "will be created")
+        _row("⚠️", _TARGET_ENV, "will be created")
+    if _DEV_MODE and crossenv_exists and os.path.realpath(_CROSSENV) != os.path.realpath(_TARGET_ENV):
+        _row("ℹ️", _CROSSENV, "exists (global) — dev mode writes to project .env instead")
 
     # ── Install hints for missing items ───────────────────────────────────────
     critical = []
@@ -1426,7 +1512,7 @@ def setup_wizard() -> None:
         f"\n"
         f"  ⭐  Gemini has a free tier — no credit card needed.\n"
         f"  You need at least one key.  Keys can be added or changed later with st-admin.\n"
-        f"  Your keys are stored only in:  {_CROSSENV}\n"
+        f"  Your keys are stored only in:  {_TARGET_ENV}\n"
         f"  They are never uploaded or shared — sent directly to each provider only.\n"
     )
     try:
@@ -1441,7 +1527,13 @@ def setup_wizard() -> None:
     # ── Read existing keys (so users can keep current values) ─────────────────
     try:
         from dotenv import dotenv_values
-        existing = dotenv_values(_CROSSENV) if crossenv_exists else {}
+        # Merge ~/.crossenv (layer 1) + _TARGET_ENV (layer 2 for devs) so the
+        # wizard pre-fills with whichever value is actually active.
+        existing = {}
+        if crossenv_exists:
+            existing.update(dotenv_values(_CROSSENV) or {})
+        if target_exists and os.path.realpath(_TARGET_ENV) != os.path.realpath(_CROSSENV):
+            existing.update(dotenv_values(_TARGET_ENV) or {})
     except Exception:
         existing = {}
 
@@ -1496,7 +1588,7 @@ def setup_wizard() -> None:
 
     def _write(var: str, val: str) -> None:
         if val:
-            set_key(_CROSSENV, var, val)
+            set_key(_TARGET_ENV, var, val)
             os.environ[var] = val
 
     _write("GEMINI_API_KEY",     gemini_key)
@@ -1506,7 +1598,7 @@ def setup_wizard() -> None:
     _write("PERPLEXITY_API_KEY", perplexity_key)
     _write("DEFAULT_AI",         default_ai)
 
-    print(f"  ✅  Settings written to {_CROSSENV}")
+    print(f"  ✅  Settings written to {_TARGET_ENV}")
 
     # ── Create data directories ───────────────────────────────────────────────
     cache_dir = os.path.expanduser("~/.cross_api_cache")
@@ -1692,7 +1784,9 @@ def settings_show_all() -> None:
 
     print(f"\n  {'Path':<{W}}  Location")
     print(f"  {'─' * W}  {'─' * 36}")
-    print(_path_line("Config (~/.crossenv)",      _CROSSENV))
+    print(_path_line("Config (active)",          _TARGET_ENV))
+    if os.path.realpath(_TARGET_ENV) != os.path.realpath(_CROSSENV):
+        print(_path_line("Config (~/.crossenv)",  _CROSSENV))
     print(_path_line("API cache",                 _get_cache_dir()))
     print(_path_line("Templates",                 str(_USER_TEMPLATES_DIR)))
     print()
@@ -1984,6 +2078,11 @@ def _print_menu(menu: dict, title: str) -> None:
 def interactive_menu() -> None:
     """Full interactive settings panel — 2-level menu, ESC to go back."""
     from mmd_single_key import get_single_key
+
+    # Show which file st-admin is reading/writing so the dev-vs-pipx
+    # distinction is never a surprise.
+    _profile_label = "developer" if _DEV_MODE else "pipx-installed"
+    print(f"  Profile: {_profile_label}  →  settings file: {_TARGET_ENV}")
 
     ai_list = get_ai_list()
     current_menu = _MENU
