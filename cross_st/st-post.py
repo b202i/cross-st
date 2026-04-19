@@ -6,13 +6,13 @@ st-post — Post a story to Discourse
 st-post subject.json                         # post to Test (cleared daily) — safe default
 st-post --category private subject.json      # post to your private category
 st-post --category reports subject.json      # post to your public portfolio
-st-post --category prompt-lab subject.json   # post to 🧪 Prompt Lab
-st-post -s 2 subject.json                   # post story 2
+st-post --category prompt-lab --prompt subject.json  # post the prompt to 🧪 Prompt Lab
+st-post -s 2 subject.json                          # post story 2
 st-post --site MySite subject.json          # post to a named Discourse site
 st-post --check                             # verify credentials without posting
 ```
 
-Options: -s story  --site  --category  --fact  --check  -v  -q
+Options: -s story  --site  --category  --fact  --prompt  --check  -v  -q
 """
 import argparse
 import json
@@ -59,6 +59,8 @@ def main():
                               'Default: "test" (safe sandbox — cleared nightly).'))
     parser.add_argument('--check', action='store_true',
                         help='Validate Discourse credentials and connection without posting')
+    parser.add_argument('--prompt', action='store_true',
+                        help='Post the prompt text from the container instead of the story (useful with --category prompt-lab)')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Verbose output, default: verbose off')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -222,31 +224,43 @@ def main():
             with open(file_json, 'r') as file:
                 main_container = json.load(file)
 
-                # Confirm story parameter, get story
-                length = len(main_container.get("story", []))
-                if 1 <= args.story <= length:
-                    select_story = main_container["story"][args.story-1]
+                if args.prompt:
+                    # --prompt mode: post the top-level prompt text, not a story
+                    prompt_text = main_container.get("prompt", "")
+                    if not prompt_text:
+                        print("Error: No prompt found in container.")
+                        sys.exit(1)
+                    file_prefix = Path(file_json).stem
+                    story_title = f"Prompt: {file_prefix}"
+                    story_markdown = f"```\n{prompt_text.strip()}\n```"
                 else:
-                    if not args.quiet:
-                        print(f"Story item out of range: {args.story}")
-                    sys.exit(1)
-
-                # Confirm fact parameter, get fact report
-                if args.fact is not None:
-                    length = len(select_story.get("fact", []))
-                    if 1 <= args.fact <= length:  # Validate range
-                        fact_obj = select_story["fact"][args.fact-1]
-                        fact_report = fact_obj.get("report")
+                    # Confirm story parameter, get story
+                    length = len(main_container.get("story", []))
+                    if 1 <= args.story <= length:
+                        select_story = main_container["story"][args.story-1]
                     else:
-                        print(f"Fact item out of range {args.fact}")
+                        if not args.quiet:
+                            print(f"Story item out of range: {args.story}")
+                        sys.exit(1)
+
+                    # Confirm fact parameter, get fact report
+                    if args.fact is not None:
+                        length = len(select_story.get("fact", []))
+                        if 1 <= args.fact <= length:  # Validate range
+                            fact_obj = select_story["fact"][args.fact-1]
+                            fact_report = fact_obj.get("report")
+                        else:
+                            print(f"Fact item out of range {args.fact}")
+
             if args.verbose:
                 print(f"Story container json successfully read.")
 
-            file_prefix = Path(file_json).stem  # filename no extension
-            story_markdown = select_story['markdown']
-            # story_text = post_story['text']  # Currently on MD is used
-            story_title = select_story['title']
-            topic_id = select_story.get('topic_id')
+            if not args.prompt:
+                file_prefix = Path(file_json).stem  # filename no extension
+                story_markdown = select_story['markdown']
+                # story_text = post_story['text']  # Currently on MD is used
+                story_title = select_story['title']
+                topic_id = select_story.get('topic_id')
 
         except FileNotFoundError:
             print(f"Error: The file {args.json_file} does not exist.")
@@ -331,14 +345,15 @@ def main():
         except Exception as e:
             print(f"An error occurred: {e}")
 
-        # Update story in main container
-        select_story["topic_id"] = topic_id
-        select_story["post_url"] = post_url
-        select_story["mp3_url"] = mp3_url
-        with open(file_json, 'w', encoding='utf-8') as f:
-            json.dump(main_container, f, ensure_ascii=False, indent=4)
-        if not args.quiet and args.verbose:
-            print(f"Story container updated: {file_json}")
+        # Update story in main container (only in normal story-post mode)
+        if not args.prompt:
+            select_story["topic_id"] = topic_id
+            select_story["post_url"] = post_url
+            select_story["mp3_url"] = mp3_url
+            with open(file_json, 'w', encoding='utf-8') as f:
+                json.dump(main_container, f, ensure_ascii=False, indent=4)
+            if not args.quiet and args.verbose:
+                print(f"Story container updated: {file_json}")
     else:
         # Not a post but a fact-check reply
         # A story is given a topic_id after it is posted

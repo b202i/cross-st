@@ -9,14 +9,14 @@ Publishes a story to your Discourse forum. Optionally attaches a fact-check as a
 ## Examples
 
 ```bash
-st-post subject.json                              # post to Test (cleared daily) — safe default
-st-post --category private subject.json           # post to your private category
-st-post --category reports subject.json           # post to public 📄 Reports portfolio
-st-post --category prompt-lab subject.json        # post to 🧪 Prompt Lab
-st-post -s 2 subject.json                         # post story 2
-st-post -f 1 subject.json                         # attach fact-check 1 as a reply
-st-post --site MySite subject.json                # post to a named Discourse site
-st-post --check                                   # verify credentials without posting
+st-post subject.json                                      # post to Test (cleared daily) — safe default
+st-post --category private subject.json                   # post to your private category
+st-post --category reports subject.json                   # post to public 📄 Reports portfolio
+st-post --category prompt-lab --prompt subject.json       # post the prompt to 🧪 Prompt Lab
+st-post -s 2 subject.json                                 # post story 2
+st-post -f 1 subject.json                                 # attach fact-check 1 as a reply
+st-post --site MySite subject.json                        # post to a named Discourse site
+st-post --check                                           # verify credentials without posting
 ```
 
 ## Options
@@ -28,6 +28,7 @@ st-post --check                                   # verify credentials without p
 | `-s N`, `--story N` | Story to publish (1-based index, default: 1) |
 | `-f N`, `--fact N` | Reply to the post with fact-check N |
 | `--category {private,test,reports,prompt-lab}` | Posting destination (default: `test` — see table below) |
+| `--prompt` | Post the prompt text from the container instead of the story (use with `--category prompt-lab`) |
 | `--check` | Validate Discourse credentials and connection without posting |
 | `-v`, `--verbose` | Verbose output |
 | `-q`, `--quiet` | Minimal output |

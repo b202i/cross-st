@@ -9,6 +9,7 @@ st-cat -t subject.json              # print title of story 1
 st-cat --markdown -s 3 subject.json # print markdown of story 3
 st-cat -f 2 -s 1 subject.json       # print fact-check report 2 from story 1
 st-cat --text -s 2 subject.json     # print plain text body of story 2
+st-cat --prompt subject.json        # print the original prompt text
 ```
 
 ## Options
@@ -22,6 +23,7 @@ st-cat --text -s 2 subject.json     # print plain text body of story 2
 | `--markdown` | Print the story markdown |
 | `--hashtags` | Print the story hashtags |
 | `--spoken` | Print the story spoken-text variant |
+| `--prompt` | Print the original prompt text stored at the top level of the container |
 | `-v`, `--verbose` | Verbose output |
 | `-q`, `--quiet` | Minimal output |
 

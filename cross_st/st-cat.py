@@ -11,9 +11,10 @@ st-cat -t subject.json              # print title of story 1
 st-cat --markdown -s 3 subject.json # print markdown of story 3
 st-cat -f 2 -s 1 subject.json       # print fact-check report 2 from story 1
 st-cat --text -s 2 subject.json     # print plain text body of story 2
+st-cat --prompt subject.json        # print the original prompt text
 ```
 
-Options: -s story  -f fact  --title  --text  --markdown  --hashtags  --spoken
+Options: -s story  -f fact  --title  --text  --markdown  --hashtags  --spoken  --prompt
 """
 
 import argparse
@@ -44,6 +45,8 @@ def main():
                         help='Story text body, default: off')
     parser.add_argument('-t', '--title', action='store_true',
                         help='Story title, default: off')
+    parser.add_argument('--prompt', action='store_true',
+                        help='Print the original prompt text stored in the container, default: off')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Verbose output, default: off')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -53,7 +56,8 @@ def main():
     # Warn early if no output field was requested
     output_requested = any([
         args.title, args.text, args.markdown,
-        args.hashtags, args.spoken, args.fact is not None
+        args.hashtags, args.spoken, args.fact is not None,
+        args.prompt,
     ])
     if not output_requested:
         print("No output field specified. Use --title, --text, --markdown, "
@@ -81,6 +85,20 @@ def main():
 
     if args.verbose:
         print(f"Loaded: {file_json}", file=sys.stderr)
+
+    # --prompt is top-level in the container, not story-specific
+    if args.prompt:
+        prompt_text = main_container.get("prompt", "")
+        if prompt_text:
+            print(prompt_text)
+        else:
+            if not args.quiet:
+                print("No prompt found in container.")
+            sys.exit(1)
+        # If --prompt is the only flag, we can stop here
+        if not any([args.title, args.text, args.markdown,
+                    args.hashtags, args.spoken, args.fact is not None]):
+            return
 
     # Confirm story parameter, get story
     length = len(main_container.get("story", []))
