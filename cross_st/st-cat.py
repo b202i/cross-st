@@ -84,9 +84,12 @@ def main():
     if args.verbose:
         print(f"Loaded: {file_json}", file=sys.stderr)
 
-    # --prompt is top-level in the container, not story-specific
+    # --prompt is stored inside data[0], not at the top level
     if args.prompt:
-        prompt_text = main_container.get("prompt", "")
+        prompt_text = ""
+        data = main_container.get("data", [])
+        if data:
+            prompt_text = data[0].get("prompt", "")
         if prompt_text:
             print(prompt_text)
         else:

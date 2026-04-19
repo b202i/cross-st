@@ -24,7 +24,7 @@ st-cat --prompt subject.json        # print the original prompt text
 | `--markdown` | Print the story markdown |
 | `--hashtags` | Print the story hashtags |
 | `--spoken` | Print the story spoken-text variant |
-| `--prompt` | Print the original prompt text stored at the top level of the container (**default** if no other field specified) |
+| `--prompt` | Print the original prompt text (read from `data[0].prompt` in the container) (**default** if no other field specified) |
 | `-v`, `--verbose` | Verbose output |
 | `-q`, `--quiet` | Minimal output |
 

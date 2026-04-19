@@ -225,8 +225,9 @@ def main():
                 main_container = json.load(file)
 
                 if args.prompt:
-                    # --prompt mode: post the top-level prompt text, not a story
-                    prompt_text = main_container.get("prompt", "")
+                    # --prompt mode: post the prompt from data[0], not a story
+                    data = main_container.get("data", [])
+                    prompt_text = data[0].get("prompt", "") if data else ""
                     if not prompt_text:
                         print("Error: No prompt found in container.")
                         sys.exit(1)
