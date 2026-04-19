@@ -7,6 +7,7 @@ requested field(s) to standard output.  Useful for piping story text into
 other tools or shell scripts.
 
 ```
+st-cat subject.json                 # print the prompt (default)
 st-cat -t subject.json              # print title of story 1
 st-cat --markdown -s 3 subject.json # print markdown of story 3
 st-cat -f 2 -s 1 subject.json       # print fact-check report 2 from story 1
@@ -46,24 +47,21 @@ def main():
     parser.add_argument('-t', '--title', action='store_true',
                         help='Story title, default: off')
     parser.add_argument('--prompt', action='store_true',
-                        help='Print the original prompt text stored in the container, default: off')
+                        help='Print the original prompt text stored in the container (default if no other field specified)')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Verbose output, default: off')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Enable minimal output')
     args = parser.parse_args()
 
-    # Warn early if no output field was requested
+    # Default to --prompt if no output field was requested
     output_requested = any([
         args.title, args.text, args.markdown,
         args.hashtags, args.spoken, args.fact is not None,
         args.prompt,
     ])
     if not output_requested:
-        print("No output field specified. Use --title, --text, --markdown, "
-              "--hashtags, --spoken, or -f <n>.")
-        print("Run 'st-cat --help' for usage.")
-        sys.exit(1)
+        args.prompt = True
 
     file_prefix = args.json_file.rsplit('.', 1)[0]  # Split from the right, only once
     file_json = file_prefix + ".json"
