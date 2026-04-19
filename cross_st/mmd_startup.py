@@ -61,8 +61,11 @@ def require_config() -> None:
 
 _UPDATE_CACHE_PATH     = os.path.join(os.path.expanduser("~/.cross_api_cache"),
                                       "update_check.json")
+_SHADOW_CACHE_PATH     = os.path.join(os.path.expanduser("~/.cross_api_cache"),
+                                      "shadow_check.json")
 _UPDATE_CHECK_INTERVAL  = 86_400   # seconds — re-check PyPI at most once per day
 _UPDATE_NOTIFY_INTERVAL =  4 * 3600  # seconds — nag at most once every 4 hours
+_SHADOW_NOTIFY_INTERVAL = 86_400   # seconds — shadow warning at most once per day
 
 
 def _read_update_cache() -> dict:
@@ -174,6 +177,103 @@ def check_for_updates() -> None:
     _write_update_cache(cache)
 
 
+def check_shadowed_install() -> None:
+    """Warn once per day if a different cross-st install shadows the active one.
+
+    The classic symptom: a user runs ``pipx upgrade cross-st`` which upgrades
+    ~/.local/pipx/venvs/cross-st, but ``st-admin --version`` still reports the
+    old version because a raw ``pip install cross-st`` into Homebrew Python (or
+    any other Python on $PATH) wrote entry-point scripts that appear *earlier* in
+    $PATH (e.g. /opt/homebrew/bin/st-admin) and shadow the pipx copy.
+
+    Detection: resolve which('st-admin') and compare its Python shebang (or its
+    real-path prefix) to sys.executable.  If they point at different Python
+    installs, print a clear warning.
+
+    Entirely silent on any error (shutil unavailable, no TTY, etc.).
+    Rate-limited to one warning per 24 hours via ~/.cross_api_cache/shadow_check.json.
+    """
+    import time
+
+    if not sys.stdout.isatty():
+        return
+
+    try:
+        import shutil
+        which_result = shutil.which("st-admin")
+        if not which_result:
+            return
+
+        # Resolve both paths to their real locations for comparison
+        which_real = os.path.realpath(which_result)
+        self_real  = os.path.realpath(sys.executable)
+
+        # Determine the Python-install prefix each belongs to
+        # (e.g. /opt/homebrew/opt/python@3.11 vs /Users/Matt/.local/pipx/...)
+        def _prefix(p: str) -> str:
+            # Walk up from the binary to find the common install root.
+            # For /opt/homebrew/bin/python3.11 → /opt/homebrew
+            # For /Users/Matt/.local/pipx/venvs/cross-st/bin/python → .../cross-st
+            # We just need "are they the same tree?" so compare up 2 levels.
+            return os.path.dirname(os.path.dirname(p))
+
+        which_prefix = _prefix(which_real)
+        self_prefix  = _prefix(self_real)
+
+        if which_prefix == self_prefix:
+            return  # same install — all good
+
+        # Check if the shadowing script actually uses a different Python by reading
+        # its shebang line (pipx wrappers and pip scripts both have one).
+        try:
+            with open(which_result, "rb") as _f:
+                first_line = _f.readline(200).decode("utf-8", errors="replace").strip()
+        except Exception:
+            first_line = ""
+
+        if first_line.startswith("#!"):
+            shadow_python = first_line[2:].split()[0]
+        else:
+            shadow_python = which_result  # fall back to the script path itself
+
+        if os.path.realpath(shadow_python) == self_real:
+            return  # same Python executable — not actually a conflict
+
+        # Rate-limit: warn at most once per day
+        try:
+            import json
+            cache: dict = {}
+            try:
+                with open(_SHADOW_CACHE_PATH) as _fc:
+                    cache = json.load(_fc)
+            except Exception:
+                pass
+            if time.time() - cache.get("last_notified", 0.0) < _SHADOW_NOTIFY_INTERVAL:
+                return
+            cache["last_notified"] = time.time()
+            os.makedirs(os.path.dirname(_SHADOW_CACHE_PATH), exist_ok=True)
+            with open(_SHADOW_CACHE_PATH, "w") as _fc:
+                json.dump(cache, _fc)
+        except Exception:
+            pass
+
+        print(
+            f"\n  ⚠️  Multiple cross-st installs detected.\n"
+            f"     When you type 'st-admin', your shell will run:\n"
+            f"       {which_result}\n"
+            f"     which uses a different Python ({shadow_python})\n"
+            f"     than the version you just upgraded.\n"
+            f"\n"
+            f"     To fix, remove the PATH-shadowing install:\n"
+            f"       {shadow_python} -m pip uninstall cross-st\n"
+            f"     Then reopen your terminal.\n",
+            file=sys.stderr,
+        )
+
+    except Exception:
+        pass  # never break a real command over a diagnostic
+
+
 def _in_project_venv() -> bool:
     """Return True when the running Python executable lives inside _PROJECT_ROOT.
 
@@ -223,3 +323,4 @@ def load_cross_env() -> None:
         load_dotenv(os.path.join(_CROSS_ST_DIR, ".env"), override=True)        # 2b. cross_st/
     load_dotenv(os.path.join(os.getcwd(), ".env"),    override=True)           # 3. CWD — highest
     check_for_updates()
+    check_shadowed_install()
