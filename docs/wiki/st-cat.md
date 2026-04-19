@@ -28,7 +28,7 @@ st-cat --prompt subject.json        # print the original prompt text
 | `-v`, `--verbose` | Verbose output |
 | `-q`, `--quiet` | Minimal output |
 
-**Related:** [st-ls](st-ls) · [st-edit](st-edit)
+**Related:** [st-ls](st-ls) · [st-edit](st-edit) · [Container Format](Container-Format)
 
 ---
 
