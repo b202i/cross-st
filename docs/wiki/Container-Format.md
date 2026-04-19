@@ -184,6 +184,7 @@ A container immediately after `st-gen` (one AI, no fact-checks yet):
 
 ```bash
 st-cat subject.json                  # print the prompt (default)
+st-cat --prompt subject.json         # print the prompt (explicit)
 st-cat -t subject.json               # print the title of story 1
 st-cat --markdown subject.json       # print the Markdown body
 st-cat --text subject.json           # print the plain-text body
