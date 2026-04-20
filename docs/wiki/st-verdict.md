@@ -47,6 +47,29 @@ Reads fact-check data from a container and produces two outputs: a **stacked bar
 | `--ai-story` | Generate an 800–1200-word narrative → stdout |
 | `--ai AI` | AI provider for content generation (default: `xai`) |
 
+### What-is lens — focused claim breakdown
+
+Switches the AI from "summarise the chart" to "summarise the **claims** that fall on one side of the truth ledger". Aggregates per-claim verdicts and explanations across **all** fact-checkers in the container, then asks one AI to synthesize them into a focused report. Pair with any `--ai-*` flag to control level of detail; `--ai-summary` is auto-enabled if no detail flag is given.
+
+| Option | Description |
+|--------|-------------|
+| `--what-is-false` | Aggregate every claim marked `false` / `partially_false` and produce a focused breakdown of what is inaccurate or disputed |
+| `--what-is-true` | Aggregate every claim marked `true` / `partially_true` and produce a focused breakdown of what is verified or supported |
+| `-s N`, `--story N` | Story index to analyse with the lens (default: `1`) |
+
+```bash
+# Detailed breakdown of inaccurate claims (e.g. "is this fake news?")
+st-verdict --what-is-false --ai-summary subject.json
+
+# Positive-evidence summary — what the report got right
+st-verdict --what-is-true --ai-caption subject.json
+
+# Long-form analysis suitable for sharing as feedback
+st-verdict --what-is-false --ai-story --no-display subject.json
+```
+
+The lens reads `story[N].fact[]` entries — run `st-cross` first so multiple AIs have fact-checked the report. The more checkers that flagged the same claim, the stronger the signal in the resulting analysis.
+
 **Related:** [st-cross](st-cross)  [st-heatmap](st-heatmap)  [st-analyze](st-analyze)
 
 ---

@@ -16,13 +16,16 @@ st-verdict --file subject.json                     # display + short caption + s
 st-verdict --ai-caption subject.json               # display + full caption instead of short
 st-verdict --no-display --file subject.json        # save PNG to ./tmp/ only, no screen
 st-verdict --file --ai-title --ai gemini s.json    # save PNG + title via gemini
+st-verdict --what-is-false --ai-summary s.json     # focused breakdown of inaccurate claims
+st-verdict --what-is-true  --ai-caption  s.json    # focused breakdown of verified claims
 ```
 
 Input:  subject.json  — populated story container (run st-cross first)
 Output: chart on screen (--display) and/or PNG saved to --path (default ./tmp/)
 
 Options: --display / --no-display   --file  --path
-         --ai-title  --ai-short / --no-ai-short  --ai-caption
+         --ai-title  --ai-short / --no-ai-short  --ai-caption  --ai-summary  --ai-story
+         --what-is-false  --what-is-true
          --ai  --cache  --no-cache  -v  -q
 
 See also: st-heatmap  (evaluator-vs-target score heatmap)
@@ -31,6 +34,7 @@ See also: st-heatmap  (evaluator-vs-target score heatmap)
 import argparse
 import json
 import os
+import re
 import sys
 import threading
 from mmd_startup import load_cross_env, require_config
@@ -255,6 +259,230 @@ def generate_ai_content(df, story_titles, ai_make, content_type, verbose=False, 
         return ""
 
 
+# ── VRD-1: --what-is-false / --what-is-true lens ──────────────────────────────
+
+# Match a "Claim N: ..." block followed by Verification: <category> and Explanation: ...
+# Tolerant of extra whitespace, optional bold/italic markup, and trailing/leading newlines.
+_CLAIM_BLOCK_RE = re.compile(
+    r"Claim\s+(\d+)\s*:\s*[\"\u201c]?(.+?)[\"\u201d]?\s*\n+"
+    r"\s*\**\s*Verification\s*\**\s*:\s*\**\s*([A-Za-z_]+)\s*\**\s*\n+"
+    r"\s*\**\s*Explanation\s*\**\s*:\s*(.+?)(?=\n\s*Claim\s+\d+\s*:|\Z)",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Map raw verdict tokens to a normalised lower-case category
+_VERDICT_NORMALISE = {
+    "true":             "true",
+    "partially_true":   "partially_true",
+    "partiallytrue":    "partially_true",
+    "opinion":          "opinion",
+    "partially_false":  "partially_false",
+    "partiallyfalse":   "partially_false",
+    "false":            "false",
+    "unverifiable":     "opinion",   # treat as neutral for the lens
+    "unverified":       "opinion",
+}
+
+_LENS_VERDICTS = {
+    "false": {"false", "partially_false"},
+    "true":  {"true", "partially_true"},
+}
+
+
+def parse_claims(report_text):
+    """Parse a fact-check report into a list of (n, claim, verdict, explanation) tuples.
+
+    Returns an empty list if the report is empty or unparseable.
+    """
+    if not report_text:
+        return []
+    out = []
+    for match in _CLAIM_BLOCK_RE.finditer(report_text):
+        n_str, claim, verdict, explanation = match.groups()
+        verdict_norm = _VERDICT_NORMALISE.get(verdict.strip().lower(), verdict.strip().lower())
+        try:
+            n = int(n_str)
+        except ValueError:
+            n = 0
+        out.append((n, claim.strip(), verdict_norm, explanation.strip()))
+    return out
+
+
+def collect_lens_claims(container, story_index, lens):
+    """Collect claims matching the lens ('false' or 'true') across all fact[] entries
+    of one story.
+
+    Returns: list of dicts with keys: claim, verdict, explanation, evaluator (make:model).
+    """
+    target = _LENS_VERDICTS[lens]
+    stories = container.get("story", [])
+    if not (1 <= story_index <= len(stories)):
+        return []
+    story = stories[story_index - 1]
+    collected = []
+    for fact in story.get("fact", []):
+        report = fact.get("report", "")
+        evaluator = f"{fact.get('make', '?')}:{fact.get('model', '?')}"
+        for _n, claim, verdict, explanation in parse_claims(report):
+            if verdict in target:
+                collected.append({
+                    "claim": claim,
+                    "verdict": verdict,
+                    "explanation": explanation,
+                    "evaluator": evaluator,
+                })
+    return collected
+
+
+def format_lens_claims_for_prompt(claims, lens):
+    """Format the collected claims as a numbered block for inclusion in an AI prompt."""
+    if not claims:
+        return f"(No claims marked {lens} or partially_{lens} were found.)"
+
+    lines = [
+        f"Claims that one or more fact-checkers marked as {lens} / partially_{lens}:",
+        f"Total such verdicts: {len(claims)}",
+        "",
+    ]
+    for i, c in enumerate(claims, 1):
+        lines.append(f"{i}. [{c['verdict']}] (per {c['evaluator']})")
+        lines.append(f"   Claim:       {c['claim']}")
+        lines.append(f"   Explanation: {c['explanation']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type):
+    """Build an AI prompt for the --what-is-{false,true} lens.
+
+    The framing differs from build_ai_prompt: we are no longer summarising the
+    verdict CHART, we are summarising the underlying CLAIMS that fall on one
+    side of the truth ledger.
+    """
+    polarity_phrase = (
+        "INACCURATE / DISPUTED claims" if lens == "false"
+        else "VERIFIED / SUPPORTED claims"
+    )
+    purpose = (
+        "constructive feedback for the report author or a 'what to fact-check'\n"
+        "shortlist for downstream readers" if lens == "false"
+        else "a positive-evidence summary highlighting which assertions hold up\n"
+             "under fact-checking — useful for citation or trust-building"
+    )
+
+    context = f"""Cross-product AI fact-check — focused {lens.upper()} lens.
+
+ORIGINAL PROMPT (the topic the report addresses):
+{prompt_text or '(no prompt recorded in container)'}
+
+REPORT TITLES (the report(s) that were fact-checked):
+{story_titles}
+
+EVIDENCE — {polarity_phrase}:
+{claims_text}
+
+YOUR TASK:
+Synthesize the above claims and explanations into {purpose}.
+Group related claims thematically; do not just list them.
+Where multiple fact-checkers flagged the same claim, that signal is stronger.
+Where only one flagged it, note the weaker evidence."""
+
+    if content_type == "title":
+        return f"""{context}
+
+Write a punchy title for this {lens}-lens analysis. Max 10 words.
+Capture the headline finding (what is most {lens} about this report).
+No markdown, no quotes. Plain text, single line."""
+
+    elif content_type == "short":
+        return f"""{context}
+
+Write a SHORT paragraph (max 80 words) summarising what is {lens} in this report.
+Lead with the most important finding. Group thematically.
+NUMBER RULES: Round to whole numbers if numbers appear at all.
+Plain text, conversational tone."""
+
+    elif content_type == "caption":
+        return f"""{context}
+
+Write a DETAILED caption (100–160 words, exactly 2 paragraphs) summarising
+what is {lens} in this report.
+
+Paragraph 1: The headline — what stands out as the most {lens} aspect, and how
+many fact-checkers flagged it.
+Paragraph 2: Supporting detail — the next most important {lens} thread, with
+specific evidence from the explanations.
+
+Plain text. No bullet points. Synthesize, do not just list."""
+
+    elif content_type == "summary":
+        return f"""{context}
+
+Write a TECHNICAL SUMMARY (120–200 words, 3 paragraphs) of what is {lens}
+in this report.
+
+Paragraph 1 — Headline: name the most important {lens} finding and the strength
+of the evidence (how many checkers agreed).
+Paragraph 2 — Themes: group remaining {lens} claims into 2–3 themes; for each
+theme cite a representative claim and its explanation.
+Paragraph 3 — So what: actionable takeaway for the report author or reader —
+what to {("verify before citing" if lens == "false" else "cite confidently")}.
+
+Plain text. 3 paragraphs. Professional, evidence-driven."""
+
+    elif content_type == "story":
+        return f"""{context}
+
+Write a COMPREHENSIVE ANALYSIS (800–1200 words) of what is {lens} in this report.
+
+STRUCTURE:
+1. Title (≤10 words — name the headline finding).
+2. Executive verdict (100–150 words) — single most important {lens} pattern,
+   strength of evidence, and what it implies for the report's reliability.
+3. Theme-by-theme breakdown (400–600 words) — group claims into 3–5 themes;
+   for each, cite the claims, the verdicts, and the explanation evidence.
+   Note where multiple fact-checkers converged.
+4. Counter-considerations (100–150 words) — where the evidence is thin (only
+   one fact-checker flagged it), or where the claim might be defensible in a
+   narrower reading.
+5. Bottom line (100–150 words) — concrete recommendation:
+   {"specific edits or sources the author should pursue" if lens == "false" else "specific assertions the author can confidently lead with"}.
+
+Plain text, clear paragraph breaks. No markdown headers. Lead with the conclusion."""
+
+    else:
+        raise ValueError(f"Unknown content_type: {content_type}")
+
+
+def generate_lens_content(claims, lens, prompt_text, story_titles, ai_make,
+                          content_type, verbose=False, use_cache=True):
+    """Generate an AI-written analysis for the --what-is-{false,true} lens."""
+    claims_text = format_lens_claims_for_prompt(claims, lens)
+    prompt = build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type)
+
+    if verbose:
+        print(f"  Calling {ai_make} for {lens}-lens {content_type} ({len(prompt)} chars prompt)…")
+
+    try:
+        result = process_prompt(ai_make, prompt, verbose=False, use_cache=use_cache)
+        _, _, response, _ = result
+        content = get_content_auto(response).strip()
+        return content
+    except Exception as e:
+        print(f"  {lens}-lens generation failed: {e}")
+        if verbose:
+            import traceback; traceback.print_exc()
+        return ""
+
+
+def get_prompt_text(container):
+    """Return the original prompt text from the container (data[0].prompt), or ''."""
+    data = container.get("data", [])
+    if data and isinstance(data[0], dict):
+        return data[0].get("prompt", "") or ""
+    return ""
+
+
 # ── Chart ─────────────────────────────────────────────────────────────────────
 
 _VERDICT_CATEGORIES = ["True", "~True", "Opinion", "~False", "False"]
@@ -377,6 +605,14 @@ def main():
     ai_group.add_argument('--ai', type=str, default=None,
                           help=f'AI to use for content generation (default: {get_default_ai()})')
 
+    lens_group = parser.add_argument_group('What-is lens (focused claim breakdown — VRD-1)')
+    lens_group.add_argument('--what-is-false', dest='lens_false', action='store_true',
+                            help='Aggregate all claims marked false / partially_false across fact-checkers and ask the AI for a focused breakdown')
+    lens_group.add_argument('--what-is-true', dest='lens_true', action='store_true',
+                            help='Aggregate all claims marked true / partially_true and ask the AI for a focused supporting summary')
+    lens_group.add_argument('-s', '--story', type=int, default=1,
+                            help='Story index to analyse with the lens (default: 1)')
+
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
                         help='Enable API cache, default: enabled')
     parser.add_argument('--no-cache', dest='cache', action='store_false',
@@ -385,6 +621,21 @@ def main():
     parser.add_argument('-q', '--quiet',   action='store_true', help='Minimal output')
 
     args = parser.parse_args()
+
+    # ── VRD-1: lens-mode resolution ──────────────────────────────────────────
+    # --what-is-false and --what-is-true are mutually exclusive
+    if args.lens_false and args.lens_true:
+        print("Error: --what-is-false and --what-is-true are mutually exclusive.")
+        sys.exit(1)
+    lens = "false" if args.lens_false else ("true" if args.lens_true else None)
+
+    # When a lens is requested without an explicit detail flag, default to --ai-summary
+    # (more useful than --ai-short for evidence aggregation). Suppress the ai-short
+    # default that would otherwise kick in.
+    if lens and not (args.ai_title or args.ai_caption or args.ai_summary or args.ai_story):
+        if args.ai_short is None or args.ai_short is True:
+            args.ai_short   = False
+            args.ai_summary = True
 
     # Resolve ai_short: default-on only when no other --ai-* flag is explicitly given
     if args.ai_short is None:
@@ -447,6 +698,19 @@ def main():
     subject       = subject_from_container(container, args.json_file)
     story_titles  = extract_story_titles(container)
 
+    # ── VRD-1: collect lens claims up front so we can fail fast ──────────────
+    lens_claims = []
+    prompt_text = ""
+    if lens:
+        lens_claims = collect_lens_claims(container, args.story, lens)
+        prompt_text = get_prompt_text(container)
+        if not lens_claims:
+            print(f"No claims marked {lens}/partially_{lens} were found in story {args.story} of {file_json}.")
+            print(f"Try the opposite lens, increase fact-check coverage with st-cross, or pick a different story with -s N.")
+            sys.exit(1)
+        if args.verbose:
+            print(f"Collected {len(lens_claims)} {lens}-lens claims from story {args.story}.")
+
     ai_content: dict[str, str] = {}
     ai_threads: list = []
 
@@ -464,10 +728,17 @@ def main():
             if not flag:
                 continue
             if not args.quiet:
-                print(f"  Generating {label} with {content_ai}…", flush=True)
-            def _generate(ctype=ctype):
-                ai_content[ctype] = generate_ai_content(
-                    df, story_titles, content_ai, ctype, args.verbose, args.cache)
+                lens_tag = f" [{lens}-lens]" if lens else ""
+                print(f"  Generating {label}{lens_tag} with {content_ai}…", flush=True)
+            if lens:
+                def _generate(ctype=ctype):
+                    ai_content[ctype] = generate_lens_content(
+                        lens_claims, lens, prompt_text, story_titles,
+                        content_ai, ctype, args.verbose, args.cache)
+            else:
+                def _generate(ctype=ctype):
+                    ai_content[ctype] = generate_ai_content(
+                        df, story_titles, content_ai, ctype, args.verbose, args.cache)
             t = threading.Thread(target=_generate, daemon=True)
             ai_threads.append((t, ctype, label))
             t.start()
