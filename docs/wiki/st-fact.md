@@ -49,6 +49,8 @@ These interpretive flags **moved to `st-verdict` in cross-st 0.7.0**. `st-fact` 
 
 If you call any of the removed flags, `st-fact` exits with a one-line error pointing at the right `st-verdict` invocation — no silent failure.
 
+**See also:** [Three Stages](Three-Stages) — the GATHER → VERIFY → INTERPRET architecture this migration is part of.
+
 ## For developers
 
 Splits the story into segments via `mmd_util.build_segments()`, sends them to the AI, and appends a `fact[]` entry to the container. The entry includes `score`, `counts`, `summary`, `claims[]` (per-segment verdicts), and `timing{}`.

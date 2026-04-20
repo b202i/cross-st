@@ -51,6 +51,8 @@ New user? Start here: **[Onboarding](Onboarding)** — set up your API keys and 
 ## Topics
 
 - [Onboarding](Onboarding) — first-time setup, API keys, running your first report
+- [Three Stages](Three-Stages) — GATHER · VERIFY · INTERPRET — how every Cross tool fits together
+- [Showcase Workflows](Showcase-Workflows) — three killer workflows: "Is this fake news?", "What's missing?", "What can I trust?"
 - [Container Format](Container-Format) — anatomy of `subject.json`: `data[]`, `story[]`, `fact[]`, timing
 - [AI Providers](ai-providers) — all 5 providers, models, free vs paid tiers
 - [Cross-Stones Benchmark](cross-stones) — benchmark suite: scoring, domains, leaderboard

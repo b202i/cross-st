@@ -295,3 +295,80 @@ class TestLensFlags:
             with pytest.raises(SystemExit):
                 st_verdict.main()
 
+
+# ── VRD-6: --how-to-fix recommendation lens ──────────────────────────────────
+
+class TestHowToFixLens:
+    """Coverage for the VRD-6 --how-to-fix lens (recommendation)."""
+
+    def test_mutually_exclusive_howtofix_with_false_exit(self):
+        argv = ["st-verdict", "dummy.json", "--how-to-fix", "--what-is-false"]
+        with patch("sys.argv", argv):
+            with pytest.raises(SystemExit):
+                st_verdict.main()
+
+    def test_mutually_exclusive_howtofix_with_true_exit(self):
+        argv = ["st-verdict", "dummy.json", "--how-to-fix", "--what-is-true"]
+        with patch("sys.argv", argv):
+            with pytest.raises(SystemExit):
+                st_verdict.main()
+
+    def test_mutually_exclusive_howtofix_with_missing_exit(self):
+        argv = ["st-verdict", "dummy.json", "--how-to-fix", "--what-is-missing"]
+        with patch("sys.argv", argv):
+            with pytest.raises(SystemExit):
+                st_verdict.main()
+
+    def test_howtofix_lens_collects_all_claims(self):
+        """The howtofix lens must use every parseable claim (no verdict filter)."""
+        container = {
+            "story": [{
+                "fact": [
+                    {"make": "xai", "model": "m", "report": _SAMPLE_REPORT},
+                ],
+            }],
+        }
+        out = st_verdict.collect_lens_claims(container, 1, "howtofix")
+        # All five verdicts from _SAMPLE_REPORT collected (no verdict filter).
+        assert len(out) == 5
+        verdicts = sorted(c["verdict"] for c in out)
+        assert verdicts == ["false", "opinion", "partially_false",
+                            "partially_true", "true"]
+
+
+class TestHowToFixPrompt:
+    """The recommendation prompt must explicitly enumerate the option set."""
+
+    def _build(self, content_type="short"):
+        return st_verdict._build_howtofix_prompt(
+            claims_text="(no claims)",
+            prompt_text="What are the best RV batteries?",
+            story_titles="A. Lithium overview",
+            report_text="THE_REPORT_BODY_MARKER",
+            score_summary="xai:grok-3:  True 6  ~True 2  False 1  Score 1.4",
+            content_type=content_type,
+        )
+
+    def test_prompt_lists_all_four_recommendations(self):
+        prompt = self._build("summary")
+        for option in ("st-fix", "st-bang", "st-merge", "publish-as-is"):
+            assert option in prompt, f"missing {option!r} from how-to-fix prompt"
+
+    def test_prompt_includes_score_summary(self):
+        assert "Score 1.4" in self._build("summary")
+
+    @pytest.mark.parametrize("ctype", ["short", "caption", "summary", "story"])
+    def test_recommendation_line_required(self, ctype):
+        assert "Recommendation:" in self._build(ctype)
+
+    def test_short_prompt_excludes_full_report(self):
+        """Brief detail levels do NOT inflate tokens with the full report body."""
+        for ctype in ("title", "short", "caption"):
+            assert "THE_REPORT_BODY_MARKER" not in self._build(ctype), ctype
+
+    def test_summary_prompt_includes_report(self):
+        assert "THE_REPORT_BODY_MARKER" in self._build("summary")
+
+    def test_story_prompt_includes_report(self):
+        assert "THE_REPORT_BODY_MARKER" in self._build("story")
+

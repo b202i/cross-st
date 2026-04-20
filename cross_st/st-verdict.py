@@ -18,6 +18,8 @@ st-verdict --no-display --file subject.json        # save PNG to ./tmp/ only, no
 st-verdict --file --ai-title --ai gemini s.json    # save PNG + title via gemini
 st-verdict --what-is-false --ai-summary s.json     # focused breakdown of inaccurate claims
 st-verdict --what-is-true  --ai-caption  s.json    # focused breakdown of verified claims
+st-verdict --what-is-missing --ai-summary s.json   # what important aspects the report omitted
+st-verdict --how-to-fix s.json                     # recommend next action: st-fix / st-bang / st-merge / publish
 ```
 
 Input:  subject.json  — populated story container (run st-cross first)
@@ -25,7 +27,7 @@ Output: chart on screen (--display) and/or PNG saved to --path (default ./tmp/)
 
 Options: --display / --no-display   --file  --path
          --ai-title  --ai-short / --no-ai-short  --ai-caption  --ai-summary  --ai-story
-         --what-is-false  --what-is-true
+         --what-is-false  --what-is-true  --what-is-missing  --how-to-fix
          --ai  --cache  --no-cache  -v  -q
 
 See also: st-heatmap  (evaluator-vs-target score heatmap)
@@ -284,10 +286,12 @@ _VERDICT_NORMALISE = {
 }
 
 _LENS_VERDICTS = {
-    "false":   {"false", "partially_false"},
-    "true":    {"true", "partially_true"},
+    "false":    {"false", "partially_false"},
+    "true":     {"true", "partially_true"},
     # "missing" lens uses the report itself + every verdict — handled separately
-    "missing": None,
+    "missing":  None,
+    # "howtofix" lens uses every claim + score summary + report — handled separately (VRD-6)
+    "howtofix": None,
 }
 
 
@@ -352,7 +356,7 @@ def collect_lens_report(container, story_index):
 def format_lens_claims_for_prompt(claims, lens):
     """Format the collected claims as a numbered block for inclusion in an AI prompt."""
     if not claims:
-        if lens == "missing":
+        if lens in ("missing", "howtofix"):
             return "(No claims were parseable from the fact-check reports.)"
         return f"(No claims marked {lens} or partially_{lens} were found.)"
 
@@ -360,6 +364,9 @@ def format_lens_claims_for_prompt(claims, lens):
         header = (f"All {len(claims)} parseable claim(s) across fact-checkers — "
                   f"use these to infer what the report DID address, so you can "
                   f"identify what it omitted:")
+    elif lens == "howtofix":
+        header = (f"All {len(claims)} parseable claim(s) across fact-checkers — "
+                  f"use the verdict mix to judge how much rework is warranted:")
     else:
         header = (f"Claims that one or more fact-checkers marked as "
                   f"{lens} / partially_{lens}:\nTotal such verdicts: {len(claims)}")
@@ -471,12 +478,147 @@ Plain text, clear paragraph breaks. No markdown headers. Lead with the conclusio
         raise ValueError(f"Unknown content_type: {content_type}")
 
 
+def _build_howtofix_prompt(claims_text, prompt_text, story_titles, report_text,
+                           score_summary, content_type):
+    """Build a prompt for the --how-to-fix recommendation lens (VRD-6).
+
+    Asks the AI to recommend exactly ONE concrete next action based on the
+    score breakdown, the verdict mix, and (for longer detail levels) the
+    report itself.  The recommendation must be one of:
+
+      st-fix     — clusters of false / partially_false claims to repair
+      st-bang -N — sample size too small (1 story) or scores vary wildly
+      st-merge   — multiple stories exist and combining sections would beat any
+      publish    — score is high and zero false / partially_false claims
+
+    Output never auto-invokes anything; the user always sees the recommendation
+    and decides.
+    """
+    REPORT_CHAR_LIMIT = 12000
+    include_report = content_type in ("summary", "story") and bool(report_text)
+    if include_report and len(report_text) > REPORT_CHAR_LIMIT:
+        report_text = report_text[:REPORT_CHAR_LIMIT] + "\n\n[…report truncated…]"
+
+    report_block = (f"\n\nREPORT BODY (so you can judge structure / coverage):\n{report_text}"
+                    if include_report else "")
+
+    context = f"""Cross-product AI fact-check — RECOMMENDATION lens (how-to-fix).
+
+ORIGINAL PROMPT (the topic the report addresses):
+{prompt_text or '(no prompt recorded in container)'}
+
+REPORT TITLES (the report(s) under review):
+{story_titles}
+
+PER-AUTHOR VERDICT BREAKDOWN (the score evidence):
+{score_summary}
+
+CLAIMS THAT WERE FACT-CHECKED (the verdict mix in detail):
+{claims_text}{report_block}
+
+YOUR TASK:
+Recommend exactly ONE next action from this set:
+
+  • `st-fix subject.json`       — when the report is mostly sound but has one
+                                  or more clusters of false / partially_false
+                                  claims that the author should repair.
+  • `st-bang -N subject.json`   — when the sample size is too small for
+                                  confidence (only one story present, or
+                                  fact-checker scores vary wildly across
+                                  authors). Suggest N=3 or N=5.
+  • `st-merge subject.json`     — when multiple stories already exist and the
+                                  best path is to synthesise the strongest
+                                  sections of each into a single combined report.
+  • `publish-as-is`             — when the per-author scores are high (avg
+                                  ≥ 1.5 on the −2…+2 scale) AND there are
+                                  zero false / partially_false claims.
+
+Pick the SINGLE best fit. If two fit, pick the cheaper one (publish < fix < bang < merge)."""
+
+    if content_type == "title":
+        return f"""{context}
+
+Write a punchy title naming the recommended next action. Max 10 words.
+Plain text, single line. No markdown, no quotes."""
+
+    elif content_type == "short":
+        return f"""{context}
+
+Write a SHORT recommendation (max 80 words). Plain English, conversational.
+The LAST line MUST be of the exact shape:
+
+    Recommendation: <st-fix | st-bang -N | st-merge | publish-as-is> — <one-sentence reason>.
+
+Lead with the verdict, then a one-sentence justification rooted in the score breakdown."""
+
+    elif content_type == "caption":
+        return f"""{context}
+
+Write a DETAILED recommendation (100–160 words, exactly 2 paragraphs).
+
+Paragraph 1: The recommendation, naming the command and one concrete reason
+grounded in the score breakdown (cite specific authors and percentages).
+Paragraph 2: What to expect after running it, plus the runner-up option you
+considered and why it lost.
+
+The LAST line MUST be of the exact shape:
+
+    Recommendation: <st-fix | st-bang -N | st-merge | publish-as-is> — <one-sentence reason>.
+
+Plain text. No bullet points."""
+
+    elif content_type == "summary":
+        return f"""{context}
+
+Write a TECHNICAL RECOMMENDATION (120–200 words, 3 paragraphs).
+
+Paragraph 1 — Verdict: name the single recommended command and the threshold
+or pattern that triggered it (cite scores or claim counts).
+Paragraph 2 — Justification: 2–3 specific evidence points from the score
+breakdown or claim mix.
+Paragraph 3 — Alternatives considered: name the runner-up command and one
+sentence on why it lost.
+
+The LAST line MUST be of the exact shape:
+
+    Recommendation: <st-fix | st-bang -N | st-merge | publish-as-is> — <one-sentence reason>.
+
+Plain text. 3 paragraphs. Professional, decisive."""
+
+    elif content_type == "story":
+        return f"""{context}
+
+Write a COMPREHENSIVE RECOMMENDATION ANALYSIS (800–1200 words).
+
+STRUCTURE:
+1. Title (≤10 words — name the recommended action).
+2. Verdict (100–150 words) — the recommended command and the headline reason.
+3. Evidence (300–500 words) — walk through the score breakdown author-by-author,
+   the claim mix, and (where the report body is available) any structural issues.
+4. Alternatives considered (200–300 words) — for each of the OTHER three
+   options, give a paragraph on why it was a worse fit here.
+5. Next steps (100–150 words) — exact command line to run, what success looks
+   like after it completes, and the next st-verdict call to evaluate the result.
+
+The LAST line MUST be of the exact shape:
+
+    Recommendation: <st-fix | st-bang -N | st-merge | publish-as-is> — <one-sentence reason>.
+
+Plain text, clear paragraph breaks. No markdown headers."""
+
+    else:
+        raise ValueError(f"Unknown content_type: {content_type}")
+
+
 def build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type,
-                      report_text=""):
-    """Build an AI prompt for the --what-is-{false,true,missing} lens."""
+                      report_text="", score_summary=""):
+    """Build an AI prompt for the --what-is-{false,true,missing} or --how-to-fix lens."""
     if lens == "missing":
         return _build_missing_prompt(claims_text, prompt_text, story_titles,
                                      report_text, content_type)
+    if lens == "howtofix":
+        return _build_howtofix_prompt(claims_text, prompt_text, story_titles,
+                                      report_text, score_summary, content_type)
 
     polarity_phrase = (
         "INACCURATE / DISPUTED claims" if lens == "false"
@@ -574,11 +716,13 @@ Plain text, clear paragraph breaks. No markdown headers. Lead with the conclusio
 
 
 def generate_lens_content(claims, lens, prompt_text, story_titles, ai_make,
-                          content_type, verbose=False, use_cache=True, report_text=""):
-    """Generate an AI-written analysis for the --what-is-{false,true,missing} lens."""
+                          content_type, verbose=False, use_cache=True,
+                          report_text="", score_summary=""):
+    """Generate an AI-written analysis for a lens (--what-is-* or --how-to-fix)."""
     claims_text = format_lens_claims_for_prompt(claims, lens)
     prompt = build_lens_prompt(claims_text, lens, prompt_text, story_titles,
-                               content_type, report_text=report_text)
+                               content_type, report_text=report_text,
+                               score_summary=score_summary)
 
     if verbose:
         print(f"  Calling {ai_make} for {lens}-lens {content_type} ({len(prompt)} chars prompt)…")
@@ -725,13 +869,15 @@ def main():
     ai_group.add_argument('--ai', type=str, default=None,
                           help=f'AI to use for content generation (default: {get_default_ai()})')
 
-    lens_group = parser.add_argument_group('What-is lens (focused claim breakdown — VRD-1/3)')
+    lens_group = parser.add_argument_group('What-is lens (focused claim breakdown — VRD-1/3/6)')
     lens_group.add_argument('--what-is-false', dest='lens_false', action='store_true',
                             help='Aggregate all claims marked false / partially_false across fact-checkers and ask the AI for a focused breakdown')
     lens_group.add_argument('--what-is-true', dest='lens_true', action='store_true',
                             help='Aggregate all claims marked true / partially_true and ask the AI for a focused supporting summary')
     lens_group.add_argument('--what-is-missing', dest='lens_missing', action='store_true',
                             help='Identify what important aspects of the prompt the report failed to mention (omissions / gaps)')
+    lens_group.add_argument('--how-to-fix', dest='lens_howtofix', action='store_true',
+                            help='Recommend exactly one next action: st-fix, st-bang -N, st-merge, or publish-as-is (never auto-invokes)')
     lens_group.add_argument('-s', '--story', type=int, default=1,
                             help='Story index to analyse with the lens (default: 1)')
 
@@ -744,11 +890,14 @@ def main():
 
     args = parser.parse_args()
 
-    # ── VRD-1/3: lens-mode resolution ────────────────────────────────────────
-    # --what-is-false / --what-is-true / --what-is-missing are mutually exclusive
-    _lens_count = sum([args.lens_false, args.lens_true, args.lens_missing])
+    # ── VRD-1/3/6: lens-mode resolution ──────────────────────────────────────
+    # The four lenses (--what-is-{false,true,missing} and --how-to-fix) are
+    # mutually exclusive.
+    _lens_count = sum([args.lens_false, args.lens_true, args.lens_missing,
+                       args.lens_howtofix])
     if _lens_count > 1:
-        print("Error: --what-is-false, --what-is-true, and --what-is-missing are mutually exclusive.")
+        print("Error: --what-is-false, --what-is-true, --what-is-missing, "
+              "and --how-to-fix are mutually exclusive.")
         sys.exit(1)
     if args.lens_false:
         lens = "false"
@@ -756,16 +905,23 @@ def main():
         lens = "true"
     elif args.lens_missing:
         lens = "missing"
+    elif args.lens_howtofix:
+        lens = "howtofix"
     else:
         lens = None
 
-    # When a lens is requested without an explicit detail flag, default to --ai-summary
-    # (more useful than --ai-short for evidence aggregation). Suppress the ai-short
-    # default that would otherwise kick in.
+    # When a lens is requested without an explicit detail flag, default to
+    # --ai-summary for evidence-aggregation lenses, or --ai-short for the
+    # how-to-fix recommendation lens (a single concrete sentence is the goal).
     if lens and not (args.ai_title or args.ai_caption or args.ai_summary or args.ai_story):
-        if args.ai_short is None or args.ai_short is True:
-            args.ai_short   = False
-            args.ai_summary = True
+        if lens == "howtofix":
+            # Keep --ai-short on; it's already the natural default
+            if args.ai_short is None:
+                args.ai_short = True
+        else:
+            if args.ai_short is None or args.ai_short is True:
+                args.ai_short   = False
+                args.ai_summary = True
 
     # Resolve ai_short: default-on only when no other --ai-* flag is explicitly given
     if args.ai_short is None:
@@ -828,19 +984,27 @@ def main():
     subject       = subject_from_container(container, args.json_file)
     story_titles  = extract_story_titles(container)
 
-    # ── VRD-1/3: collect lens claims (and report) up front ───────────────────
+    # ── VRD-1/3/6: collect lens claims (and report / score summary) up front ──
     lens_claims = []
     prompt_text = ""
     report_text = ""
+    score_summary = ""
     if lens:
         lens_claims = collect_lens_claims(container, args.story, lens)
         prompt_text = get_prompt_text(container)
-        if lens == "missing":
+        if lens in ("missing", "howtofix"):
             report_text = collect_lens_report(container, args.story)
+        if lens == "howtofix":
+            # Score summary is the verdict-by-target table the chart is built from
+            score_summary = format_verdicts_for_prompt(df, story_titles)
         if not lens_claims:
             if lens == "missing":
                 print(f"No parseable fact-check claims found in story {args.story} of {file_json}.")
                 print(f"The missing-lens needs at least one fact-check report to reason about coverage.")
+                print(f"Run:  st-cross {args.json_file}   (or st-fact ...)")
+            elif lens == "howtofix":
+                print(f"No parseable fact-check claims found in story {args.story} of {file_json}.")
+                print(f"The how-to-fix lens needs fact-check evidence to recommend a next action.")
                 print(f"Run:  st-cross {args.json_file}   (or st-fact ...)")
             else:
                 print(f"No claims marked {lens}/partially_{lens} were found in story {args.story} of {file_json}.")
@@ -866,14 +1030,22 @@ def main():
             if not flag:
                 continue
             if not args.quiet:
-                lens_tag = f" [{lens}-lens]" if lens else ""
-                print(f"  Generating {label}{lens_tag} with {content_ai}…", flush=True)
+                if lens == "howtofix":
+                    lens_tag = " [how-to-fix]"
+                    display_label = "Recommendation" if ctype == "short" else f"Recommendation {label}"
+                elif lens:
+                    lens_tag = f" [{lens}-lens]"
+                    display_label = label
+                else:
+                    lens_tag = ""
+                    display_label = label
+                print(f"  Generating {display_label}{lens_tag} with {content_ai}…", flush=True)
             if lens:
                 def _generate(ctype=ctype):
                     ai_content[ctype] = generate_lens_content(
                         lens_claims, lens, prompt_text, story_titles,
                         content_ai, ctype, args.verbose, args.cache,
-                        report_text=report_text)
+                        report_text=report_text, score_summary=score_summary)
             else:
                 def _generate(ctype=ctype):
                     ai_content[ctype] = generate_ai_content(

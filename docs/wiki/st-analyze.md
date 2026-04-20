@@ -38,7 +38,7 @@ st-analyze --ai-story subject.json      # full AI narrative from analysis
 | `--ai-summary` | Generate a 120–200-word summary → stdout |
 | `--ai-story` | Generate an 800–1200-word narrative → stdout |
 
-**Related:** [st-cross](st-cross)  [st-heatmap](st-heatmap)  [st-verdict](st-verdict)
+**Related:** [Three Stages](Three-Stages)  [st-cross](st-cross)  [st-heatmap](st-heatmap)  [st-verdict](st-verdict)
 
 ---
 

@@ -39,6 +39,25 @@ Cross uses [Semantic Versioning](https://semver.org/).
   isn't. Tailored prompts per content type — long-form `--ai-story` includes
   theme-by-theme severity ratings (critical / important / nice-to-have)
   and counter-considerations.
+- **VRD-6 — `st-verdict --how-to-fix` (recommendation lens).**
+  Fourth lens: reads the score breakdown, the verdict mix, and (at
+  `--ai-summary` / `--ai-story` detail levels) the report itself, then
+  recommends exactly **one** next action — `st-fix`, `st-bang -N`,
+  `st-merge`, or `publish-as-is`. Never auto-invokes the recommended tool.
+  Output ends with a fixed-shape `Recommendation: <command> — <reason>.`
+  line for easy grepping. Default detail: `--ai-short` (single concrete
+  sentence). Mutually exclusive with the three `--what-is-*` lenses.
+- **VRD-7 — Wiki: `Three-Stages.md`.**
+  New hand-authored topic page naming the GATHER → VERIFY → INTERPRET
+  architecture and mapping every Cross tool to exactly one stage. Linked
+  from Home, `st-fact`, `st-verdict`, `st-analyze`.
+- **VRD-8 — Wiki: `Showcase-Workflows.md`.**
+  New hand-authored page with copy-pastable transcripts for the three
+  killer workflows: "Is this fake news?" (`--what-is-false`), "What's
+  missing?" (`--what-is-missing`), and "What can I trust here?"
+  (`--what-is-true`). Each includes a realistic AI-output sample. Lens
+  rows in `st-verdict.md` are now anchored links into the matching
+  workflow section.
 
 ### Removed (breaking)
 - **VRD-5 — `st-fact --ai-*` flags removed.** Interpretive flags now live
@@ -64,7 +83,10 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ### Tests
 - `tests/test_st_verdict.py` — +13 tests for parse/collect/lens/missing
-  helpers and three-way mutual-exclusion.
+  helpers and three-way mutual-exclusion (VRD-1/2/3); +13 more for the
+  VRD-6 `--how-to-fix` lens (mutual exclusion vs each other lens, prompt
+  enumerates all four candidate actions, recommendation line required at
+  every detail level, report-truncation at brief detail levels).
 - `tests/test_st_fact_removed_flags.py` — new file, 7 parametrised
   regression tests guarding the removed-flag stderr message and exit code.
 

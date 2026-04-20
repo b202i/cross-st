@@ -53,12 +53,12 @@ Switches the AI from "summarise the chart" to "summarise the **claims** that fal
 
 | Option | Description |
 |--------|-------------|
-| `--what-is-false` | Aggregate every claim marked `false` / `partially_false` and produce a focused breakdown of what is inaccurate or disputed |
-| `--what-is-true` | Aggregate every claim marked `true` / `partially_true` and produce a focused breakdown of what is verified or supported |
-| `--what-is-missing` | Identify what important aspects of the prompt the report failed to mention (omissions / coverage gaps) |
+| [`--what-is-false`](Showcase-Workflows#workflow-a--is-this-fake-news) | Aggregate every claim marked `false` / `partially_false` and produce a focused breakdown of what is inaccurate or disputed |
+| [`--what-is-true`](Showcase-Workflows#workflow-c--what-can-i-trust-here) | Aggregate every claim marked `true` / `partially_true` and produce a focused breakdown of what is verified or supported |
+| [`--what-is-missing`](Showcase-Workflows#workflow-b--whats-missing) | Identify what important aspects of the prompt the report failed to mention (omissions / coverage gaps) |
 | `-s N`, `--story N` | Story index to analyse with the lens (default: `1`) |
 
-The three lenses are mutually exclusive.
+The three lenses are mutually exclusive (and also exclusive with `--how-to-fix` below).
 
 ```bash
 # Detailed breakdown of inaccurate claims (e.g. "is this fake news?")
@@ -76,9 +76,41 @@ st-verdict --what-is-false --ai-story --no-display subject.json
 
 The lens reads `story[N].fact[]` entries — run `st-cross` first so multiple AIs have fact-checked the report. The more checkers that flagged the same claim, the stronger the signal in the resulting analysis. The `--what-is-missing` lens additionally reads the original prompt (`data[0].prompt`) and the report markdown so the AI can reason about what should be there but isn't.
 
-> **Architectural note:** As of cross-st 0.7.0, all interpretive `--ai-*` and `--what-is-*` flags live here in `st-verdict`. `st-fact` is now a pure verifier (it produces fact-check data; `st-verdict` interprets it). This is the **GATHER → VERIFY → INTERPRET** division of responsibility.
+**See also:** [Showcase Workflows](Showcase-Workflows) — copy-pastable transcripts for each lens.
 
-**Related:** [st-cross](st-cross)  [st-heatmap](st-heatmap)  [st-analyze](st-analyze)
+### Recommendation lens — `--how-to-fix`
+
+After looking at the chart and the lens output, the natural next question is "*so what do I do about it?*" The recommendation lens asks the AI to read the score breakdown, the verdict mix, and (at `--ai-summary` / `--ai-story` detail levels) the report itself, then recommend exactly **one** next action. The recommendation is human-facing prose; **st-verdict never auto-invokes** the suggested tool.
+
+| Option | Description |
+|--------|-------------|
+| `--how-to-fix` | Recommend exactly one of: `st-fix`, `st-bang -N`, `st-merge`, or `publish-as-is`. Default detail level: `--ai-short` (single concrete recommendation sentence). |
+
+The four candidate actions and when each is recommended:
+
+| Recommendation | Triggered when |
+|---|---|
+| `st-fix subject.json` | Report is mostly sound but has clusters of false / partially_false claims |
+| `st-bang -N subject.json` | Sample size too small (one story) or scores vary wildly across fact-checkers |
+| `st-merge subject.json` | Multiple stories already present; combining their strongest sections beats any single one |
+| `publish-as-is` | Per-author scores are high (avg ≥ 1.5) AND zero false / partially_false claims |
+
+The output's last line always has the exact shape `Recommendation: <command> — <reason>.` so it is easy to spot in a terminal scrollback.
+
+```bash
+# One-line recommendation (default)
+st-verdict --how-to-fix subject.json
+
+# Three-paragraph technical recommendation with alternatives considered
+st-verdict --how-to-fix --ai-summary subject.json
+
+# Long-form recommendation analysis suitable for archival
+st-verdict --how-to-fix --ai-story --no-display subject.json
+```
+
+> **Architectural note:** As of cross-st 0.7.0, all interpretive `--ai-*`, `--what-is-*`, and `--how-to-fix` flags live here in `st-verdict`. `st-fact` is now a pure verifier (it produces fact-check data; `st-verdict` interprets it). This is the **[GATHER → VERIFY → INTERPRET](Three-Stages)** division of responsibility.
+
+**Related:** [Three Stages](Three-Stages)  [Showcase Workflows](Showcase-Workflows)  [st-cross](st-cross)  [st-heatmap](st-heatmap)  [st-analyze](st-analyze)
 
 ---
 
