@@ -58,6 +58,16 @@ Cross uses [Semantic Versioning](https://semver.org/).
   (`--what-is-true`). Each includes a realistic AI-output sample. Lens
   rows in `st-verdict.md` are now anchored links into the matching
   workflow section.
+- **`st-cross --force` flag.** Bypasses resume detection AND clears all
+  existing `fact[]` entries on disk before launching, then re-runs every
+  cell. Implies `--no-cache`. The previous workflow ("re-run with
+  `--no-cache` to refresh", as the all-complete exit message instructed)
+  was broken in two ways: the resume pre-scan ran before the cache layer
+  saw `--no-cache`, so the run short-circuited; and even if a re-run did
+  fire, `st-fact` dedupes by payload-MD5, so a changed prompt would
+  *append* new entries beside the old ones rather than replacing them.
+  `--force` fixes both — the all-complete exit message now correctly
+  points at it.
 
 ### Removed (breaking)
 - **VRD-5 — `st-fact --ai-*` flags removed.** Interpretive flags now live

@@ -341,7 +341,14 @@ def main() -> None:
     parser.add_argument("--cache", dest="cache", action="store_true", default=True,
                         help="Enable API cache (default: enabled)")
     parser.add_argument("--no-cache", dest="cache", action="store_false",
-                        help="Disable API cache")
+                        help="Disable API cache (no read, no write). NOTE: does not "
+                             "by itself force a re-fact-check — see --force.")
+    parser.add_argument("--force", action="store_true",
+                        help="Bypass resume detection AND clear all existing fact[] "
+                             "entries before launching, then re-run every cell. Use "
+                             "this when you've changed the fact-check prompt or want "
+                             "fresh verdicts. Implies --no-cache so the new payloads "
+                             "don't pull stale cached responses.")
     parser.add_argument("--timeout", type=int, default=1800,
                         help="Per-cell wall-clock timeout in seconds (default: 1800 = "
                              "30 min). 0 = no timeout. Applies to the whole st-fact "
@@ -391,6 +398,12 @@ def main() -> None:
     file_prefix = args.json_file.rsplit(".", 1)[0]
     file_json   = file_prefix + ".json"
     file_prompt = file_prefix + ".prompt"
+
+    # --force implies --no-cache so a re-fact-check with a changed prompt
+    # produces all-fresh API responses rather than pulling a stale cached
+    # response written under the previous prompt for the same MD5.
+    if args.force:
+        args.cache = False
     cache_flag  = "--cache" if args.cache else "--no-cache"
 
     ai_list = get_ai_list()
@@ -658,24 +671,50 @@ def main() -> None:
 
     # ── Pre-scan: mark cells already present in the JSON as done ─────────────
     # This makes restart after Ctrl+C instant — cached cells skip re-running.
+    # --force bypasses this (so a changed-prompt re-fact-check actually runs)
+    # AND clears any pre-existing fact[] entries from the container so the new
+    # results don't append-as-duplicates beside the old ones (st-fact dedupes
+    # by md5_hash, but a changed prompt produces a different md5 → no dedupe).
     n_preloaded = 0
-    try:
-        with open(file_json) as f:
-            existing = json.load(f)
-        for si, story in enumerate(existing.get("story", [])[:N]):
-            for fact in story.get("fact", []):
-                fc_make = fact.get("make", "")
-                # Match fact-checker make to column index
-                for fi, ai_key in enumerate(ai_list):
-                    if get_ai_make(ai_key) == fc_make:
-                        if cells[(si, fi)]["status"] == ST_PENDING:
-                            cells[(si, fi)]["status"]   = ST_DONE
-                            cells[(si, fi)]["start_time"] = 0.0
-                            cells[(si, fi)]["end_time"]   = 0.0
-                            n_preloaded += 1
-                        break
-    except (OSError, json.JSONDecodeError, KeyError):
-        pass  # no existing data — start fresh
+    n_force_cleared = 0
+    if args.force:
+        try:
+            with open(file_json) as f:
+                container = json.load(f)
+            for story in container.get("story", [])[:N]:
+                facts = story.get("fact") or []
+                if facts:
+                    n_force_cleared += len(facts)
+                    story["fact"] = []
+            tmp = file_json + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(container, f, ensure_ascii=False, indent=4)
+                f.flush(); os.fsync(f.fileno())
+            os.replace(tmp, file_json)
+        except (OSError, json.JSONDecodeError):
+            pass
+        if not args.quiet and n_force_cleared:
+            print(f"  {_clr('--force', BOLD)}: cleared {_clr(n_force_cleared, YELLOW, BOLD)} "
+                  f"existing fact-check entr{'y' if n_force_cleared == 1 else 'ies'} "
+                  f"before re-running.")
+    else:
+        try:
+            with open(file_json) as f:
+                existing = json.load(f)
+            for si, story in enumerate(existing.get("story", [])[:N]):
+                for fact in story.get("fact", []):
+                    fc_make = fact.get("make", "")
+                    # Match fact-checker make to column index
+                    for fi, ai_key in enumerate(ai_list):
+                        if get_ai_make(ai_key) == fc_make:
+                            if cells[(si, fi)]["status"] == ST_PENDING:
+                                cells[(si, fi)]["status"]   = ST_DONE
+                                cells[(si, fi)]["start_time"] = 0.0
+                                cells[(si, fi)]["end_time"]   = 0.0
+                                n_preloaded += 1
+                            break
+        except (OSError, json.JSONDecodeError, KeyError):
+            pass  # no existing data — start fresh
 
     if not args.quiet and n_preloaded:
         print(f"  Resuming: {_clr(n_preloaded, GREEN, BOLD)} cell(s) already complete in {file_json}")
@@ -771,7 +810,7 @@ def main() -> None:
             print(f"  {_clr('Next:', DIM)} "
                   f"{_clr('st-verdict', BOLD)} {file_json}  "
                   f"{_clr('to view results, or', DIM)} "
-                  f"{_clr('--no-cache', BOLD)} {_clr('to refresh.', DIM)}")
+                  f"{_clr('--force', BOLD)} {_clr('to clear and re-run all cells.', DIM)}")
             print()
         sys.exit(0)
 

@@ -17,7 +17,8 @@ Runs the full research pipeline in one command: generates a report from every AI
 
 ```bash
 st-cross subject.json                   # full N×N run: generate + fact-check all AIs
-st-cross --no-cache subject.json        # force fresh API calls (no cache)
+st-cross --no-cache subject.json        # bypass cache (no read, no write); does NOT force a re-run on a complete container
+st-cross --force subject.json           # clear all existing fact[] entries and re-run every cell — use after a prompt change
 st-cross --skip-gen subject.json        # skip generation — only run fact-checking
 st-cross --timeout 3600 subject.json    # set a 60-minute per-cell timeout
 st-cross --sequential subject.json      # run cells one at a time (debug / low-quota)
@@ -32,7 +33,8 @@ st-cross -q subject.json                # minimal output (suppress live table)
 |--------|-------------|
 | `file.json` | Path to the JSON container |
 | `--cache` | Enable API cache (default: enabled) |
-| `--no-cache` | Disable API cache — always call AI live |
+| `--no-cache` | Disable API cache (no read, no write). Does **not** by itself force a re-fact-check on an already-complete container — see `--force`. |
+| `--force` | Bypass resume detection AND clear all existing `fact[]` entries before launching, then re-run every cell. Implies `--no-cache`. Use after changing the fact-check prompt or when you want fresh verdicts. |
 | `--skip-gen` | Skip Step 1 (story generation). Auto-detected if all stories already exist. |
 | `--dry-run` | Preview the Step 2 matrix (pending vs complete cells) and exit without running anything. Implies `--skip-gen`. |
 | `--timeout SECONDS` | Per-cell wall-clock timeout (default: 1800 = 30 min). `0` = no timeout. |
