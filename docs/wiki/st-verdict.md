@@ -49,13 +49,16 @@ Reads fact-check data from a container and produces two outputs: a **stacked bar
 
 ### What-is lens — focused claim breakdown
 
-Switches the AI from "summarise the chart" to "summarise the **claims** that fall on one side of the truth ledger". Aggregates per-claim verdicts and explanations across **all** fact-checkers in the container, then asks one AI to synthesize them into a focused report. Pair with any `--ai-*` flag to control level of detail; `--ai-summary` is auto-enabled if no detail flag is given.
+Switches the AI from "summarise the chart" to "summarise the **claims** that fall on one side of the truth ledger" — or, with `--what-is-missing`, to identify what the report failed to cover at all. Aggregates per-claim verdicts and explanations across **all** fact-checkers in the container, then asks one AI to synthesize them into a focused report. Pair with any `--ai-*` flag to control level of detail; `--ai-summary` is auto-enabled if no detail flag is given.
 
 | Option | Description |
 |--------|-------------|
 | `--what-is-false` | Aggregate every claim marked `false` / `partially_false` and produce a focused breakdown of what is inaccurate or disputed |
 | `--what-is-true` | Aggregate every claim marked `true` / `partially_true` and produce a focused breakdown of what is verified or supported |
+| `--what-is-missing` | Identify what important aspects of the prompt the report failed to mention (omissions / coverage gaps) |
 | `-s N`, `--story N` | Story index to analyse with the lens (default: `1`) |
+
+The three lenses are mutually exclusive.
 
 ```bash
 # Detailed breakdown of inaccurate claims (e.g. "is this fake news?")
@@ -64,11 +67,16 @@ st-verdict --what-is-false --ai-summary subject.json
 # Positive-evidence summary — what the report got right
 st-verdict --what-is-true --ai-caption subject.json
 
+# Coverage-gap analysis — what the report failed to mention
+st-verdict --what-is-missing --ai-summary subject.json
+
 # Long-form analysis suitable for sharing as feedback
 st-verdict --what-is-false --ai-story --no-display subject.json
 ```
 
-The lens reads `story[N].fact[]` entries — run `st-cross` first so multiple AIs have fact-checked the report. The more checkers that flagged the same claim, the stronger the signal in the resulting analysis.
+The lens reads `story[N].fact[]` entries — run `st-cross` first so multiple AIs have fact-checked the report. The more checkers that flagged the same claim, the stronger the signal in the resulting analysis. The `--what-is-missing` lens additionally reads the original prompt (`data[0].prompt`) and the report markdown so the AI can reason about what should be there but isn't.
+
+> **Architectural note:** As of cross-st 0.7.0, all interpretive `--ai-*` and `--what-is-*` flags live here in `st-verdict`. `st-fact` is now a pure verifier (it produces fact-check data; `st-verdict` interprets it). This is the **GATHER → VERIFY → INTERPRET** division of responsibility.
 
 **Related:** [st-cross](st-cross)  [st-heatmap](st-heatmap)  [st-analyze](st-analyze)
 

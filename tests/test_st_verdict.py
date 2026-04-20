@@ -227,6 +227,25 @@ class TestCollectLensClaims:
         assert st_verdict.collect_lens_claims(c, story_index=99, lens="false") == []
         assert st_verdict.collect_lens_claims(c, story_index=0,  lens="false") == []
 
+    def test_missing_lens_collects_all_claims(self):
+        """VRD-3: missing-lens returns every parseable claim regardless of verdict."""
+        c = self._container(n_facts=1)
+        out = st_verdict.collect_lens_claims(c, story_index=1, lens="missing")
+        assert len(out) == 5  # all five from _SAMPLE_REPORT
+        verdicts = sorted(x["verdict"] for x in out)
+        assert verdicts == ["false", "opinion", "partially_false",
+                            "partially_true", "true"]
+
+    def test_collect_lens_report_returns_markdown(self):
+        """VRD-3: collect_lens_report returns story[N].markdown."""
+        c = {"data": [{"prompt": "p"}],
+             "story": [{"markdown": "# Title\n\nBody text."}]}
+        assert "Body text" in st_verdict.collect_lens_report(c, 1)
+
+    def test_collect_lens_report_invalid_index_returns_empty(self):
+        c = {"story": []}
+        assert st_verdict.collect_lens_report(c, 1) == ""
+
 
 class TestGetPromptText:
     def test_returns_data_zero_prompt(self):
@@ -258,6 +277,20 @@ class TestLensFlags:
     def test_mutually_exclusive_flags_exit(self):
         """--what-is-false and --what-is-true together must SystemExit."""
         argv = ["st-verdict", "dummy.json", "--what-is-false", "--what-is-true"]
+        with patch("sys.argv", argv):
+            with pytest.raises(SystemExit):
+                st_verdict.main()
+
+    def test_mutually_exclusive_three_way_exit(self):
+        """VRD-3: false + missing must SystemExit."""
+        argv = ["st-verdict", "dummy.json", "--what-is-false", "--what-is-missing"]
+        with patch("sys.argv", argv):
+            with pytest.raises(SystemExit):
+                st_verdict.main()
+
+    def test_mutually_exclusive_true_missing_exit(self):
+        """VRD-3: true + missing must SystemExit."""
+        argv = ["st-verdict", "dummy.json", "--what-is-true", "--what-is-missing"]
         with patch("sys.argv", argv):
             with pytest.raises(SystemExit):
                 st_verdict.main()

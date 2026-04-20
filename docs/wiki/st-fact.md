@@ -15,12 +15,6 @@ st-fact --ai all subject.json          # run all AIs in parallel (one per story)
 st-fact --timeout 30 subject.json      # 30-second per-paragraph timeout
 st-fact --file subject.json            # also write results to a file
 st-fact --paragraph subject.json       # write paragraph segments to _paragraph_test_n.txt
-st-fact --ai-review subject.json       # AI digest of existing fact-check results
-st-fact --ai-title subject.json        # title (≤10 words) from existing fact data
-st-fact --ai-short subject.json        # short caption (≤80 words) from existing fact data
-st-fact --ai-caption subject.json      # detailed caption (100–160 words)
-st-fact --ai-summary subject.json      # concise summary (120–200 words)
-st-fact --ai-story subject.json        # comprehensive story (800–1200 words)
 ```
 
 ## Options
@@ -40,19 +34,20 @@ st-fact --ai-story subject.json        # comprehensive story (800–1200 words)
 | `-q`, `--quiet` | Minimal output |
 | `--timeout N` | With `--ai all`: per-job limit in minutes (default: 20). Single-AI mode: per-paragraph limit in seconds (default: 0 = no limit) |
 
-## AI content options
+## What happened to `--ai-review` / `--ai-caption` / `--ai-summary` / …?
 
-These flags read **existing** fact-check data and generate new AI content — they do not run a new fact-check.
+These interpretive flags **moved to `st-verdict` in cross-st 0.7.0**. `st-fact` is now a pure verifier: it produces fact-check data; `st-verdict` interprets it. This is the GATHER → VERIFY → INTERPRET architecture.
 
-| Option | Output | Length |
-|--------|--------|--------|
-| `--ai-review` | AI digest of fact-check results (implies `--ai-short` unless another flag is set) | — |
-| `--ai-title` | Title → stdout | ≤ 10 words |
-| `--ai-short` | Short caption → stdout | ≤ 80 words |
-| `--no-ai-short` | Suppress the automatic short caption in review mode | — |
-| `--ai-caption` | Detailed caption → stdout | 100–160 words |
-| `--ai-summary` | Concise summary → stdout | 120–200 words |
-| `--ai-story` | Comprehensive story → stdout | 800–1200 words |
+| Old (st-fact) | New (st-verdict) |
+|---|---|
+| `st-fact --ai-review subject.json` | `st-verdict --what-is-false subject.json` *(or `--what-is-true` / `--what-is-missing`)* |
+| `st-fact --ai-title subject.json` | `st-verdict --ai-title subject.json` |
+| `st-fact --ai-short subject.json` | `st-verdict --ai-short subject.json` |
+| `st-fact --ai-caption subject.json` | `st-verdict --ai-caption subject.json` |
+| `st-fact --ai-summary subject.json` | `st-verdict --ai-summary subject.json` |
+| `st-fact --ai-story subject.json` | `st-verdict --ai-story subject.json` |
+
+If you call any of the removed flags, `st-fact` exits with a one-line error pointing at the right `st-verdict` invocation — no silent failure.
 
 ## For developers
 

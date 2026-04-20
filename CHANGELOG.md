@@ -7,6 +7,69 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0] — Unreleased
+
+> **GATHER → VERIFY → INTERPRET refactor.** `st-fact` is now a pure verifier
+> (it produces fact-check verdicts); `st-verdict` owns all interpretation
+> (chart + AI-content framework + three `--what-is-*` lenses). This is a
+> **breaking** change for anyone who scripted `st-fact --ai-*` against
+> 0.6.0; see Removed below for the migration map.
+
+### Added
+- **VRD-1 — `st-verdict --what-is-false` / `--what-is-true`.**
+  Switches the AI from "summarise the verdict chart" to "summarise the
+  **claims** that fall on one side of the truth ledger". Aggregates per-claim
+  verdicts and explanations across **all** fact-checkers in the container,
+  then asks one AI to synthesise them into a focused report. Pair with
+  `--ai-caption/summary/story` to control level of detail (auto-promotes to
+  `--ai-summary` if no detail flag is given). Mutually exclusive with each
+  other and with `--what-is-missing`. New `-s/--story N` flag selects the
+  story index (default: 1).
+- **VRD-2 — `--ai-caption/short/summary/story` framework on `st-verdict`.**
+  Full parity with the framework that previously lived on `st-fact`: same
+  word-count contracts (title ≤10w, short ≤80w, caption 100–160w, summary
+  120–200w, story 800–1200w), same `--ai PROVIDER` selector. `--ai-short`
+  is the default output when no other `--ai-*` flag is given;
+  `--no-ai-short` suppresses it. Threaded so multiple `--ai-*` flags run
+  concurrently per the standard progress-message UX rule.
+- **VRD-3 — `st-verdict --what-is-missing` (omissions lens).**
+  Identifies what important aspects of the prompt the report failed to
+  address. Reads `data[0].prompt` plus `story[N].markdown` (trimmed at
+  12 000 chars) so the AI can reason about what *should* be there but
+  isn't. Tailored prompts per content type — long-form `--ai-story` includes
+  theme-by-theme severity ratings (critical / important / nice-to-have)
+  and counter-considerations.
+
+### Removed (breaking)
+- **VRD-5 — `st-fact --ai-*` flags removed.** Interpretive flags now live
+  exclusively on `st-verdict`. `st-fact` intercepts each removed flag
+  *before* `argparse` and exits 2 with a one-line migration message
+  pointing at `st-verdict`. Mapping:
+
+  | Removed | Replacement |
+  |---|---|
+  | `st-fact --ai-title` | `st-verdict --ai-title` |
+  | `st-fact --ai-short` | `st-verdict --ai-short` (default-on) |
+  | `st-fact --no-ai-short` | `st-verdict --no-ai-short` |
+  | `st-fact --ai-caption` | `st-verdict --ai-caption` |
+  | `st-fact --ai-summary` | `st-verdict --ai-summary` |
+  | `st-fact --ai-story` | `st-verdict --ai-story` |
+  | `st-fact --ai-review` | `st-verdict --what-is-false / --what-is-true / --what-is-missing` |
+
+  No soft-deprecation cycle was shipped (the friendly removed-flag message
+  delivers the same migration guidance; rationale logged in
+  `cross-internal/st-fact/IMPLEMENTATION_VRD4_SKIPPED.md`). One-token fix:
+  replace `st-fact` with `st-verdict`. For verify-then-interpret pipelines:
+  `st-fact report.json && st-verdict --ai-caption report.json`.
+
+### Tests
+- `tests/test_st_verdict.py` — +13 tests for parse/collect/lens/missing
+  helpers and three-way mutual-exclusion.
+- `tests/test_st_fact_removed_flags.py` — new file, 7 parametrised
+  regression tests guarding the removed-flag stderr message and exit code.
+
+---
+
 ## [0.6.0] — 2026-04-17
 
 ### Added

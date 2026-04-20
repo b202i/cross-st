@@ -284,8 +284,10 @@ _VERDICT_NORMALISE = {
 }
 
 _LENS_VERDICTS = {
-    "false": {"false", "partially_false"},
-    "true":  {"true", "partially_true"},
+    "false":   {"false", "partially_false"},
+    "true":    {"true", "partially_true"},
+    # "missing" lens uses the report itself + every verdict — handled separately
+    "missing": None,
 }
 
 
@@ -309,12 +311,17 @@ def parse_claims(report_text):
 
 
 def collect_lens_claims(container, story_index, lens):
-    """Collect claims matching the lens ('false' or 'true') across all fact[] entries
-    of one story.
+    """Collect claims matching the lens ('false', 'true', or 'missing') across all
+    fact[] entries of one story.
+
+    For 'false'/'true' lenses: returns claims with verdict in the matching set.
+    For 'missing' lens: returns *every* parseable claim (the AI uses the full
+    distribution to reason about coverage gaps). The story markdown is fetched
+    separately via collect_lens_report().
 
     Returns: list of dicts with keys: claim, verdict, explanation, evaluator (make:model).
     """
-    target = _LENS_VERDICTS[lens]
+    target = _LENS_VERDICTS.get(lens)
     stories = container.get("story", [])
     if not (1 <= story_index <= len(stories)):
         return []
@@ -324,7 +331,7 @@ def collect_lens_claims(container, story_index, lens):
         report = fact.get("report", "")
         evaluator = f"{fact.get('make', '?')}:{fact.get('model', '?')}"
         for _n, claim, verdict, explanation in parse_claims(report):
-            if verdict in target:
+            if target is None or verdict in target:   # missing → all claims
                 collected.append({
                     "claim": claim,
                     "verdict": verdict,
@@ -334,16 +341,30 @@ def collect_lens_claims(container, story_index, lens):
     return collected
 
 
+def collect_lens_report(container, story_index):
+    """Return the story's markdown body for the missing-lens prompt context."""
+    stories = container.get("story", [])
+    if not (1 <= story_index <= len(stories)):
+        return ""
+    return stories[story_index - 1].get("markdown", "") or ""
+
+
 def format_lens_claims_for_prompt(claims, lens):
     """Format the collected claims as a numbered block for inclusion in an AI prompt."""
     if not claims:
+        if lens == "missing":
+            return "(No claims were parseable from the fact-check reports.)"
         return f"(No claims marked {lens} or partially_{lens} were found.)"
 
-    lines = [
-        f"Claims that one or more fact-checkers marked as {lens} / partially_{lens}:",
-        f"Total such verdicts: {len(claims)}",
-        "",
-    ]
+    if lens == "missing":
+        header = (f"All {len(claims)} parseable claim(s) across fact-checkers — "
+                  f"use these to infer what the report DID address, so you can "
+                  f"identify what it omitted:")
+    else:
+        header = (f"Claims that one or more fact-checkers marked as "
+                  f"{lens} / partially_{lens}:\nTotal such verdicts: {len(claims)}")
+
+    lines = [header, ""]
     for i, c in enumerate(claims, 1):
         lines.append(f"{i}. [{c['verdict']}] (per {c['evaluator']})")
         lines.append(f"   Claim:       {c['claim']}")
@@ -352,13 +373,111 @@ def format_lens_claims_for_prompt(claims, lens):
     return "\n".join(lines)
 
 
-def build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type):
-    """Build an AI prompt for the --what-is-{false,true} lens.
+def _build_missing_prompt(claims_text, prompt_text, story_titles, report_text, content_type):
+    """Build a prompt for the --what-is-missing lens.
 
-    The framing differs from build_ai_prompt: we are no longer summarising the
-    verdict CHART, we are summarising the underlying CLAIMS that fall on one
-    side of the truth ledger.
+    Unlike the truth-ledger lenses, this asks the AI to identify GAPS — what
+    important aspects of the original prompt's topic the report failed to
+    address. The full report markdown is included so the AI can see exactly
+    what was (and wasn't) covered.
     """
+    # Trim the report so we don't blow the token budget on long reports
+    REPORT_CHAR_LIMIT = 12000
+    if len(report_text) > REPORT_CHAR_LIMIT:
+        report_text = report_text[:REPORT_CHAR_LIMIT] + "\n\n[…report truncated…]"
+
+    context = f"""Cross-product AI fact-check — OMISSIONS lens.
+
+ORIGINAL PROMPT (the topic the report was supposed to address):
+{prompt_text or '(no prompt recorded in container)'}
+
+REPORT TITLES (what got produced):
+{story_titles}
+
+REPORT BODY (so you can see what WAS covered):
+{report_text or '(no report markdown found)'}
+
+CLAIMS THAT WERE FACT-CHECKED (use these to infer what the report actually said):
+{claims_text}
+
+YOUR TASK:
+Identify what important aspects of the topic the report FAILED to mention.
+Do not critique what is in the report — focus only on the gaps.
+A gap is something a knowledgeable reader of the prompt would expect to see
+addressed but cannot find in the report or in any of the fact-checked claims.
+
+Be specific. "Could be more detailed" is not a gap; "does not mention X
+which is essential because Y" is a gap."""
+
+    if content_type == "title":
+        return f"""{context}
+
+Write a punchy title for this omissions analysis. Max 10 words.
+Capture the headline gap.
+No markdown, no quotes. Plain text, single line."""
+
+    elif content_type == "short":
+        return f"""{context}
+
+Write a SHORT paragraph (max 80 words) listing the most important omissions.
+Lead with the single biggest gap. Be concrete.
+Plain text, conversational tone."""
+
+    elif content_type == "caption":
+        return f"""{context}
+
+Write a DETAILED caption (100–160 words, exactly 2 paragraphs) on what is missing.
+
+Paragraph 1: The headline gap — what important aspect was omitted, and why a
+reader of the prompt would expect to see it.
+Paragraph 2: 2–3 secondary gaps with brief justification for each.
+
+Plain text. No bullet points. Be specific, not vague."""
+
+    elif content_type == "summary":
+        return f"""{context}
+
+Write a TECHNICAL SUMMARY (120–200 words, 3 paragraphs) of what is missing.
+
+Paragraph 1 — Headline gap: name the single most important omission and
+explain why it matters for the prompt's intent.
+Paragraph 2 — Secondary gaps: 2–3 additional omissions, each with a one-
+sentence justification rooted in the prompt or domain knowledge.
+Paragraph 3 — So what: a short list of the next 1–3 things the report
+author should add to make the report complete.
+
+Plain text. 3 paragraphs. Professional, evidence-driven, specific."""
+
+    elif content_type == "story":
+        return f"""{context}
+
+Write a COMPREHENSIVE OMISSIONS ANALYSIS (800–1200 words).
+
+STRUCTURE:
+1. Title (≤10 words — name the headline gap).
+2. Executive summary (100–150 words) — the single most important omission
+   and why it matters for the prompt's intent.
+3. Theme-by-theme gap analysis (400–600 words) — group missing aspects into
+   3–5 themes; for each theme, name what's missing, cite why a reader of the
+   prompt would expect it, and rate the severity (critical / important / nice-to-have).
+4. Counter-considerations (100–150 words) — note where an omission might be
+   defensible (out of scope for this prompt; covered implicitly elsewhere).
+5. Bottom line (100–150 words) — a prioritised list of additions the author
+   should make for completeness.
+
+Plain text, clear paragraph breaks. No markdown headers. Lead with the conclusion."""
+
+    else:
+        raise ValueError(f"Unknown content_type: {content_type}")
+
+
+def build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type,
+                      report_text=""):
+    """Build an AI prompt for the --what-is-{false,true,missing} lens."""
+    if lens == "missing":
+        return _build_missing_prompt(claims_text, prompt_text, story_titles,
+                                     report_text, content_type)
+
     polarity_phrase = (
         "INACCURATE / DISPUTED claims" if lens == "false"
         else "VERIFIED / SUPPORTED claims"
@@ -455,10 +574,11 @@ Plain text, clear paragraph breaks. No markdown headers. Lead with the conclusio
 
 
 def generate_lens_content(claims, lens, prompt_text, story_titles, ai_make,
-                          content_type, verbose=False, use_cache=True):
-    """Generate an AI-written analysis for the --what-is-{false,true} lens."""
+                          content_type, verbose=False, use_cache=True, report_text=""):
+    """Generate an AI-written analysis for the --what-is-{false,true,missing} lens."""
     claims_text = format_lens_claims_for_prompt(claims, lens)
-    prompt = build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type)
+    prompt = build_lens_prompt(claims_text, lens, prompt_text, story_titles,
+                               content_type, report_text=report_text)
 
     if verbose:
         print(f"  Calling {ai_make} for {lens}-lens {content_type} ({len(prompt)} chars prompt)…")
@@ -605,11 +725,13 @@ def main():
     ai_group.add_argument('--ai', type=str, default=None,
                           help=f'AI to use for content generation (default: {get_default_ai()})')
 
-    lens_group = parser.add_argument_group('What-is lens (focused claim breakdown — VRD-1)')
+    lens_group = parser.add_argument_group('What-is lens (focused claim breakdown — VRD-1/3)')
     lens_group.add_argument('--what-is-false', dest='lens_false', action='store_true',
                             help='Aggregate all claims marked false / partially_false across fact-checkers and ask the AI for a focused breakdown')
     lens_group.add_argument('--what-is-true', dest='lens_true', action='store_true',
                             help='Aggregate all claims marked true / partially_true and ask the AI for a focused supporting summary')
+    lens_group.add_argument('--what-is-missing', dest='lens_missing', action='store_true',
+                            help='Identify what important aspects of the prompt the report failed to mention (omissions / gaps)')
     lens_group.add_argument('-s', '--story', type=int, default=1,
                             help='Story index to analyse with the lens (default: 1)')
 
@@ -622,12 +744,20 @@ def main():
 
     args = parser.parse_args()
 
-    # ── VRD-1: lens-mode resolution ──────────────────────────────────────────
-    # --what-is-false and --what-is-true are mutually exclusive
-    if args.lens_false and args.lens_true:
-        print("Error: --what-is-false and --what-is-true are mutually exclusive.")
+    # ── VRD-1/3: lens-mode resolution ────────────────────────────────────────
+    # --what-is-false / --what-is-true / --what-is-missing are mutually exclusive
+    _lens_count = sum([args.lens_false, args.lens_true, args.lens_missing])
+    if _lens_count > 1:
+        print("Error: --what-is-false, --what-is-true, and --what-is-missing are mutually exclusive.")
         sys.exit(1)
-    lens = "false" if args.lens_false else ("true" if args.lens_true else None)
+    if args.lens_false:
+        lens = "false"
+    elif args.lens_true:
+        lens = "true"
+    elif args.lens_missing:
+        lens = "missing"
+    else:
+        lens = None
 
     # When a lens is requested without an explicit detail flag, default to --ai-summary
     # (more useful than --ai-short for evidence aggregation). Suppress the ai-short
@@ -698,15 +828,23 @@ def main():
     subject       = subject_from_container(container, args.json_file)
     story_titles  = extract_story_titles(container)
 
-    # ── VRD-1: collect lens claims up front so we can fail fast ──────────────
+    # ── VRD-1/3: collect lens claims (and report) up front ───────────────────
     lens_claims = []
     prompt_text = ""
+    report_text = ""
     if lens:
         lens_claims = collect_lens_claims(container, args.story, lens)
         prompt_text = get_prompt_text(container)
+        if lens == "missing":
+            report_text = collect_lens_report(container, args.story)
         if not lens_claims:
-            print(f"No claims marked {lens}/partially_{lens} were found in story {args.story} of {file_json}.")
-            print(f"Try the opposite lens, increase fact-check coverage with st-cross, or pick a different story with -s N.")
+            if lens == "missing":
+                print(f"No parseable fact-check claims found in story {args.story} of {file_json}.")
+                print(f"The missing-lens needs at least one fact-check report to reason about coverage.")
+                print(f"Run:  st-cross {args.json_file}   (or st-fact ...)")
+            else:
+                print(f"No claims marked {lens}/partially_{lens} were found in story {args.story} of {file_json}.")
+                print(f"Try the opposite lens, increase fact-check coverage with st-cross, or pick a different story with -s N.")
             sys.exit(1)
         if args.verbose:
             print(f"Collected {len(lens_claims)} {lens}-lens claims from story {args.story}.")
@@ -734,7 +872,8 @@ def main():
                 def _generate(ctype=ctype):
                     ai_content[ctype] = generate_lens_content(
                         lens_claims, lens, prompt_text, story_titles,
-                        content_ai, ctype, args.verbose, args.cache)
+                        content_ai, ctype, args.verbose, args.cache,
+                        report_text=report_text)
             else:
                 def _generate(ctype=ctype):
                     ai_content[ctype] = generate_ai_content(
