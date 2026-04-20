@@ -39,7 +39,18 @@ from mmd_util import get_tmp_dir, tmp_safe_name, build_segments, progress_file_p
 
 
 def get_fact_check_prompt(paragraph):
+    from datetime import date
+    today = date.today().isoformat()
     prompt = f"""
+    Today's date is {today}.  When evaluating any claim that references a
+    date, document, study, product release, or report, treat dates on or
+    before {today} as **past or present**, not future.  A document dated in
+    2025 is NOT in the future as of {today}; do not flag a claim as false
+    purely because the date is later than your training-data cutoff.  Only
+    flag a date-based claim as false if you can affirmatively show the
+    referenced document does not exist, contradicts the cited content, or
+    is genuinely after {today}.
+
     Please fact-check the following paragraph for accuracy:
 
     {paragraph}
@@ -62,6 +73,10 @@ def get_fact_check_prompt(paragraph):
     - Avoid reproducing the entire paragraph in your response; instead, reference each claim numerically or by quoting key phrases.
     - Use neutral language and do not inject bias into the fact-checking process.
     - If you encounter claims that require expert knowledge or specific data beyond your general knowledge, acknowledge this and suggest where one might find such information.
+    - If a claim cites a date, study, or document beyond your training-data
+      cutoff but on or before {today}, mark it `Partially_true` (or
+      `Unverifiable`) with an explanation noting the cutoff — do NOT mark it
+      `False` solely because you cannot independently verify it.
     """
     return prompt.strip()
 

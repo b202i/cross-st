@@ -86,9 +86,36 @@ Cross uses [Semantic Versioning](https://semver.org/).
   helpers and three-way mutual-exclusion (VRD-1/2/3); +13 more for the
   VRD-6 `--how-to-fix` lens (mutual exclusion vs each other lens, prompt
   enumerates all four candidate actions, recommendation line required at
-  every detail level, report-truncation at brief detail levels).
+  every detail level, report-truncation at brief detail levels); +5 more
+  for the calendar-anchor regression guard.
 - `tests/test_st_fact_removed_flags.py` — new file, 7 parametrised
   regression tests guarding the removed-flag stderr message and exit code.
+- `tests/test_calendar_context_in_prompts.py` *(new)* — 3 tests guarding
+  `st-fact.get_fact_check_prompt()` includes today's ISO date and the
+  post-cutoff guidance.
+- `tests/test_update_check_dev_guard.py` *(new)* — 4 tests guarding the
+  dev-checkout suppression of the PyPI-upgrade nag.
+
+### Fixed
+- **Stale upgrade nag in dev checkouts** — `mmd_startup.check_for_updates()`
+  now returns early when either `_in_project_venv()` or the new
+  `_running_from_dev_checkout()` (sys.argv[0] inside `_PROJECT_ROOT`)
+  is `True`. Previously a stale `pip install cross-st==0.2.0` registered
+  in some other Python interpreter's metadata could cause the running
+  dev source to print misleading "💡 cross-st X is available
+  (installed: 0.2.0)" warnings. Dev users manage their own version via
+  `git pull`; they never need the PyPI nag.
+- **Calendar anchor in fact-check + lens prompts** — `st-fact`'s
+  `get_fact_check_prompt()` now declares today's ISO date and explicitly
+  instructs AIs not to flag a claim as `False` purely because the cited
+  date is later than their training-data cutoff. The fix also propagates
+  to `st-verdict` via a new `_today_context_block()` helper prepended to
+  all four lens prompt builders (`_build_missing_prompt`,
+  `_build_howtofix_prompt`, and the truth-ledger branch in
+  `build_lens_prompt`). Field symptom: gemini's `--what-is-false`
+  summary on a 2026-04-19 run mistook every 2025-dated study citation
+  as "future-dated, therefore non-existent". Full write-up:
+  `cross-internal/st-verdict/BUGFIX_calendar_anchor_and_dev_upgrade_nag.md`.
 
 ---
 

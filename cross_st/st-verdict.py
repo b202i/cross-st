@@ -380,6 +380,25 @@ def format_lens_claims_for_prompt(claims, lens):
     return "\n".join(lines)
 
 
+def _today_context_block() -> str:
+    """A short calendar-context block to prepend to every lens prompt.
+
+    Without this, AIs whose training-data cutoff predates the current date
+    can confidently mis-classify legitimate post-cutoff dates as "future"
+    (and therefore "non-existent" / "false").  Especially relevant for
+    fact-checking reports that cite recent studies or product releases.
+    """
+    from datetime import date
+    today = date.today().isoformat()
+    return (
+        f"CALENDAR CONTEXT: Today's date is {today}. Any year, study, or "
+        f"document with a date on or before {today} is past or present, "
+        f"NOT future. Do not characterise such items as future-dated or "
+        f"non-existent merely because the date is later than your "
+        f"training-data cutoff.\n\n"
+    )
+
+
 def _build_missing_prompt(claims_text, prompt_text, story_titles, report_text, content_type):
     """Build a prompt for the --what-is-missing lens.
 
@@ -393,7 +412,7 @@ def _build_missing_prompt(claims_text, prompt_text, story_titles, report_text, c
     if len(report_text) > REPORT_CHAR_LIMIT:
         report_text = report_text[:REPORT_CHAR_LIMIT] + "\n\n[…report truncated…]"
 
-    context = f"""Cross-product AI fact-check — OMISSIONS lens.
+    context = f"""{_today_context_block()}Cross-product AI fact-check — OMISSIONS lens.
 
 ORIGINAL PROMPT (the topic the report was supposed to address):
 {prompt_text or '(no prompt recorded in container)'}
@@ -502,7 +521,7 @@ def _build_howtofix_prompt(claims_text, prompt_text, story_titles, report_text,
     report_block = (f"\n\nREPORT BODY (so you can judge structure / coverage):\n{report_text}"
                     if include_report else "")
 
-    context = f"""Cross-product AI fact-check — RECOMMENDATION lens (how-to-fix).
+    context = f"""{_today_context_block()}Cross-product AI fact-check — RECOMMENDATION lens (how-to-fix).
 
 ORIGINAL PROMPT (the topic the report addresses):
 {prompt_text or '(no prompt recorded in container)'}
@@ -631,7 +650,7 @@ def build_lens_prompt(claims_text, lens, prompt_text, story_titles, content_type
              "under fact-checking — useful for citation or trust-building"
     )
 
-    context = f"""Cross-product AI fact-check — focused {lens.upper()} lens.
+    context = f"""{_today_context_block()}Cross-product AI fact-check — focused {lens.upper()} lens.
 
 ORIGINAL PROMPT (the topic the report addresses):
 {prompt_text or '(no prompt recorded in container)'}

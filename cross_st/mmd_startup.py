@@ -110,6 +110,35 @@ def _bg_update_check(current_ver: str) -> None:
     })
 
 
+def _running_from_dev_checkout() -> bool:
+    """Return True when the *executing script* lives inside _PROJECT_ROOT.
+
+    Distinct from _in_project_venv(): a developer can be running the project
+    source through any Python interpreter (system, brew, an old pip install
+    that registered 0.2.0 in its metadata) — in that case `_pkg_version()`
+    returns the stale installed version, but the code actually executing is
+    the fresh checkout. Detect that via sys.argv[0] / __main__.__file__ and
+    suppress the upgrade nag so we don't tell the user "you're on 0.2.0" when
+    they're patently not.
+
+    Returns False on any error.
+    """
+    project_prefix = os.path.abspath(_PROJECT_ROOT) + os.sep
+    candidates = []
+    try:
+        if sys.argv and sys.argv[0]:
+            candidates.append(os.path.abspath(sys.argv[0]))
+    except Exception:
+        pass
+    try:
+        import __main__  # type: ignore
+        if hasattr(__main__, "__file__") and __main__.__file__:
+            candidates.append(os.path.abspath(__main__.__file__))
+    except Exception:
+        pass
+    return any(c.startswith(project_prefix) for c in candidates)
+
+
 def check_for_updates() -> None:
     """Show a one-line update notice if a newer cross-st is on PyPI.
 
@@ -127,6 +156,13 @@ def check_for_updates() -> None:
 
     # Only notify in interactive terminals
     if not sys.stdout.isatty():
+        return
+
+    # Skip the nag for developers running the checkout source directly — the
+    # installed-package metadata is often a stale pre-existing pip install
+    # that does not reflect what's actually executing.  Dev users manage
+    # their own version via `git pull` + `pip install -e .`.
+    if _in_project_venv() or _running_from_dev_checkout():
         return
 
     # Resolve installed version

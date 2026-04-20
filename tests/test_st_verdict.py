@@ -372,3 +372,46 @@ class TestHowToFixPrompt:
     def test_story_prompt_includes_report(self):
         assert "THE_REPORT_BODY_MARKER" in self._build("story")
 
+
+# ── BUG: calendar context — every lens prompt must declare today's date ─────
+
+class TestCalendarContext:
+    """Without a date anchor, AIs reject post-cutoff dates as 'future'.
+
+    Every lens prompt must include today's ISO date so fact-checkers and
+    interpreters reason against the actual calendar rather than their
+    training-data cutoff. Regression guard for the bug where Gemini's
+    false-lens summary fixated on '2025 dates haven't happened yet'.
+    """
+
+    def _today_iso(self):
+        from datetime import date
+        return date.today().isoformat()
+
+    def test_today_context_block_includes_iso_date(self):
+        block = st_verdict._today_context_block()
+        assert self._today_iso() in block
+        assert "Today's date" in block
+
+    def test_missing_lens_prompt_contains_today(self):
+        prompt = st_verdict._build_missing_prompt(
+            claims_text="(c)", prompt_text="p", story_titles="t",
+            report_text="r", content_type="summary",
+        )
+        assert self._today_iso() in prompt
+
+    def test_howtofix_lens_prompt_contains_today(self):
+        prompt = st_verdict._build_howtofix_prompt(
+            claims_text="(c)", prompt_text="p", story_titles="t",
+            report_text="r", score_summary="s", content_type="short",
+        )
+        assert self._today_iso() in prompt
+
+    @pytest.mark.parametrize("lens", ["false", "true"])
+    def test_truth_ledger_lens_prompt_contains_today(self, lens):
+        prompt = st_verdict.build_lens_prompt(
+            claims_text="(c)", lens=lens, prompt_text="p",
+            story_titles="t", content_type="caption",
+        )
+        assert self._today_iso() in prompt
+
