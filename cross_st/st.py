@@ -438,6 +438,8 @@ def main():
                 sys.exit(0)
         elif key in ["DELETE", "LEFT"]:  # Trigger editing mode
             cmd = line_edit(prompt, cmd)
+        elif key == "CTRL_U":  # Kill line — clear the current command
+            cmd = ""
         elif key == "?":
             show_menu = True  # Show menu on `?`
         elif key in ["A", "S", "F"]:

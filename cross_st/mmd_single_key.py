@@ -78,6 +78,9 @@ def get_single_key():
         if key == "\x7f":
             logger.debug("\nDelete key (\x7f) detected, returning DELETE")
             return "DELETE"
+        if key == "\x15":  # Ctrl+U — kill line
+            logger.debug("\nCtrl+U detected, returning CTRL_U")
+            return "CTRL_U"
         if key == "\r":  # Handle Return key
             logger.debug("\nReturn key detected, returning RETURN")
             return "RETURN"
@@ -131,6 +134,9 @@ def line_edit(prompt, cmd):
             elif key == "RETURN":  # Exit, keep changes
                 logger.debug("\nExiting edit mode, returning edited command")
                 return cmd
+            elif key == "CTRL_U":  # Kill line — clear entire command
+                cmd = ""
+                cursor_pos = 0
             elif key == "DELETE" and cursor_pos > 0:  # Remove char left of cursor
                 cmd = cmd[:cursor_pos - 1] + cmd[cursor_pos:]
                 cursor_pos -= 1
