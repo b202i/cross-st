@@ -188,9 +188,7 @@ def display_menu(menu, menu_name):
                     cat_suffix = f" [{_cat_labels.get(cat_sel, cat_sel)}]"
                     label = f"{value}  → {site_sel}{cat_suffix}"
             print(f"{key}: {label}")
-    print("\nesc: Escape back to the previous menu")
-    print("?: Display this menu")
-    print("ASF: Next Ai, Story, Fact")
+    print("\nesc: Back  ?: Menu  Ctrl+U or u: Clear command  ASF: Next Ai/Story/Fact")
 
 
 def get_prompt(menu_names):
@@ -438,7 +436,7 @@ def main():
                 sys.exit(0)
         elif key in ["DELETE", "LEFT"]:  # Trigger editing mode
             cmd = line_edit(prompt, cmd)
-        elif key == "CTRL_U":  # Kill line — clear the current command
+        elif key in ("CTRL_U", "u"):  # Kill line — clear the current command (Ctrl+U or u)
             cmd = ""
         elif key == "?":
             show_menu = True  # Show menu on `?`
