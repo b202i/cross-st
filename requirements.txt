@@ -40,7 +40,7 @@
 #   setuptools 78.1.0 → 78.1.1 CVE-2025-47273                  (HIGH)
 
 # ── AI providers ─────────────────────────────────────────────────────────────
-cross-ai-core[all]==0.5.0     # AI provider stack (anthropic, openai, gemini, xai, perplexity)
+cross-ai-core[all]==0.6.0     # AI provider stack (anthropic, openai, gemini, xai, perplexity)
 # anthropic/google-genai/openai are transitive deps of cross-ai-core; re-pinned
 # here explicitly so pip-audit and Dependabot can scan exact developer versions.
 anthropic==0.92.0
