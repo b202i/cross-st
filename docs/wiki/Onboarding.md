@@ -2,6 +2,8 @@
 
 Cross generates research reports using up to 5 AI providers simultaneously, then cross-checks every report against all the others. This page walks you through setup from zero to your first report.
 
+> **Windows users:** see the dedicated [Windows / WSL2](Windows-WSL2) guide.
+
 ---
 
 ## 1. Install Cross
@@ -160,6 +162,7 @@ st-man st-cross                 # local help for st-cross
 st-man st-cross --web           # open the st-cross wiki page
 ```
 
+- [Windows / WSL2](Windows-WSL2) — complete setup guide for Windows users
 - [AI Providers](ai-providers) — detailed notes on each provider, model options, rate limits
 - [Cross-Stones Benchmark](cross-stones) — run and score the standard 10-domain benchmark
 - [FAQ](faq) — common questions and troubleshooting
