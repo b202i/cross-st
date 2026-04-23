@@ -2252,10 +2252,12 @@ def interactive_menu() -> None:
                             print("  Cancelled.")
 
                     case _:
-                        print(f"  Invalid choice: {key!r}  (press ? for menu)")
+                        if key != "RETURN":
+                            print(f"  Invalid choice: {key!r}  (press ? for menu)")
 
         else:
-            print(f"  Invalid choice: {key!r}  (press ? for menu)")
+            if key != "RETURN":
+                print(f"  Invalid choice: {key!r}  (press ? for menu)")
 
 
 # ── CLI entry point ────────────────────────────────────────────────────────────
