@@ -27,8 +27,8 @@ from mmd_single_key import get_single_key, line_edit
 load_cross_env()   # must happen before get_discourse_slugs_sites() reads env vars
 slugs, sites = get_discourse_slugs_sites()
 site_sel = slugs[0] if slugs else ""  # Currently selected Discourse site
-cat_categories = ["test", "private", ""]  # test = default; "" = use site's configured default
-cat_sel = "test"                           # Session-level post category selection (default: test)
+cat_categories = ["reports", "test", "private", "prompt-lab"]  # selectable post categories
+cat_sel = "reports"                        # Session-level post category selection (default: reports)
 
 # Commands that mutate the .json container — state is re-read after these run.
 # st.py builds and fires the command; the st-* tool owns all the logic.
@@ -51,6 +51,7 @@ menus = {
             "m": "Merge stories 1-5 into a master story"
         }),
         "v": ("View", {
+            "p": "Show prompt",
             "v": "View story with browser",
             "s": "List stories",
             "l": "List stories and fact-checks",
@@ -171,7 +172,7 @@ def display_menu(menu, menu_name):
             label = value
             # Inject active site/category into Post menu items
             if menu_name.endswith("Post"):
-                _cat_labels = {"": "default", "private": "private", "test": "test"}
+                _cat_labels = {"reports": "📄 Reports", "test": "test", "private": "private", "prompt-lab": "🧪 Prompt Lab"}
                 site_rotation = "[" + ", ".join(
                     f"*{s}*" if s == site_sel else s for s in slugs
                 ) + "]"
@@ -184,8 +185,7 @@ def display_menu(menu, menu_name):
                 elif key == "c":
                     label = f"Select category: {cat_rotation}"
                 elif key in ("p", "a", "f", "L"):
-                    cat_suffix = (f" [{_cat_labels[cat_sel]}]"
-                                  if cat_sel else "")
+                    cat_suffix = f" [{_cat_labels.get(cat_sel, cat_sel)}]"
                     label = f"{value}  → {site_sel}{cat_suffix}"
             print(f"{key}: {label}")
     print("\nesc: Escape back to the previous menu")
@@ -251,6 +251,8 @@ def execute_menu(menu_name, choice):
 
         case "View":
             match choice:
+                case "p":
+                    cmd = f"st-cat --prompt {file_json}"
                 case "v":
                     cmd = f"st-edit --view-only --markdown -s {story_sel} {file_json}"
                 case "s":
@@ -296,13 +298,13 @@ def execute_menu(menu_name, choice):
                 case "c":
                     post_rotate_category()
                 case "p":
-                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
+                    cat_arg = f" --category {cat_sel}"
                     cmd = f"st-post --site {site_sel}{cat_arg} -s {story_sel} {file_json}"
                 case "a":
-                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
+                    cat_arg = f" --category {cat_sel}"
                     cmd = f"st-post --site {site_sel}{cat_arg} -s {story_sel} {file_prefix + '.mp3'} {file_json}"
                 case "f":
-                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
+                    cat_arg = f" --category {cat_sel}"
                     cmd = f"st-post --site {site_sel}{cat_arg} -f {fact_sel} -s {story_sel} {file_json}"
                 case "v":
                     cmd = f"st-edit --view-only --markdown -s {story_sel} {file_json}"
@@ -513,7 +515,7 @@ def post_rotate_next_social_media():
 
 def post_rotate_category():
     global cat_sel
-    _cat_labels = {"": "default", "private": "private", "test": "test"}
+    _cat_labels = {"reports": "📄 Reports", "test": "test", "private": "private", "prompt-lab": "🧪 Prompt Lab"}
     idx = cat_categories.index(cat_sel) if cat_sel in cat_categories else 0
     cat_sel = cat_categories[(idx + 1) % len(cat_categories)]
     rotation = "[" + ", ".join(
