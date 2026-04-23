@@ -1601,61 +1601,85 @@ Modes:
     # ── Dry-run: show plan for iterate/patch/best-source and exit ─────────────
     if args.dry_run:
         w = 72
-        print()
-        print(f"  DRY RUN — mode: {args.mode}  rewriter: {args.ai}")
-        if args.mode == "iterate":
-            checker_ai_dry = args.checker or fact_obj.get("make") or args.ai
-            writer_pool_dry = [args.ai] + [a for a in get_ai_list() if a != args.ai]
-            print(f"  Checker: {checker_ai_dry}  Writers: {', '.join(writer_pool_dry)}")
-            print()
-            # Classify each claim and locate the target sentence without calling AI
-            no_evidence_phrases = [
-                "no evidence", "no search results", "not found", "not mentioned",
-                "cannot confirm", "no results mention", "no sources", "not verified",
-                "unverified", "no data", "could not find", "no reference",
-            ]
-            correction_patterns = [
-                r'\bnot\s+\w', r'\bshould be\b', r'\bactually\b',
-                r'\bcorrect\w*\s+is\b', r'\bin fact\b', r'\bfounded in\b',
-                r'\b\d{4}\b', r'https?://', r'\$[\d,]+',
-            ]
-            for i, fc in enumerate(fact_checks, 1):
-                expl_lower = fc['explanation'].lower()
-                has_no_ev  = any(p in expl_lower for p in no_evidence_phrases)
-                has_corr   = any(re.search(p, fc['explanation'], re.IGNORECASE)
-                                 for p in correction_patterns)
-                action = "HEDGE" if (has_no_ev or not has_corr) else "REPLACE"
-                search_frag = fc.get('text') or fc['claim']
-                sentence = _find_sentence_containing(
-                    primary_text, search_frag, explanation=fc['explanation'])
-                verdict = "✗ False  " if fc["verification"] == "False" else "~ Partial"
-                claim_short = fc['claim'][:55] + ('…' if len(fc['claim']) > 55 else '')
-                print(f"  {i:>2}/{len(fact_checks)}  [{verdict}]  [{action:<7}]  {claim_short}")
-                if sentence:
-                    print(f"        target: \"{sentence[:80]}{'…' if len(sentence) > 80 else ''}\"")
-                else:
-                    print(f"        target: (sentence not located — would be skipped)")
-        else:
-            PATCH_BATCH = 10
-            batches = [fact_checks[i:i + PATCH_BATCH]
-                       for i in range(0, len(fact_checks), PATCH_BATCH)]
-            print(f"  {n_false} claims in {len(batches)} batch(es) of up to {PATCH_BATCH}")
-            if args.mode == "best-source" and n_stories >= 2:
-                alt_scores = [(avg_score_for_story(s), s.get("make","?"))
-                              for s in stories if s is not primary]
-                alt_scores.sort(reverse=True)
-                print("  Reference stories:")
-                for score, make in alt_scores:
-                    score_str = f"{score:.2f}" if score is not None else " n/a"
-                    print(f"    {make:<12}  avg score: {score_str}")
+
+        # ── Shared classification constants (mirror iterate mode exactly) ─────
+        _no_evidence_phrases = [
+            "no evidence", "no search results", "not found", "not mentioned",
+            "cannot confirm", "no results mention", "no sources", "not verified",
+            "unverified", "no data", "could not find", "no reference",
+        ]
+        _correction_patterns = [
+            r'\bnot\s+\w', r'\bshould be\b', r'\bactually\b',
+            r'\bcorrect\w*\s+is\b', r'\bin fact\b', r'\bfounded in\b',
+            r'\b\d{4}\b', r'https?://', r'\$[\d,]+',
+        ]
+
+        def _classify_action(fc):
+            expl_lower = fc['explanation'].lower()
+            has_no_ev  = any(p in expl_lower for p in _no_evidence_phrases)
+            has_corr   = any(re.search(p, fc['explanation'], re.IGNORECASE)
+                             for p in _correction_patterns)
+            return "HEDGE" if (has_no_ev or not has_corr) else "REPLACE"
+
         print()
         print("─" * w)
-        print("  Dry run complete — no AI calls made, no file written.")
-        s_arg = f"-s {args.story}" if args.story else ""
-        f_arg = f"-f {args.fact}" if args.fact else ""
+        print(f"  DRY RUN — mode: {args.mode}  rewriter: {args.ai}")
+
+        if args.mode == "iterate":
+            checker_ai_dry  = args.checker or fact_obj.get("make") or args.ai
+            writer_pool_dry = [args.ai] + [a for a in get_ai_list() if a != args.ai]
+            print(f"  Checker: {checker_ai_dry}  "
+                  f"Writers: {', '.join(writer_pool_dry)}")
+        elif args.mode == "best-source" and n_stories >= 2:
+            alt_scores = [(avg_score_for_story(s), s.get("make", "?"))
+                          for s in stories if s is not primary]
+            alt_scores.sort(reverse=True)
+            print("  Reference reports (by avg fact-check score):")
+            for score, make in alt_scores:
+                score_str = f"{score:.2f}" if score is not None else " n/a"
+                print(f"    {make:<12}  avg score: {score_str}")
+
+        n_replace = sum(1 for fc in fact_checks if _classify_action(fc) == "REPLACE")
+        n_hedge   = n_false - n_replace
+        print(f"  {n_false} claims to address  ({n_replace} REPLACE, {n_hedge} HEDGE)")
+        print("─" * w)
+
+        for i, fc in enumerate(fact_checks, 1):
+            action  = _classify_action(fc)
+            verdict = "✗ False  " if fc["verification"] == "False" else "~ Partial"
+            search_frag = fc.get('text') or fc['claim']
+            sentence    = _find_sentence_containing(
+                primary_text, search_frag, explanation=fc['explanation'])
+            claim_short = fc['claim'][:60] + ('…' if len(fc['claim']) > 60 else '')
+            expl_short  = fc['explanation'][:120] + ('…' if len(fc['explanation']) > 120 else '')
+
+            print()
+            print(f"  Claim {i}/{len(fact_checks)}  [{verdict}]  → {action}")
+            if sentence:
+                sent_disp = sentence[:100] + ('…' if len(sentence) > 100 else '')
+                print(f"    Report says:  \"{sent_disp}\"")
+            else:
+                print(f"    Report says:  (sentence not located — would be skipped)")
+            print(f"    Problem:      {expl_short}")
+            if action == "REPLACE":
+                print(f"    Would do:     Substitute the incorrect value with the "
+                      f"correction from the explanation above")
+            else:
+                print(f"    Would do:     Add a hedging qualifier "
+                      f"(e.g. \"reportedly\", \"according to sources\")")
+
+        print()
+        print("─" * w)
+        print(f"  {n_false} claims identified  "
+              f"({n_replace} REPLACE, {n_hedge} HEDGE)")
+        print("  No AI calls made · No file written")
+        print()
+        s_arg    = f"-s {args.story}"
+        f_arg    = f"-f {args.fact}"
         mode_arg = f"--mode {args.mode}" if args.mode != "iterate" else ""
-        flags = " ".join(filter(None, [s_arg, f_arg, mode_arg]))
-        print(f"  To run for real:  st-fix {flags} {os.path.basename(file_json)}".rstrip())
+        flags    = " ".join(filter(None, [s_arg, f_arg, mode_arg]))
+        print(f"  To fix:  st-fix {flags} {os.path.basename(file_json)}")
+        print("─" * w)
         print()
         return
 
