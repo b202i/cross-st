@@ -29,7 +29,7 @@ These work at any menu level, at any time:
 |-----|--------|
 | `RETURN` | Execute the current command |
 | `ESC` | Go back to the previous menu (or quit if already at the top) |
-| `Ctrl+U` or `u` | **Clear the current command** — the fastest way to undo a mis-press |
+| `Ctrl+U` | **Clear the current command** — the fastest way to undo a mis-press |
 | `←` / `DELETE` | Enter edit mode — move the cursor and tweak the command before running |
 | `?` | Redisplay the current menu |
 | `A` | Cycle to the next AI provider (global, works in any submenu) |
@@ -40,7 +40,7 @@ These work at any menu level, at any time:
 
 `^C` interrupts the currently *running* `st-*` command and returns you to the `st` prompt — it does **not** quit `st` itself. It's safe to use if a long-running job (e.g. `st-bang`, `st-cross`) takes too long or you realise it's the wrong command.
 
-For simply undoing a mis-selected menu item (before pressing RETURN), use **`Ctrl+U`** (or just **`u`**) instead — it clears the command line instantly without interrupting anything.
+For simply undoing a mis-selected menu item (before pressing RETURN), use **`Ctrl+U`** instead — it clears the command line instantly without interrupting anything.
 
 ## Options
 
