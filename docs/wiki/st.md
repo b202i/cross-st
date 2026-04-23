@@ -19,7 +19,28 @@ The menus follow the natural top-down workflow:
 | `u` | Utility | Charts, audio, remove stories |
 | `x` | Settings | Default AI, voice, editor |
 
-Press a letter to enter a submenu, then a second letter to run the command.  Press `q` to go back, `q` again to quit.
+Press a letter to enter a submenu, then a second letter to build the command. Press `RETURN` to run it, `ESC` to go back.
+
+## Keyboard shortcuts
+
+These work at any menu level, at any time:
+
+| Key | Action |
+|-----|--------|
+| `RETURN` | Execute the current command |
+| `ESC` | Go back to the previous menu (or quit if already at the top) |
+| `^U` (Ctrl+U) | **Clear the current command** — the fastest way to undo a mis-press |
+| `←` / `DELETE` | Enter edit mode — move the cursor and tweak the command before running |
+| `?` | Redisplay the current menu |
+| `A` | Cycle to the next AI provider (global, works in any submenu) |
+| `S` | Cycle to the next story |
+| `F` | Cycle to the next fact-check |
+
+### About Ctrl+C
+
+`^C` interrupts the currently *running* `st-*` command and returns you to the `st` prompt — it does **not** quit `st` itself. It's safe to use if a long-running job (e.g. `st-bang`, `st-cross`) takes too long or you realise it's the wrong command.
+
+For simply undoing a mis-selected menu item (before pressing RETURN), use **`^U`** instead — it clears the command line instantly without interrupting anything.
 
 ## Options
 
