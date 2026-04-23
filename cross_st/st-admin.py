@@ -2099,7 +2099,8 @@ def interactive_menu() -> None:
 
         print(f"\n{title}> ", end="", flush=True)
         key = get_single_key()
-        print(key)
+        if key != "RETURN":
+            print(key)
 
         # ── Navigation ────────────────────────────────────────────────────────
         if key in ("ESC", "q"):
