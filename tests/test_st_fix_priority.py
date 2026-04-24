@@ -54,11 +54,13 @@ def _run_stfix(json_path, *extra):
     """Run st-fix --dry-run and return (returncode, stdout)."""
     env = os.environ.copy()
     env["PYTHONPATH"] = str(REPO / "cross_st") + os.pathsep + env.get("PYTHONPATH", "")
-    # Ensure config gate doesn't kill us
-    env.setdefault("OPENAI_API_KEY", "test")
-    env.setdefault("XAI_API_KEY", "test")
+    # require_config() needs a .env file somewhere it looks; the JSON's
+    # tmp dir is convenient (CWD-level .env counts).  Without this, CI
+    # runners with no ~/.crossenv exit 1 before argparse runs.
+    tmp_dir = json_path.parent
+    (tmp_dir / ".env").write_text("OPENAI_API_KEY=test\nXAI_API_KEY=test\n")
     cmd = [sys.executable, str(ST_FIX), "--dry-run", *extra, str(json_path)]
-    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(tmp_dir))
     return proc.returncode, proc.stdout + proc.stderr
 
 

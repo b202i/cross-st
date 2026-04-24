@@ -41,7 +41,21 @@ def require_config() -> None:
 
     Running from an arbitrary directory (e.g. cross-story/shang/) will still
     succeed as long as the repo-local .env exists (layer 2).
+
+    Short-circuits on `--help` / `-h` / `--version` / `-V` so argparse can
+    handle those flags even on a freshly-cloned machine with no config (the
+    GitHub Actions CI runner is the canonical example — no `~/.crossenv`,
+    but `--help` smoke tests must still pass).
     """
+    # ── Bypass for help / version flags ──────────────────────────────────────
+    # Without this, every `st-* --help` invocation on an unconfigured machine
+    # exits 1 with the "not configured" message before argparse runs, which
+    # breaks CI smoke tests and confuses first-time users who haven't yet
+    # found `st-admin --setup`.
+    _help_flags = {"-h", "--help", "--version", "-V"}
+    if any(arg in _help_flags for arg in sys.argv[1:]):
+        return
+
     crossenv   = os.path.expanduser("~/.crossenv")
     repo_env   = os.path.join(_PROJECT_ROOT, ".env")   # cross/.env  (dev layout)
     local_env2 = os.path.join(_CROSS_ST_DIR, ".env")   # cross_st/.env  (future)
