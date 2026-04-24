@@ -7,6 +7,23 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.1] — 2026-04-24
+
+### Fixed
+- **`require_config()` no longer blocks `--help` on a fresh install.**
+  `mmd_startup.require_config()` now early-returns when `sys.argv`
+  contains `-h`, `--help`, `--version`, or `-V`, so first-time pipx
+  users running `st-fact --help` (or any other `st-* --help`) get the
+  usage they expected instead of the "Cross is not configured" message
+  before they have a chance to run `st-admin --setup`. Same fix
+  unblocked the GitHub Actions CI job, which had no `~/.crossenv` and
+  was failing every `--help` smoke assertion.
+- **`tests/test_st_fix_priority.py`** seeds a `.env` in the temp
+  directory it spawns `st-fix` from, so the new st-fix selector tests
+  pass on no-config CI runners.
+
+---
+
 ## [0.7.0] — 2026-04-24
 
 > **GATHER → VERIFY → INTERPRET refactor.** `st-fact` is now a pure verifier
