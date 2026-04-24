@@ -26,13 +26,13 @@ st-fetch https://example.com/article-about-rv-batteries --prep
 st-cross article.json
 
 # 3. INTERPRET — focused breakdown of what is false / disputed
-st-verdict --what-is-false --ai-summary article.json
+st-verdict -s 1 --what-is-false --ai-summary article.json
 ```
 
 ### Sample output
 
 ```text
-$ st-verdict --what-is-false --ai-summary article.json
+$ st-verdict -s 1 --what-is-false --ai-summary article.json
   Generating Summary [false-lens] with xai…
 
 The most critical inaccuracy in the report is the claim that annual maintenance
@@ -71,13 +71,13 @@ st-fetch https://example.com/article-about-rv-batteries --prep
 st-cross article.json
 
 # 3. INTERPRET — coverage-gap analysis
-st-verdict --what-is-missing --ai-summary article.json
+st-verdict -s 1 --what-is-missing --ai-summary article.json
 ```
 
 ### Sample output
 
 ```text
-$ st-verdict --what-is-missing --ai-summary article.json
+$ st-verdict -s 1 --what-is-missing --ai-summary article.json
   Generating Summary [missing-lens] with xai…
 
 The most important omission in the report is the absence of any discussion of
@@ -113,13 +113,13 @@ st-fetch https://example.com/article-about-rv-batteries --prep
 st-cross article.json
 
 # 3. INTERPRET — focused breakdown of verified claims
-st-verdict --what-is-true --ai-caption article.json
+st-verdict -s 1 --what-is-true --ai-caption article.json
 ```
 
 ### Sample output
 
 ```text
-$ st-verdict --what-is-true --ai-caption article.json
+$ st-verdict -s 1 --what-is-true --ai-caption article.json
   Generating Caption [true-lens] with xai…
 
 The article's strongest verified thread is its energy-density comparison: the

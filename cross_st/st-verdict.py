@@ -16,10 +16,11 @@ st-verdict --file subject.json                     # display + short caption + s
 st-verdict --ai-caption subject.json               # display + full caption instead of short
 st-verdict --no-display --file subject.json        # save PNG to ./tmp/ only, no screen
 st-verdict --file --ai-title --ai gemini s.json    # save PNG + title via gemini
-st-verdict --what-is-false --ai-summary s.json     # focused breakdown of inaccurate claims
-st-verdict --what-is-true  --ai-caption  s.json    # focused breakdown of verified claims
-st-verdict --what-is-missing --ai-summary s.json   # what important aspects the report omitted
+st-verdict --what-is-false --ai-summary s.json     # focused breakdown of inaccurate claims (story 1)
+st-verdict --what-is-true  --ai-caption  s.json    # focused breakdown of verified claims (story 1)
+st-verdict --what-is-missing --ai-summary s.json   # what important aspects the report omitted (story 1)
 st-verdict --how-to-fix s.json                     # recommend next action: st-fix / st-bang / st-merge / publish
+st-verdict -s 2 --what-is-false --ai-summary s.json # analyse story 2 instead of the default story 1
 ```
 
 Input:  subject.json  — populated story container (run st-cross first)

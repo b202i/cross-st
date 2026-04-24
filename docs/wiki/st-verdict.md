@@ -62,17 +62,19 @@ The three lenses are mutually exclusive (and also exclusive with `--how-to-fix` 
 
 ```bash
 # Detailed breakdown of inaccurate claims (e.g. "is this fake news?")
-st-verdict --what-is-false --ai-summary subject.json
+st-verdict -s 1 --what-is-false --ai-summary subject.json
 
 # Positive-evidence summary — what the report got right
-st-verdict --what-is-true --ai-caption subject.json
+st-verdict -s 1 --what-is-true --ai-caption subject.json
 
 # Coverage-gap analysis — what the report failed to mention
-st-verdict --what-is-missing --ai-summary subject.json
+st-verdict -s 1 --what-is-missing --ai-summary subject.json
 
 # Long-form analysis suitable for sharing as feedback
-st-verdict --what-is-false --ai-story --no-display subject.json
+st-verdict -s 1 --what-is-false --ai-story --no-display subject.json
 ```
+
+> Each lens analyses **one** story at a time (the AI author at index `N`). `-s 1` is the default; pass `-s 2`, `-s 3`, … to inspect another author. To compare across authors, run the command once per index.
 
 The lens reads `story[N].fact[]` entries — run `st-cross` first so multiple AIs have fact-checked the report. The more checkers that flagged the same claim, the stronger the signal in the resulting analysis. The `--what-is-missing` lens additionally reads the original prompt (`data[0].prompt`) and the report markdown so the AI can reason about what should be there but isn't.
 
@@ -99,13 +101,13 @@ The output's last line always has the exact shape `Recommendation: <command> —
 
 ```bash
 # One-line recommendation (default)
-st-verdict --how-to-fix subject.json
+st-verdict -s 1 --how-to-fix subject.json
 
 # Three-paragraph technical recommendation with alternatives considered
-st-verdict --how-to-fix --ai-summary subject.json
+st-verdict -s 1 --how-to-fix --ai-summary subject.json
 
 # Long-form recommendation analysis suitable for archival
-st-verdict --how-to-fix --ai-story --no-display subject.json
+st-verdict -s 1 --how-to-fix --ai-story --no-display subject.json
 ```
 
 > **Architectural note:** As of cross-st 0.7.0, all interpretive `--ai-*`, `--what-is-*`, and `--how-to-fix` flags live here in `st-verdict`. `st-fact` is now a pure verifier (it produces fact-check data; `st-verdict` interprets it). This is the **[GATHER → VERIFY → INTERPRET](Three-Stages)** division of responsibility.
