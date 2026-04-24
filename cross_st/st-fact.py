@@ -427,6 +427,15 @@ def main():
         if args.timeout > 0 else None
     )
 
+    # Count how many stories we will actually process so the per-story header
+    # can show "Story X/N" honestly when --story filters down to one.
+    _stories_to_do = (
+        [args.story] if args.story is not None
+        else list(range(1, len(main_container["story"]) + 1))
+    )
+    _n_to_do = len(_stories_to_do)
+    _done_so_far = 0
+
     for story_index, story in enumerate(main_container["story"], start=1):
         if args.story is not None and args.story != story_index:
             continue
@@ -435,7 +444,10 @@ def main():
         title = story.get("title")
         text = story.get("text")
 
-        header = f"{file_json} s:{args.story} {make} {model}\n\n"
+        # Header used by --verbose dumps and as a report-prefix line.
+        # Was previously formatted with "s:{args.story}" which printed
+        # "s:None" whenever --story wasn't explicit; use the loop index.
+        header = f"{file_json} s:{story_index} {make} {model}\n\n"
         if args.verbose:
             print(header)
         report_lines = [header]
@@ -456,6 +468,27 @@ def main():
             segments_are_new = False
 
         total_para = len(segments)
+
+        # ── UX: announce which story / AI is about to run ────────────────────
+        # Without this header, multi-story runs (e.g. `st-fact --ai anthropic
+        # file.json` over a 5-story container) print four anonymous tqdm bars
+        # in a row with no indication of which story or which AI is which.
+        # See AGENTS.md → "Progress feedback before every AI call".
+        _done_so_far += 1
+        if not args.quiet:
+            short_title = (title or "")[:50]
+            if short_title and len(title or "") > 50:
+                short_title += "…"
+            print(
+                f"\n  Story {story_index}/{len(main_container['story'])}"
+                f" — {make} {model}"
+                f"  ·  {total_para} segment{'s' if total_para != 1 else ''}"
+                f"  ·  fact-check by {args.ai}"
+                f"   ({_done_so_far}/{_n_to_do} this run)",
+                flush=True,
+            )
+            if short_title:
+                print(f"    Title: {short_title}", flush=True)
 
         # Progress file: written each segment so st-cross can display n/total.
         # Lives in project-root tmp/  e.g. tmp/story__shang__yubikey_2fa_s1_openai.progress
@@ -478,7 +511,7 @@ def main():
 
         # ── Step 2: iterate segments, call AI, collect structured results ─────
         for n, seg in enumerate(tqdm(segments,
-                                     desc="Processing",
+                                     desc=f"  {args.ai} fact-checking story {story_index}",
                                      ncols=80,
                                      disable=args.silent)):
 
