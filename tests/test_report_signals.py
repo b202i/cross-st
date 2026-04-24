@@ -87,6 +87,46 @@ Explanation: They cannot."""
     assert out[1][2] == "false"
 
 
+def test_parse_claims_anthropic_bold_markup():
+    """Anthropic wraps labels in bold and leaves stray ** on their own lines.
+    The shared CLAIM_BLOCK_RE must tolerate this — used to silently drop
+    every anthropic claim (st-ls 'Claims' column showed '-')."""
+    report = """# Fact-Check Analysis
+
+**Claim 1:** "The field continues to evolve"
+**  
+Verification: True  
+**
+Explanation: Well documented.
+
+**Claim 2:** "Pigs can fly"
+**  
+Verification: False  
+**
+Explanation: They cannot.
+"""
+    out = rs.parse_claims(report)
+    assert len(out) == 2, f"expected 2 claims, got {len(out)}: {out}"
+    verdicts = [c[2] for c in out]
+    assert verdicts == ["true", "false"]
+
+
+def test_parse_claims_inline_verification():
+    """xai/openai sometimes emit Verification on the same line as the claim."""
+    report = """Claim 1: "The sky is blue."
+Verification: True
+Explanation: ok.
+
+Claim 2: "Test claim"
+Verification: Partially_true
+Explanation: with caveats.
+"""
+    out = rs.parse_claims(report)
+    assert len(out) == 2
+    assert out[1][2] == "partially_true"
+
+
+
 def test_parse_claims_empty():
     assert rs.parse_claims("") == []
     assert rs.parse_claims(None) == []

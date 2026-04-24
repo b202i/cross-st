@@ -69,11 +69,23 @@ def verdict_normalise(s: str) -> str:
 # ── Claim parsing ─────────────────────────────────────────────────────────────
 
 # Match a "Claim N: ..." block followed by Verification: <category> and Explanation: ...
-# Tolerant of extra whitespace, optional bold/italic markup, and trailing/leading newlines.
+# Tolerant of:
+#   - extra whitespace and bold/italic markup (`**`, `__`) around any label
+#   - stray markup tokens sitting on their own lines between blocks
+#     (anthropic frequently emits `**\nVerification: True\n**` — see
+#      st-internal/st-fix/IMPLEMENTATION_anthropic_claims_parse.md)
+#   - inline `Verification:` (xai/openai) OR on its own line (anthropic/gemini)
+# Captures: (claim_number, claim_text, verdict, explanation)
 CLAIM_BLOCK_RE = re.compile(
-    r"Claim\s+(\d+)\s*:\s*[\"\u201c]?(.+?)[\"\u201d]?\s*\n+"
-    r"\s*\**\s*Verification\s*\**\s*:\s*\**\s*([A-Za-z_]+)\s*\**\s*\n+"
-    r"\s*\**\s*Explanation\s*\**\s*:\s*(.+?)(?=\n\s*Claim\s+\d+\s*:|\Z)",
+    r"Claim\s+(\d+)\s*:\s*"
+    r"[*_]*\s*[\"\u201c]?(.+?)[\"\u201d]?\s*[*_]*"            # claim text
+    r"\s*[\n\r]+[\s*_]*"                                      # gap → may be empty
+    r"Verification\s*[*_]*\s*:\s*[*_]*\s*"
+    r"([A-Za-z_]+)"                                            # verdict
+    r"\s*[*_]*"
+    r"\s*[\n\r]+[\s*_]*"
+    r"Explanation\s*[*_]*\s*:\s*"
+    r"(.+?)(?=[\n\r]+[\s*_]*Claim\s+\d+\s*:|\Z)",
     re.DOTALL | re.IGNORECASE,
 )
 

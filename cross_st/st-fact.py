@@ -36,6 +36,7 @@ from tqdm import tqdm
 from mmd_branding import get_ai_tag_mini
 from mmd_process_report import remove_markdown
 from mmd_util import get_tmp_dir, tmp_safe_name, build_segments, progress_file_path
+from _report_signals import CLAIM_BLOCK_RE as _CLAIM_BLOCK_RE
 
 
 def get_fact_check_prompt(paragraph):
@@ -550,26 +551,13 @@ def main():
             overall_tally.update(status.strip() for status in statuses)
 
             # ── Step 3: parse AI response into structured claims keyed to seg_id
-            # Two formats observed in the wild:
-            #   Format A (anthropic/gemini) — Verification on its own line:
-            #     Claim 1: "text"
-            #     Verification: True
-            #     Explanation: ...
-            #   Format B (xai/openai) — Verification inline after claim text:
-            #     Claim 1: "text" Verification:True
-            #     Explanation: ...
-            claim_pattern = re.compile(
-                r'Claim\s+\d+:\s*'                                       # "Claim N:"
-                r'["\u201c]?'                                             # optional open quote
-                r'(.*?)'                                                  # claim text (non-greedy)
-                r'["\u201d]?'                                             # optional close quote
-                r'\s*Verification:\s*'                                    # Verification: (inline or next line)
-                r'(True|False|Partially_true|Partially_false|Opinion)'   # verdict
-                r'\s*\n\s*Explanation:\s*'                                # Explanation: on next line
-                r'(.*?)(?=\nClaim\s+\d+:|\Z)',                           # explanation text
-                re.DOTALL | re.IGNORECASE
-            )
-            for claim_text, verdict, explanation in claim_pattern.findall(fact_check_text):
+            # Uses the shared CLAIM_BLOCK_RE from _report_signals so st-fact and
+            # st-verdict/st-fix agree on what counts as a parseable claim.
+            # The shared regex tolerates stray markdown markup (`**`, `__`)
+            # around any label or on its own line — anthropic emits the latter
+            # form, which used to drop *every* anthropic claim on the floor.
+            # Capture order: (claim_number, claim_text, verdict, explanation).
+            for _n, claim_text, verdict, explanation in _CLAIM_BLOCK_RE.findall(fact_check_text):
                 structured_claims.append({
                     "seg_id":      seg["id"],
                     "verdict":     verdict.strip(),
