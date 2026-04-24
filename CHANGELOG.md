@@ -9,6 +9,26 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ## [0.7.1] — 2026-04-24
 
+### Added
+- **I1 — `st-post --category` now correctly handles non-crossai.dev sites.**
+  Resolution is centralised in a new `discourse.resolve_category(site,
+  name_or_id)` helper. `--category` accepts three forms on every site:
+  - `private`             — your private area (`site.private_category_id`,
+    falls back to `site.category_id`)
+  - a numeric ID          — any Discourse category number
+  - `test` / `reports` / `prompt-lab` — crossai.dev shortcuts that
+    resolve only when `site["url"]` contains `crossai.dev`; on other
+    sites they raise a clear error pointing the user at numeric IDs.
+
+  The argparse `choices=` constraint was removed so numeric IDs and the
+  crossai.dev shortcuts can coexist. Backward-compat for crossai.dev
+  users is preserved (`--category private/test/reports/prompt-lab` still
+  resolves to the same IDs). The previous silent misroute of
+  `--category reports` to id=16 on a self-hosted forum is now fixed.
+  `st.py` post-menu rotation is also site-aware: switching the active
+  site auto-resets `cat_sel` to that site's default.
+  22 new unit tests in `tests/test_discourse_resolve_category.py`.
+
 ### Fixed
 - **`require_config()` no longer blocks `--help` on a fresh install.**
   `mmd_startup.require_config()` now early-returns when `sys.argv`

@@ -21,14 +21,58 @@ import sys
 
 from mmd_startup import load_cross_env
 from ai_handler import get_ai_list, get_default_ai
-from discourse import get_discourse_slugs_sites
+from discourse import get_discourse_slugs_sites, CROSSAI_NAMED_CATEGORIES, _is_crossai
 from mmd_single_key import get_single_key, line_edit
 
 load_cross_env()   # must happen before get_discourse_slugs_sites() reads env vars
 slugs, sites = get_discourse_slugs_sites()
 site_sel = slugs[0] if slugs else ""  # Currently selected Discourse site
-cat_categories = ["reports", "test", "private", "prompt-lab"]  # selectable post categories
-cat_sel = "reports"                        # Session-level post category selection (default: reports)
+
+
+def _active_site_dict():
+    """Return the dict for the currently-selected site (or empty dict)."""
+    for s in sites:
+        if s.get("slug") == site_sel:
+            return s
+    return sites[0] if sites else {}
+
+
+def _categories_for(site):
+    """Return [(slug, label), ...] for the post-menu rotation.
+
+    On crossai.dev: surface the four named shortcuts (private/test/
+    reports/prompt-lab).  On any other site: only ``private`` is
+    meaningful as a shortcut — users rotate between {private, default}
+    and pass numeric IDs via the CLI for anything else. (I1)
+    """
+    if _is_crossai(site):
+        return [
+            ("test",       "test"),
+            ("private",    "private"),
+            ("reports",    "📄 Reports"),
+            ("prompt-lab", "🧪 Prompt Lab"),
+        ]
+    # Self-hosted — minimal rotation: private + the site default.
+    default_id = site.get("category_id", "?")
+    return [
+        ("private", "private"),
+        (None,      f"default [id={default_id}]"),
+    ]
+
+
+def _default_cat_for(site):
+    """Default --category for the rotation when the active site changes."""
+    cats = _categories_for(site)
+    if not cats:
+        return None
+    # Prefer "test" (POST-1 default) when present
+    for slug, _ in cats:
+        if slug == "test":
+            return slug
+    return cats[0][0]
+
+
+cat_sel = _default_cat_for(_active_site_dict())  # Session-level post category
 
 # Commands that mutate the .json container — state is re-read after these run.
 # st.py builds and fires the command; the st-* tool owns all the logic.
@@ -172,13 +216,14 @@ def display_menu(menu, menu_name):
             label = value
             # Inject active site/category into Post menu items
             if menu_name.endswith("Post"):
-                _cat_labels = {"reports": "📄 Reports", "test": "test", "private": "private", "prompt-lab": "🧪 Prompt Lab"}
+                cats = _categories_for(_active_site_dict())
+                _cat_labels = {slug: label for slug, label in cats}
                 site_rotation = "[" + ", ".join(
                     f"*{s}*" if s == site_sel else s for s in slugs
                 ) + "]"
                 cat_rotation = "[" + ", ".join(
-                    f"*{_cat_labels[c]}*" if c == cat_sel else _cat_labels[c]
-                    for c in cat_categories
+                    f"*{label}*" if slug == cat_sel else label
+                    for slug, label in cats
                 ) + "]"
                 if key == "n":
                     label = f"Select site: {site_rotation}"
@@ -296,13 +341,13 @@ def execute_menu(menu_name, choice):
                 case "c":
                     post_rotate_category()
                 case "p":
-                    cat_arg = f" --category {cat_sel}"
+                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
                     cmd = f"st-post --site {site_sel}{cat_arg} -s {story_sel} {file_json}"
                 case "a":
-                    cat_arg = f" --category {cat_sel}"
+                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
                     cmd = f"st-post --site {site_sel}{cat_arg} -s {story_sel} {file_prefix + '.mp3'} {file_json}"
                 case "f":
-                    cat_arg = f" --category {cat_sel}"
+                    cat_arg = f" --category {cat_sel}" if cat_sel else ""
                     cmd = f"st-post --site {site_sel}{cat_arg} -f {fact_sel} -s {story_sel} {file_json}"
                 case "v":
                     cmd = f"st-edit --view-only --markdown -s {story_sel} {file_json}"
@@ -505,24 +550,30 @@ def next_fact_check():
 
 
 def post_rotate_next_social_media():
-    global site_sel
+    global site_sel, cat_sel
     site_sel = slugs[(slugs.index(site_sel) + 1) % len(slugs)]
     rotation = "[" + ", ".join(
         f"*{s}*" if s == site_sel else s for s in slugs
     ) + "]"
     print(f"\n  Site → {site_sel}   {rotation}")
+    # Reset category to the new site's default — catalogs differ per site (I1)
+    cat_sel = _default_cat_for(_active_site_dict())
 
 
 def post_rotate_category():
     global cat_sel
-    _cat_labels = {"reports": "📄 Reports", "test": "test", "private": "private", "prompt-lab": "🧪 Prompt Lab"}
-    idx = cat_categories.index(cat_sel) if cat_sel in cat_categories else 0
-    cat_sel = cat_categories[(idx + 1) % len(cat_categories)]
+    cats = _categories_for(_active_site_dict())
+    if not cats:
+        return
+    slugs_list = [s for s, _ in cats]
+    labels     = {s: l for s, l in cats}
+    idx = slugs_list.index(cat_sel) if cat_sel in slugs_list else 0
+    cat_sel = slugs_list[(idx + 1) % len(slugs_list)]
     rotation = "[" + ", ".join(
-        f"*{_cat_labels[c]}*" if c == cat_sel else _cat_labels[c]
-        for c in cat_categories
+        f"*{labels[c]}*" if c == cat_sel else labels[c]
+        for c in slugs_list
     ) + "]"
-    print(f"\n  Category → {_cat_labels[cat_sel]}   {rotation}")
+    print(f"\n  Category → {labels[cat_sel]}   {rotation}")
 
 
 if __name__ == "__main__":

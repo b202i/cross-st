@@ -1,10 +1,111 @@
 #!/usr/bin/env python3
+"""
+discourse — Discourse client subclass + DISCOURSE-config helpers.
+
+The DISCOURSE JSON in ~/.crossenv has the shape::
+
+    {"sites": [
+        {
+            "slug":        "crossai.dev",
+            "url":         "https://crossai.dev",
+            "username":    "alice",
+            "api_key":     "…",
+            "category_id": 6,                    # default posting category
+            "private_category_id":   42,         # optional
+            "private_category_slug": "alice-private",
+        }
+    ]}
+
+`st-post --category` accepts three things — see ``resolve_category()``:
+
+  * ``private``   — your private area (resolves to ``private_category_id``)
+  * a number      — any Discourse category ID
+  * crossai.dev   — extra named shortcuts ``test`` / ``reports`` /
+                    ``prompt-lab`` resolve only when the active site URL
+                    contains ``crossai.dev``.
+"""
 
 import json
 import os
 import sys
 from pydiscourse.client import DiscourseClient
 from dotenv import load_dotenv
+
+
+# ── Named-category shortcuts for crossai.dev ─────────────────────────────────
+# These three names resolve to crossai.dev category IDs only. On any other
+# Discourse site, the user must pass a numeric category ID instead.
+# `private` is special-cased — it resolves to site["private_category_id"]
+# on every site.
+CROSSAI_NAMED_CATEGORIES = {
+    # alias       -> (category_id, display_name)
+    "test":       (6,  "Test (cleared daily)"),
+    "reports":    (16, "📄 Reports"),
+    "prompt-lab": (17, "🧪 Prompt Lab"),
+}
+
+
+def _is_crossai(site: dict) -> bool:
+    """Return True if ``site["url"]`` points at crossai.dev."""
+    url = (site or {}).get("url", "") or ""
+    return "crossai.dev" in url.lower()
+
+
+def resolve_category(site: dict, name_or_id) -> int:
+    """Resolve a --category argument to a numeric Discourse category ID.
+
+    Accepted values (every site):
+      * ``None`` / blank      → ``site["category_id"]``
+      * ``int`` or digit-str  → returned as-is
+      * ``"private"``         → ``site["private_category_id"]``
+                                (falls back to ``site["category_id"]``)
+
+    Accepted only when ``site["url"]`` contains ``crossai.dev``:
+      * ``"test"``       → 6
+      * ``"reports"``    → 16
+      * ``"prompt-lab"`` → 17
+
+    Anything else → ``ValueError`` with a short usage hint.
+    """
+    # 1 — empty / None
+    if name_or_id is None or (isinstance(name_or_id, str) and not name_or_id.strip()):
+        cid = site.get("category_id")
+        if cid is None:
+            raise ValueError("site has no default category_id")
+        return int(cid)
+
+    # 2 — numeric
+    if isinstance(name_or_id, int):
+        return name_or_id
+    s = str(name_or_id).strip()
+    if s.isdigit():
+        return int(s)
+
+    s_low = s.lower()
+
+    # 3 — "private"
+    if s_low == "private":
+        priv = site.get("private_category_id") or site.get("category_id")
+        if priv is None:
+            raise ValueError(
+                "site has no private_category_id and no category_id"
+            )
+        return int(priv)
+
+    # 4 — crossai.dev shortcut
+    if s_low in CROSSAI_NAMED_CATEGORIES:
+        if _is_crossai(site):
+            return int(CROSSAI_NAMED_CATEGORIES[s_low][0])
+        raise ValueError(
+            f"{name_or_id!r} is a crossai.dev-only shortcut. "
+            f"On {site.get('slug', 'this site')} pass a numeric category ID instead."
+        )
+
+    # 5 — unknown
+    raise ValueError(
+        f"unknown category {name_or_id!r}. "
+        f"Use 'private', a numeric ID, or (on crossai.dev) test / reports / prompt-lab."
+    )
 
 
 

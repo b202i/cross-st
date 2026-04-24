@@ -21,7 +21,11 @@ import subprocess
 import sys
 from mmd_startup import load_cross_env, require_config
 
-from discourse import get_discourse_slugs_sites, get_discourse_site
+from discourse import (
+    get_discourse_slugs_sites,
+    get_discourse_site,
+    resolve_category,
+)
 from mmd_process_report import add_mp3_player, add_mp3_player_top, sanitize_at_mentions
 from pathlib import Path
 from discourse import MmdDiscourseClient
@@ -50,13 +54,14 @@ def main():
                         help='Select story to publish: default 1')
     parser.add_argument('-f', '--fact', type=int,
                         help='Reply with fact-check to the post, default: no reply')
-    parser.add_argument('--category', type=str, choices=['private', 'test', 'reports', 'prompt-lab'], default='test',
-                        help=('Post to a specific category: '
-                              '"private" = your private area (visible only to you), '
-                              '"test" = Test (cleared daily, id=6) — safe sandbox, '
-                              '"reports" = 📄 Reports (id=16) — your public portfolio at '
-                              'crossai.dev/u/<username>/activity/topics. '
-                              'Default: "test" (safe sandbox — cleared nightly).'))
+    parser.add_argument('--category', type=str, default='test',
+                        help=('Where to post. Accepts: '
+                              '"private" (your private area), '
+                              'a numeric Discourse category ID, or '
+                              '— on crossai.dev only — "test" (id=6, sandbox '
+                              'cleared daily), "reports" (id=16, public '
+                              'portfolio), "prompt-lab" (id=17). '
+                              'Default: "test".'))
     parser.add_argument('--check', action='store_true',
                         help='Validate Discourse credentials and connection without posting')
     parser.add_argument('--prompt', action='store_true',
@@ -66,6 +71,7 @@ def main():
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Enable minimal output')
     args = parser.parse_args()
+
 
     # ── --check: validate credentials without posting ─────────────────────────
     if args.check:
@@ -166,23 +172,14 @@ def main():
     site = get_discourse_site(args.site, sites)
 
     # Resolve the posting category for the story post.
-    # --category private  → user's own private category (private_category_id or default)
-    # --category test     → Test (cleared daily) category, id=6  [default]
-    # --category reports  → public Reports showcase category, id=16
-    # (site['category_id'] fallback kept for safety but not normally reached)
-    _DISCOURSE_TEST_CATEGORY_ID       = 6
-    _DISCOURSE_REPORTS_CATEGORY_ID    = 16
-    _DISCOURSE_PROMPT_LAB_CATEGORY_ID = 17
-    if args.category == 'private':
-        post_category_id = site.get('private_category_id') or site['category_id']
-    elif args.category == 'test':
-        post_category_id = _DISCOURSE_TEST_CATEGORY_ID
-    elif args.category == 'reports':
-        post_category_id = _DISCOURSE_REPORTS_CATEGORY_ID
-    elif args.category == 'prompt-lab':
-        post_category_id = _DISCOURSE_PROMPT_LAB_CATEGORY_ID
-    else:
-        post_category_id = site['category_id']
+    # Accepts: "private", a numeric ID, or (on crossai.dev only) the
+    # named shortcuts "test" / "reports" / "prompt-lab". See
+    # discourse.resolve_category() for the full rules.
+    try:
+        post_category_id = resolve_category(site, args.category)
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(2)
 
     file_list = args.files
     if len(file_list) == 0:
