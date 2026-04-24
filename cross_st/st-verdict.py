@@ -262,87 +262,28 @@ def generate_ai_content(df, story_titles, ai_make, content_type, verbose=False, 
 
 
 # ── VRD-1: --what-is-false / --what-is-true lens ──────────────────────────────
+#
+# Claim parsing, verdict normalisation, and lens groupings live in
+# cross_st/_report_signals.py so st-fix can share them. We re-export the
+# names below for backwards compatibility with any caller that imports
+# them from this module.
 
-# Match a "Claim N: ..." block followed by Verification: <category> and Explanation: ...
-# Tolerant of extra whitespace, optional bold/italic markup, and trailing/leading newlines.
-_CLAIM_BLOCK_RE = re.compile(
-    r"Claim\s+(\d+)\s*:\s*[\"\u201c]?(.+?)[\"\u201d]?\s*\n+"
-    r"\s*\**\s*Verification\s*\**\s*:\s*\**\s*([A-Za-z_]+)\s*\**\s*\n+"
-    r"\s*\**\s*Explanation\s*\**\s*:\s*(.+?)(?=\n\s*Claim\s+\d+\s*:|\Z)",
-    re.DOTALL | re.IGNORECASE,
+from _report_signals import (
+    CLAIM_BLOCK_RE      as _CLAIM_BLOCK_RE,
+    VERDICT_NORMALISE   as _VERDICT_NORMALISE,
+    LENS_VERDICTS       as _LENS_VERDICTS,
+    parse_claims        as parse_claims,
+    collect_claims      as _collect_claims_shared,
 )
-
-# Map raw verdict tokens to a normalised lower-case category
-_VERDICT_NORMALISE = {
-    "true":             "true",
-    "partially_true":   "partially_true",
-    "partiallytrue":    "partially_true",
-    "opinion":          "opinion",
-    "partially_false":  "partially_false",
-    "partiallyfalse":   "partially_false",
-    "false":            "false",
-    "unverifiable":     "opinion",   # treat as neutral for the lens
-    "unverified":       "opinion",
-}
-
-_LENS_VERDICTS = {
-    "false":    {"false", "partially_false"},
-    "true":     {"true", "partially_true"},
-    # "missing" lens uses the report itself + every verdict — handled separately
-    "missing":  None,
-    # "howtofix" lens uses every claim + score summary + report — handled separately (VRD-6)
-    "howtofix": None,
-}
-
-
-def parse_claims(report_text):
-    """Parse a fact-check report into a list of (n, claim, verdict, explanation) tuples.
-
-    Returns an empty list if the report is empty or unparseable.
-    """
-    if not report_text:
-        return []
-    out = []
-    for match in _CLAIM_BLOCK_RE.finditer(report_text):
-        n_str, claim, verdict, explanation = match.groups()
-        verdict_norm = _VERDICT_NORMALISE.get(verdict.strip().lower(), verdict.strip().lower())
-        try:
-            n = int(n_str)
-        except ValueError:
-            n = 0
-        out.append((n, claim.strip(), verdict_norm, explanation.strip()))
-    return out
 
 
 def collect_lens_claims(container, story_index, lens):
-    """Collect claims matching the lens ('false', 'true', or 'missing') across all
-    fact[] entries of one story.
+    """Collect claims matching the lens ('false', 'true', 'missing', 'howtofix').
 
-    For 'false'/'true' lenses: returns claims with verdict in the matching set.
-    For 'missing' lens: returns *every* parseable claim (the AI uses the full
-    distribution to reason about coverage gaps). The story markdown is fetched
-    separately via collect_lens_report().
-
-    Returns: list of dicts with keys: claim, verdict, explanation, evaluator (make:model).
+    Thin wrapper around `_report_signals.collect_claims()` that preserves the
+    lens-specific semantics callers rely on.
     """
-    target = _LENS_VERDICTS.get(lens)
-    stories = container.get("story", [])
-    if not (1 <= story_index <= len(stories)):
-        return []
-    story = stories[story_index - 1]
-    collected = []
-    for fact in story.get("fact", []):
-        report = fact.get("report", "")
-        evaluator = f"{fact.get('make', '?')}:{fact.get('model', '?')}"
-        for _n, claim, verdict, explanation in parse_claims(report):
-            if target is None or verdict in target:   # missing → all claims
-                collected.append({
-                    "claim": claim,
-                    "verdict": verdict,
-                    "explanation": explanation,
-                    "evaluator": evaluator,
-                })
-    return collected
+    return _collect_claims_shared(container, story_index, lens)
 
 
 def collect_lens_report(container, story_index):
