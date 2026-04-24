@@ -73,7 +73,7 @@ def verdict_normalise(s: str) -> str:
 #   - extra whitespace and bold/italic markup (`**`, `__`) around any label
 #   - stray markup tokens sitting on their own lines between blocks
 #     (anthropic frequently emits `**\nVerification: True\n**` — see
-#      st-internal/st-fix/IMPLEMENTATION_anthropic_claims_parse.md)
+#      cross-internal/st-fact/BUGFIX_anthropic_claims_parse.md)
 #   - inline `Verification:` (xai/openai) OR on its own line (anthropic/gemini)
 # Captures: (claim_number, claim_text, verdict, explanation)
 CLAIM_BLOCK_RE = re.compile(

@@ -7,7 +7,7 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.0] — Unreleased
+## [0.7.0] — 2026-04-24
 
 > **GATHER → VERIFY → INTERPRET refactor.** `st-fact` is now a pure verifier
 > (it produces fact-check verdicts); `st-verdict` owns all interpretation
@@ -68,6 +68,38 @@ Cross uses [Semantic Versioning](https://semver.org/).
   *append* new entries beside the old ones rather than replacing them.
   `--force` fixes both — the all-complete exit message now correctly
   points at it.
+- **`st-fix` weighted auto-selector.** Replaces the single-axis
+  most-broken-claims sort with a weighted formula judging each
+  `(story, fact)` candidate on **expected post-fix quality**: `claims ×
+  1.0 + score × 2.0 + n_false × 0.5 + n_partial × 0.25 + length_fit ×
+  1.0 + subject_cover × 1.5 + default_ai_bonus × 0.3 −
+  fixed_penalty × 2.0`. New `--include-fixed` CLI flag (default off) so
+  prior `st-fix` outputs are skipped by default; new hidden
+  `--weights '{...}'` JSON escape hatch. Audit table grew
+  `Score · Claims · False · ~Fls · Cover · Fit · Prio · Why` columns,
+  with `Why` naming the dominant scoring terms in vocabulary aligned to
+  `st-verdict`'s lenses ("topical coverage", "false-claim density"). Three
+  new recovery messages cover the empty-candidate cases (no fact entries,
+  all-fixed, all-clean). Stories produced by `st-fix` are now stamped
+  with `_generated_by` for provenance — additive, no migration needed.
+  See `cross-internal/st-fix/IMPLEMENTATION_st_fix_selector.md`.
+- **`cross_st/_report_signals.py` — new shared module.** Extracts
+  prompt/claim parsing primitives (`parse_prompt`, `parse_claims`,
+  `collect_claims`, `get_prompt_text`, `verdict_normalise`,
+  `calendar_context`, `report_tokens`, `CLAIM_BLOCK_RE`) from
+  `st-verdict.py`. `st-verdict`, `st-fix`, and `st-fact` all import the
+  same regex/normalisation rules so they can never drift again.
+  Backwards-compat aliases preserved for any external caller importing
+  the leading-underscore names.
+- **`st-fact` — per-story progress header.** Multi-story runs (e.g.
+  `st-fact --ai anthropic file.json` over a 5-story container) now
+  announce each story before its `tqdm` bar:
+  `Story 2/5 — xai grok-4-1-fast-reasoning · 25 segments · fact-check by
+  anthropic (2/5 this run)`. The `tqdm` bar `desc` itself includes the
+  AI name and story number. Suppressed by `--quiet`/`--silent`. Also
+  fixes a long-standing `s:None` annotation in the per-story report
+  prefix when `--story` wasn't passed. See
+  `cross-internal/st-fact/UX_silent_multi_story_progress.md`.
 
 ### Removed (breaking)
 - **VRD-5 — `st-fact --ai-*` flags removed.** Interpretive flags now live
@@ -107,6 +139,21 @@ Cross uses [Semantic Versioning](https://semver.org/).
   dev-checkout suppression of the PyPI-upgrade nag.
 
 ### Fixed
+- **Anthropic structured `claims[]` silently dropped.** Anthropic emits
+  `**Claim N:**` followed by stray `**` markers on their own lines around
+  `Verification:` and `Explanation:`. Both `st-fact`'s local
+  `claim_pattern` and `_report_signals.CLAIM_BLOCK_RE` allowed only `\s*`
+  in those gaps, so `len(fact["claims"]) == 0` for every anthropic
+  fact-check entry — `st-ls --story --fact` showed `Claims = -` for the
+  anthropic rows even though `report` text and aggregate `counts`/`score`
+  were correct. Relaxed the shared regex to tolerate stray `*`/`_`
+  markup in any whitespace gap, and consolidated `st-fact` to import
+  from `_report_signals` (single source of truth). Recovers ~60–100
+  claims per anthropic report on the test corpus; xai/openai/gemini
+  counts unchanged. Existing JSON files can be rebuilt with
+  `st-fact --ai anthropic file.json` (uses cached responses, no fresh
+  API calls). See
+  `cross-internal/st-fact/BUGFIX_anthropic_claims_parse.md`.
 - **Stale upgrade nag in dev checkouts** — `mmd_startup.check_for_updates()`
   now returns early when either `_in_project_venv()` or the new
   `_running_from_dev_checkout()` (sys.argv[0] inside `_PROJECT_ROOT`)

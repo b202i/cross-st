@@ -2,7 +2,7 @@
 
 Sends a single story to an AI and asks it to fact-check every claim, scoring each one true, partially true, or false. Appends the result to the container.
 
-**Run after:** `st-prep`    **Run before:** `st-fix`  `st-heatmap`
+**Run after:** `st-prep`    **Run before:** `st-verdict`  `st-fix`  `st-heatmap`  `st-cross`
 
 ![st-fact workflow](st-fact-flow.svg)
 
@@ -33,6 +33,7 @@ st-fact --paragraph subject.json       # write paragraph segments to _paragraph_
 | `-v`, `--verbose` | Verbose output |
 | `-q`, `--quiet` | Minimal output |
 | `--timeout N` | With `--ai all`: per-job limit in minutes (default: 20). Single-AI mode: per-paragraph limit in seconds (default: 0 = no limit) |
+| `--retry-budget SECONDS` | Total retry budget in seconds passed through to `process_prompt()` (default: 0 = unlimited). Useful for parallel `st-cross --parallel` runs where a single 105-second tail would stall the matrix. Per-call (per segment), independent of `--timeout` (per subprocess). |
 
 ## What happened to `--ai-review` / `--ai-caption` / `--ai-summary` / …?
 
@@ -54,3 +55,6 @@ If you call any of the removed flags, `st-fact` exits with a one-line error poin
 ## For developers
 
 Splits the story into segments via `mmd_util.build_segments()`, sends them to the AI, and appends a `fact[]` entry to the container. The entry includes `score`, `counts`, `summary`, `claims[]` (per-segment verdicts), and `timing{}`.
+
+The structured `claims[]` list is parsed from the AI's free-text reply via the shared `cross_st/_report_signals.CLAIM_BLOCK_RE` regex (also used by `st-verdict` and `st-fix`), so all three tools agree on what counts as a parseable claim. The pattern tolerates stray markdown markup (`**`, `__`) — anthropic in particular wraps every label in bold, which used to silently drop every anthropic claim from the structured list (counts and score were unaffected).
+
