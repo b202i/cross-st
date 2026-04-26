@@ -101,7 +101,6 @@ menus = {
             "l": "List stories and fact-checks",
             "a": "List all contents of .json file",
             "f": "List fact-checks",
-            "F": "Edit a fact-check",
         }),
         "e": ("Edit", {
             "T": "Edit title",
@@ -306,8 +305,6 @@ def execute_menu(menu_name, choice):
                     cmd = f"st-ls --all {file_json}"
                 case "f":
                     cmd = f"st-ls --fact {file_json}"
-                case "F":
-                    cmd = f"st-edit -s {story_sel} -f {fact_sel} {file_json}"
                 case _:
                     print("\nCommand not implemented yet.")
 
