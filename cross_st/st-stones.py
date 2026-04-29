@@ -61,6 +61,7 @@ from typing import Optional
 from tabulate import tabulate
 
 from ai_handler import process_prompt, get_content_auto, get_default_ai
+from _report_signals import score_authors
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 DEFAULT_W1        = 0.7    # accuracy weight
@@ -97,6 +98,21 @@ def compute_domain_scores(container: dict) -> dict:
         Keyed by AI make (string).  Each value is a dict:
             fact_avg        : float | None   — mean fact-check score (−2..+2)
                                                averaged over all evaluator AIs
+                                               (legacy; still returned for
+                                               backwards compatibility)
+            composite       : float | None   — VRD-10 composite "best author"
+                                               score in roughly [-1, +1] from
+                                               ``score_authors()``.  None if
+                                               this make does not appear as a
+                                               story author.
+            excluded        : bool           — True if this author was gated
+                                               out of "best author" selection
+                                               (low words/segments/claims, or
+                                               truncated, or absent from data[])
+            excluded_reason : str | None     — human-readable gate reason
+            model           : str | None     — author's model string (the same
+                                               make may have multiple models;
+                                               this is the *first* one seen)
             n_fact_checkers : int            — how many AIs fact-checked this story
             gen_elapsed     : float | None   — story-generation time in seconds
                                                (None if absent or cached)
@@ -131,14 +147,31 @@ def compute_domain_scores(container: dict) -> dict:
                     fc_elapsed_by_make.setdefault(fc_make, []).append(el)
 
     results: dict = {}
+    # VRD-10d: pull composite "best author" scores once per container so we
+    # can stamp ``composite`` / ``excluded`` on each per-author record below.
+    # Keep a make→AuthorScore map (first-wins on duplicate makes — matches
+    # the existing "first non-cached entry wins" pattern for gen timing).
+    try:
+        _author_scores = score_authors(container)
+    except Exception:
+        _author_scores = []
+    _by_make: dict = {}
+    for _aus in _author_scores:
+        _by_make.setdefault(_aus.make, _aus)
+
     for story in stories:
         author = story.get("make", "")
         if not author:
             continue
         facts       = story.get("fact", [])
         fact_scores = [fc.get("score") for fc in facts if fc.get("score") is not None]
+        _aus = _by_make.get(author)
         results[author] = {
             "fact_avg":        mean(fact_scores) if fact_scores else None,
+            "composite":       _aus.composite if _aus is not None else None,
+            "excluded":        bool(_aus.excluded) if _aus is not None else False,
+            "excluded_reason": _aus.excluded_reason if _aus is not None else None,
+            "model":           _aus.model if _aus is not None else story.get("model"),
             "n_fact_checkers": len(fact_scores),
             "gen_elapsed":     gen_elapsed_by_make.get(author),
             "fc_elapsed_list": list(fc_elapsed_by_make.get(author, [])),
@@ -196,6 +229,10 @@ def compute_cross_stone_scores(
     """
     n_domains = len(domain_results)
     max_fact  = n_domains * n_claims * 2.0   # all claims True at +2
+    # VRD-10d: composite is in roughly [-1, +1]; max contribution is
+    # n_claims per domain (sign-preserving rescaling so composite_norm and
+    # fact_norm share the same [-1, +1] range).
+    max_composite = n_domains * n_claims * 1.0
 
     # Accumulate per-AI totals across all domains
     totals: dict = {}
@@ -203,15 +240,25 @@ def compute_cross_stone_scores(
         for make, info in dr.items():
             if make not in totals:
                 totals[make] = {
-                    "fact_contributions": [],
-                    "gen_elapsed":        [],
-                    "fc_elapsed":         [],
-                    "n_domains":          0,
+                    "fact_contributions":      [],
+                    "composite_contributions": [],
+                    "gen_elapsed":             [],
+                    "fc_elapsed":              [],
+                    "n_domains":               0,
+                    "n_excluded":              0,
+                    "model":                   info.get("model"),
+                    "excluded_reasons":        [],
                 }
             rec = totals[make]
             if info.get("fact_avg") is not None:
                 rec["fact_contributions"].append(info["fact_avg"] * n_claims)
                 rec["n_domains"] += 1
+            if info.get("composite") is not None:
+                rec["composite_contributions"].append(info["composite"] * n_claims)
+            if info.get("excluded"):
+                rec["n_excluded"] += 1
+                if info.get("excluded_reason"):
+                    rec["excluded_reasons"].append(info["excluded_reason"])
             if info.get("gen_elapsed") is not None:
                 rec["gen_elapsed"].append(info["gen_elapsed"])
             rec["fc_elapsed"].extend(info.get("fc_elapsed_list", []))
@@ -243,10 +290,17 @@ def compute_cross_stone_scores(
 
         rows.append({
             "make":        make,
+            "model":       rec.get("model"),
             "fact_score":  fact_score,
+            "composite_score": (sum(rec["composite_contributions"])
+                                if rec["composite_contributions"] else 0.0),
             "speed_score": speed_score,
             "speed_ratio": speed_ratio,
             "n_domains":   rec["n_domains"],
+            "n_excluded":  rec["n_excluded"],
+            "excluded":    rec["n_excluded"] >= rec["n_domains"] and rec["n_domains"] > 0,
+            "excluded_reason": (("; ".join(sorted(set(rec["excluded_reasons"]))))
+                                if rec["excluded_reasons"] else None),
             "avg_gen_s":   avg_gen,
             "avg_fc_s":    avg_fc,
         })
@@ -257,6 +311,8 @@ def compute_cross_stone_scores(
     # Normalise fact:  README formula → domain_fact_score / max_fact_score
     for r in rows:
         r["fact_norm"] = r["fact_score"] / max_fact if max_fact > 0 else 0.0
+        r["composite_norm"] = (r["composite_score"] / max_composite
+                               if max_composite > 0 else 0.0)
 
     # Normalise speed
     abs_mode = speed_baseline_s is not None
@@ -278,14 +334,18 @@ def compute_cross_stone_scores(
             else:
                 r["speed_norm"] = 0.0
 
-    # Cross-stone composite
+    # Cross-stone composite (VRD-10d: now driven by ``composite_norm`` from
+    # ``score_authors()`` instead of the legacy ``fact_norm`` mean — keeps the
+    # benchmark leaderboard consistent with st-ls / st-verdict).
     total_w = w1 + w2
     for r in rows:
+        accuracy_term = r["composite_norm"]
         if r.get("speed_score") is not None:
-            r["cross_stone_score"] = w1 * r["fact_norm"] + w2 * r["speed_norm"]
+            r["cross_stone_score"] = w1 * accuracy_term + w2 * r["speed_norm"]
         else:
             # No timing available: redistribute speed weight to accuracy
-            r["cross_stone_score"] = (w1 / total_w * r["fact_norm"]) if total_w > 0 else r["fact_norm"]
+            r["cross_stone_score"] = ((w1 / total_w * accuracy_term)
+                                      if total_w > 0 else accuracy_term)
 
     rows.sort(key=lambda r: r["cross_stone_score"], reverse=True)
     return rows
@@ -320,6 +380,7 @@ def display_leaderboard(
                    "Speed (1/s)", "Speed%", "Cross-Stone", "Domains"]
 
     rows = []
+    any_excluded = False
     for i, r in enumerate(scores, 1):
         fact_norm = f"{r.get('fact_norm', 0.0):.1%}"
         if abs_mode:
@@ -330,8 +391,15 @@ def display_leaderboard(
             speed_col  = (f"{r['speed_score']:.4f}"
                           if r.get("speed_score") is not None else "  —  ")
             extra_cols = [f"{r.get('speed_norm', 0.0):.1%}"]
+        # VRD-10d: mark structurally incomplete authors with `*` so they
+        # are visible in the leaderboard but flagged as not "best author"
+        # candidates (consistent with st-ls).
+        ai_label = r["make"]
+        if r.get("excluded"):
+            ai_label += "*"
+            any_excluded = True
         rows.append([
-            i, r["make"],
+            i, ai_label,
             f"{r['fact_score']:+.1f}",
             f"+{max_fact:.0f}" if max_fact else "—",
             fact_norm, speed_col, *extra_cols,
@@ -361,6 +429,8 @@ def display_leaderboard(
         ))
     print()
     print(tabulate(rows, headers=headers, tablefmt="github"))
+    if any_excluded:
+        print(_clr("  * = author excluded from best-author selection (incomplete)", DIM))
     print()
 
 

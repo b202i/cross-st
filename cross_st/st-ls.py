@@ -32,7 +32,7 @@ st-ls --fact -C subject.json    # fact-check table + claims
 | S      | Story index (use with -s N in other commands) |
 | Flag   | Story origin: blank = original AI output; [fix:patch/best/synth] = improved by st-fix; [merge] = synthesized by st-merge |
 | Segs   | Number of fact-checkable segments extracted from the story |
-| Score  | Average fact-check score across all evaluators (higher = more accurate; max 200 for 10 claims at 20 pts each) |
+| Score  | Composite "best author" score (VRD-10) — coverage + completeness + accuracy + calibration; range roughly [-1, +1]. A `*` suffix marks an author excluded from best-author selection (incomplete: missing data, low word/segment/claim count, or truncated). |
 
 Run `st-fact` or `st-cross` to populate the Score column.
 
@@ -54,6 +54,7 @@ from mmd_startup import require_config
 from tabulate import tabulate
 
 from ai_handler import get_data_title
+from _report_signals import score_authors
 
 model_clip = 17  # shorten model names to 'claude-3-7-sonnet'
 
@@ -139,6 +140,17 @@ def main():
     if not stories:
         print("Story list empty")
     else:
+        # VRD-10c: composite "best author" score, keyed by make:model so we
+        # don't collide when two stories share a make but differ on model.
+        # Falls back to legacy fact-score average when the scorer can't run
+        # (e.g. an empty container).
+        try:
+            _scores_by_author = {
+                s.author: s for s in score_authors(main_container)
+            }
+        except Exception:
+            _scores_by_author = {}
+        any_excluded = False
         story_data = []
         fact_data = []
         for i, story in enumerate(main_container["story"], start=1):
@@ -169,11 +181,20 @@ def main():
             n_segs = len(story.get("segments") or [])
             segs_str = str(n_segs) if n_segs else "-"
 
-            # Avg fact-check score across all fact entries for this story
-            fact_scores = [f.get("score") for f in story.get("fact", [])
-                           if f.get("score") is not None]
-            avg_score_str = f"{sum(fact_scores)/len(fact_scores):.2f}" \
-                if fact_scores else "-"
+            # VRD-10c: composite score replaces the legacy fact-score mean.
+            _author_id = f"{story.get('make') or '?'}:{story.get('model') or '?'}"
+            _aus = _scores_by_author.get(_author_id)
+            if _aus is not None:
+                avg_score_str = f"{_aus.composite:+.3f}"
+                if _aus.excluded:
+                    avg_score_str += "*"
+                    any_excluded = True
+            else:
+                # Fallback: legacy fact-score mean (no segments / data row)
+                fact_scores = [f.get("score") for f in story.get("fact", [])
+                               if f.get("score") is not None]
+                avg_score_str = f"{sum(fact_scores)/len(fact_scores):.2f}" \
+                    if fact_scores else "-"
 
             story_data.append([
                 i,
@@ -209,6 +230,8 @@ def main():
             print(tabulate(story_data,
                            headers=["S", "Make", "Model", "Flag", "Segs", "Score", "Title"],
                            tablefmt="github"))
+            if any_excluded:
+                print("  * = author excluded from best-author selection (incomplete)")
 
         if args.fact and len(fact_data) > 0:
             print(f"{newline}FACT CHECK")

@@ -318,10 +318,10 @@ class TestComputeCrossStoneScores:
             assert -1.1 <= r["cross_stone_score"] <= 1.1
 
     def test_weights_w1_and_w2(self):
-        """w1=1, w2=0 → cross_stone_score equals fact_norm"""
+        """w1=1, w2=0 → cross_stone_score equals composite_norm (VRD-10d)."""
         rows = self._scores_for(DOMAIN_A, w1=1.0, w2=0.0)
         for r in rows:
-            assert abs(r["cross_stone_score"] - r["fact_norm"]) < 1e-9
+            assert abs(r["cross_stone_score"] - r["composite_norm"]) < 1e-9
 
     def test_accuracy_only_flag_equivalent(self):
         rows_no_speed  = self._scores_for(DOMAIN_A, w1=1.0, w2=0.0)
@@ -361,8 +361,8 @@ class TestComputeCrossStoneScores:
         for r in rows:
             assert r["speed_score"] is None
             assert r["speed_norm"] == 0.0
-            # cross_stone = (w1 / (w1+w2)) * fact_norm = 0.7 * fact_norm  (since w1+w2=1.0)
-            expected = (w1 / (w1 + w2)) * r["fact_norm"]
+            # cross_stone = (w1 / (w1+w2)) * composite_norm = 0.7 * composite_norm  (since w1+w2=1.0)
+            expected = (w1 / (w1 + w2)) * r["composite_norm"]
             assert r["cross_stone_score"] == pytest.approx(expected)
 
     # -- custom n_claims ---------------------------------------------------------
@@ -492,14 +492,14 @@ class TestComputeCrossStoneScores:
             assert r["cross_stone_score"] == pytest.approx(0.0)
 
     def test_zero_weights_without_speed_falls_back_to_fact_norm(self):
-        """w1=0, w2=0 with no timing → total_w=0 guard → cross_stone = fact_norm."""
+        """w1=0, w2=0 with no timing → total_w=0 guard → cross_stone = composite_norm (VRD-10d)."""
         container = make_container(
             stories=[make_story("xai", [make_fact("openai", 1.6)])],
         )
         rows = compute_cross_stone_scores(
             [compute_domain_scores(container)], w1=0.0, w2=0.0
         )
-        assert rows[0]["cross_stone_score"] == pytest.approx(rows[0]["fact_norm"])
+        assert rows[0]["cross_stone_score"] == pytest.approx(rows[0]["composite_norm"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -853,10 +853,10 @@ class TestScoringMath:
         assert by["xai"]["fact_norm"]    == pytest.approx(16 / max_fact)
         assert by["openai"]["fact_norm"] == pytest.approx(18 / max_fact)
 
-        # No speed → cross_stone = (w1 / (w1+w2)) * fact_norm
-        #                        = 0.7 * fact_norm  (since w1+w2=1)
+        # No speed → cross_stone = (w1 / (w1+w2)) * composite_norm  (VRD-10d)
+        #                        = 0.7 * composite_norm  (since w1+w2=1)
         for r in rows:
-            expected = (w1 / (w1 + w2)) * r["fact_norm"]
+            expected = (w1 / (w1 + w2)) * r["composite_norm"]
             assert r["cross_stone_score"] == pytest.approx(expected)
 
     def test_speed_weight_reorders_ranking(self):
@@ -871,10 +871,16 @@ class TestScoringMath:
         """
         c = make_container(
             stories=[
-                # "fast" is the story author; "slow" evaluates it — slowly (200s)
-                make_story("fast", [make_fact("slow", 1.0, elapsed=200.0)]),
-                # "slow" is the story author; "fast" evaluates it — quickly (5s)
-                make_story("slow", [make_fact("fast", 1.9, elapsed=5.0)]),
+                # "fast" is the story author; "slow" evaluates it — slowly (200s).
+                # Low accuracy: counts skewed toward False so composite is low.
+                make_story("fast", [make_fact("slow", 1.0,
+                                              counts=[1, 1, 1, 3, 4],
+                                              elapsed=200.0)]),
+                # "slow" is the story author; "fast" evaluates it — quickly (5s).
+                # High accuracy: counts skewed toward True so composite is high.
+                make_story("slow", [make_fact("fast", 1.9,
+                                              counts=[7, 2, 0, 1, 0],
+                                              elapsed=5.0)]),
             ],
             data=[
                 make_data_entry("fast", elapsed=3.0),    # fast generates quickly
@@ -1323,7 +1329,7 @@ class TestAbsoluteSpeedScoring:
         assert rows[0]["speed_norm"] == pytest.approx(rows[0]["speed_ratio"])
 
     def test_cross_stone_score_uses_speed_ratio_in_composite(self):
-        """composite = w1*fact_norm + w2*speed_ratio in absolute mode."""
+        """composite = w1*composite_norm + w2*speed_ratio in absolute mode (VRD-10d)."""
         baseline_s = 60.0
         rows = compute_cross_stone_scores(
             [self._domain_with_timing(10.0, 20.0)],  # 30s → ratio=2.0
@@ -1332,7 +1338,7 @@ class TestAbsoluteSpeedScoring:
             w2=0.3,
         )
         r = rows[0]
-        expected = 0.7 * r["fact_norm"] + 0.3 * r["speed_ratio"]
+        expected = 0.7 * r["composite_norm"] + 0.3 * r["speed_ratio"]
         assert r["cross_stone_score"] == pytest.approx(expected)
 
     def test_score_can_exceed_one_when_faster_than_baseline(self):

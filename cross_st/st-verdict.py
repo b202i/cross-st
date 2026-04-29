@@ -849,12 +849,19 @@ def _short_label(target_str):
     return target_str[:20]
 
 
-def render_verdict_bar(df, output_path, display, file_out, quiet, subject="", show=True):
+def render_verdict_bar(df, output_path, display, file_out, quiet, subject="",
+                       show=True, container=None):
     """Render stacked verdict bar chart (avg claims per eval, per target AI).
 
     When show=True (default) and display=True, blocks until the user closes the
     window.  When show=False and display=True, returns the Figure so the caller
     can arrange a non-blocking show followed by a deferred blocking show.
+
+    VRD-10e: when ``container`` is supplied, authors that ``score_authors()``
+    flags as ``excluded`` get a grey/hatched overlay drawn on top of their
+    bar stack and an "incomplete" entry is added to the legend.  Visually
+    signals "do not pick this author as the winner" without removing the
+    bar (so the verdict mix is still visible for context).
     """
     by_target    = get_verdict_by_target(df)
     n_evaluators = df["evaluator"].nunique()
@@ -887,12 +894,46 @@ def render_verdict_bar(df, output_path, display, file_out, quiet, subject="", sh
     ax.set_ylabel("Avg. claims per evaluation", fontsize=11)
     ax.set_xlabel("Story Author (target AI)", fontsize=11)
 
+    # ── VRD-10e: excluded-author overlay + legend tag ────────────────────────
+    excluded_authors: set = set()
+    if container is not None:
+        try:
+            excluded_authors = {s.author for s in score_authors(container)
+                                if s.excluded}
+        except Exception:
+            excluded_authors = set()
+    has_excluded = False
+    if excluded_authors:
+        # Identify which x-positions correspond to excluded authors and overlay
+        # a hatched grey rectangle from y=0 up to the column total.
+        targets = list(by_target.index)
+        column_totals = [sum(t) for t in zip(*[by_target[c].tolist()
+                                               for c in by_target.columns])]
+        # Cushion height: extend slightly above the tallest bar so the hatch
+        # is unmistakable even when the stack is small.
+        y_max = max(column_totals) if column_totals else 1.0
+        overlay_top = max(y_max * 1.04, y_max + 0.2)
+        for xi, target in enumerate(targets):
+            if target not in excluded_authors:
+                continue
+            has_excluded = True
+            ax.bar(xi, overlay_top, width=0.55, bottom=0.0,
+                   facecolor="none", edgecolor="#555555",
+                   hatch="////", linewidth=0.8, zorder=5)
+
     title_lines = ["Verdict Breakdown by Story Author"]
     if subject:
         title_lines.insert(0, subject)
     ax.set_title("\n".join(title_lines), fontsize=13, pad=10)
 
-    ax.legend(title="Verdict", loc="upper right", framealpha=0.9, fontsize=9)
+    handles, leg_labels = ax.get_legend_handles_labels()
+    if has_excluded:
+        from matplotlib.patches import Patch
+        handles.append(Patch(facecolor="white", edgecolor="#555555",
+                             hatch="////", label="incomplete"))
+        leg_labels.append("incomplete")
+    ax.legend(handles, leg_labels, title="Verdict",
+              loc="upper right", framealpha=0.9, fontsize=9)
     ax.spines[["top", "right"]].set_visible(False)
 
     sub = (f"{n_evaluators} evaluator(s) × {by_target.shape[0]} author(s)"
@@ -1147,7 +1188,7 @@ def main():
     if chart_requested:
         output_path = args.path if args.path.endswith(os.sep) else args.path + os.sep
         fig = render_verdict_bar(df, output_path, args.display, args.file, args.quiet,
-                                 subject=subject, show=False)
+                                 subject=subject, show=False, container=container)
 
     # ── Display chart ─────────────────────────────────────────────────────────
     if fig is not None:
