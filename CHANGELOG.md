@@ -7,6 +7,74 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.8.0] — 2026-04-29
+
+### Added
+- **VRD-10 — composite "best author" scoring.** A new
+  `score_authors(container, weights=…)` helper in
+  `cross_st/_report_signals.py` replaces the old verdict-ratio winner
+  pick across `st-verdict`, `st-ls`, and `st-stones`. Composite combines
+  four sub-scores — **Coverage** (prompt-aspect hits via
+  `parse_prompt()`), **Completeness** (words vs `target_words` band,
+  segments vs cohort median, truncation flag), **Accuracy** (true−false
+  ratio with a min-claim floor `K = max(3, 0.5·median hard claims)`),
+  and **Calibration** (opinion share vs cohort median) — defaulting to
+  weights `(cov=0.25, comp=0.25, acc=0.40, cal=0.10)`. Authors that are
+  not in `data[]`, are below `0.5×` cohort median on words / segments /
+  claims, or carry a truncation marker are **excluded** from the
+  ranking and shown with a hatched/grey overlay in the chart legend.
+  `make:model` (not `make`) is the identity key throughout, so the
+  scorer is forward-compatible with the upcoming cross-ai-core
+  multi-model work.
+- **`--score-weights cov=…,comp=…,acc=…,cal=…` flag** plumbed through
+  `st-verdict`, `st-ls`, and `st-stones`. Validates non-negative
+  components and a positive sum.
+- **`-s/--story` defaults to the scoring winner on `st-verdict` lenses**
+  (`--what-is-false`, `--what-is-true`, `--what-is-missing`,
+  `--how-to-fix`). When `-s` is omitted, the lens runs against the
+  highest-scoring non-excluded author and prints
+  `Lens defaulting to story N (winner: make:model, composite=…). Override with -s N.`
+  Pass `-s N` explicitly to analyse another author. (VRD-10i.)
+- **`"unknown"` verdict bucket** is now distinct from `opinion` —
+  `verdict_normalise()` returns `"unknown"` for unverifiable claims, the
+  chart palette extends to 6 categories, and `fact[].counts` is written
+  as a 6-int tuple. Readers tolerate the legacy 5-int form so older
+  containers keep working without migration. (VRD-10g.)
+- **`"role"` field** stamped on container writes — `"author"` on
+  `data[]` entries, `"evaluator"` on `fact[]` entries. Read-side infers
+  role from container shape for older JSONs (no migration needed).
+  (VRD-10h.)
+- **`format_verdicts_for_prompt()` rewritten** to give the caption AI
+  an explicit author list, evaluator list, and pre-computed winner +
+  components — eliminating the "Gemini emerged as the winner" caption
+  hallucination on reports where Gemini was only an evaluator. (VRD-10b.)
+- **Chart UX:** excluded authors now render with a hatched/grey overlay
+  and an `incomplete` tag in the legend. (VRD-10e.)
+- **`st-ls` Score column** now reports the composite (with `*` marker
+  for excluded authors); **`st-stones`** rollup uses the same scorer so
+  domain leaderboards stay consistent. (VRD-10c/d.)
+
+### Changed
+- **Single source of truth for the winner.** `st-verdict`, `st-ls`, and
+  `st-stones` all call `score_authors()` instead of computing ad-hoc
+  verdict ratios. The chart, the caption prompt, the leaderboard, and
+  the lens default story all agree on who won and why.
+
+### Migration notes
+- **No data migration required.** `score_authors()` recomputes on the
+  fly from existing `data[]`/`fact[]` shapes; legacy 5-int `counts` are
+  padded to 6 on read; missing `"role"` is inferred. Any
+  `verdict.score` written by older releases is ignored.
+- **Caption / lens output may name a different winner** than 0.7.x for
+  containers where a low-volume author won by ratio alone — that's the
+  bug VRD-10 was filed to fix. Override with `-s N` if you specifically
+  want to inspect the previous pick.
+- Internal docs: `st-verdict/VRD-10.md` (spec),
+  `st-verdict/IMPLEMENTATION_VRD10*.md` (per-slice logs),
+  `st-verdict/ANALYSIS_scoring_flaws.md` (background).
+
+---
+
 ## [0.7.1] — 2026-04-24
 
 ### Added

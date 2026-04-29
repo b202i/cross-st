@@ -1035,8 +1035,10 @@ def main():
                             help='Identify what important aspects of the prompt the report failed to mention (omissions / gaps)')
     lens_group.add_argument('--how-to-fix', dest='lens_howtofix', action='store_true',
                             help='Recommend exactly one next action: st-fix, st-bang -N, st-merge, or publish-as-is (never auto-invokes)')
-    lens_group.add_argument('-s', '--story', type=int, default=1,
-                            help='Story index to analyse with the lens (default: 1)')
+    lens_group.add_argument('-s', '--story', type=int, default=None,
+                            help=('Story index to analyse with the lens '
+                                  '(default: winning story per score_authors(); '
+                                  'falls back to 1 if no winner can be resolved)'))
 
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
                         help='Enable API cache, default: enabled')
@@ -1158,6 +1160,35 @@ def main():
     report_text = ""
     score_summary = ""
     if lens:
+        # ── VRD-10i: default story to the scoring winner ────────────────
+        if args.story is None:
+            winner_story = None
+            try:
+                _scores = score_authors(container, weights=score_weights)
+            except Exception:
+                _scores = []
+            _included = [s for s in _scores if not s.excluded]
+            if _included:
+                top = _included[0]
+                for _idx, _story in enumerate(stories, start=1):
+                    if not isinstance(_story, dict):
+                        continue
+                    _aid = f"{(_story.get('make') or '?').strip()}:{(_story.get('model') or '?').strip()}"
+                    if _aid == top.author:
+                        winner_story = _idx
+                        break
+                if winner_story is not None:
+                    args.story = winner_story
+                    if not args.quiet:
+                        print(f"  Lens defaulting to story {winner_story} "
+                              f"(winner: {top.author}, composite={top.composite:+.3f}). "
+                              f"Override with -s N.", flush=True)
+            if args.story is None:
+                args.story = 1
+                if not args.quiet:
+                    print(f"  Lens defaulting to story 1 "
+                          f"(no scoring winner could be resolved). "
+                          f"Override with -s N.", flush=True)
         lens_claims = collect_lens_claims(container, args.story, lens)
         prompt_text = get_prompt_text(container)
         if lens in ("missing", "howtofix"):

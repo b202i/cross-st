@@ -74,7 +74,7 @@ st-verdict -s 1 --what-is-missing --ai-summary subject.json
 st-verdict -s 1 --what-is-false --ai-story --no-display subject.json
 ```
 
-> Each lens analyses **one** story at a time (the AI author at index `N`). `-s 1` is the default; pass `-s 2`, `-s 3`, … to inspect another author. To compare across authors, run the command once per index.
+> Each lens analyses **one** story at a time (the AI author at index `N`). Since cross-st 0.8.0 the default is the **highest-scoring story** per `score_authors()` (composite Coverage / Completeness / Accuracy / Calibration); pass `-s 1`, `-s 2`, … to inspect a specific author. To compare across authors, run the command once per index. Override the scoring weights with `--score-weights cov=…,comp=…,acc=…,cal=…`.
 
 The lens reads `story[N].fact[]` entries — run `st-cross` first so multiple AIs have fact-checked the report. The more checkers that flagged the same claim, the stronger the signal in the resulting analysis. The `--what-is-missing` lens additionally reads the original prompt (`data[0].prompt`) and the report markdown so the AI can reason about what should be there but isn't.
 
