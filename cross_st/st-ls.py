@@ -54,7 +54,7 @@ from mmd_startup import require_config
 from tabulate import tabulate
 
 from ai_handler import get_data_title
-from _report_signals import score_authors
+from _report_signals import score_authors, parse_score_weights
 
 model_clip = 17  # shorten model names to 'claude-3-7-sonnet'
 
@@ -82,6 +82,10 @@ def main():
                         help='Enable verbose output, default is verbose')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Enable minimal output')
+    parser.add_argument('--score-weights', type=str, default=None, metavar='SPEC',
+                        help=('Override composite-score weights, e.g. '
+                              '"cov=0.25,comp=0.25,acc=0.40,cal=0.10". '
+                              'Keys: cov, comp, acc, cal (or full names).'))
 
     args = parser.parse_args()
     file_prefix = args.json_file.rsplit('.', 1)[0]  # Split from the right, only once
@@ -145,8 +149,14 @@ def main():
         # Falls back to legacy fact-score average when the scorer can't run
         # (e.g. an empty container).
         try:
+            _weights = parse_score_weights(args.score_weights)
+        except ValueError as e:
+            print(f"Error: {e}")
+            sys.exit(2)
+        try:
             _scores_by_author = {
-                s.author: s for s in score_authors(main_container)
+                s.author: s for s in score_authors(main_container,
+                                                   weights=_weights)
             }
         except Exception:
             _scores_by_author = {}

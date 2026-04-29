@@ -71,7 +71,11 @@ def test_verdict_normalise_canonical():
     assert rs.verdict_normalise("True") == "true"
     assert rs.verdict_normalise("PARTIALLY_FALSE") == "partially_false"
     assert rs.verdict_normalise("partiallyfalse") == "partially_false"
-    assert rs.verdict_normalise("Unverifiable") == "opinion"
+    # VRD-10g: unverifiable / unverified now resolve to a dedicated "unknown"
+    # bucket rather than being aliased to "opinion".
+    assert rs.verdict_normalise("Unverifiable") == "unknown"
+    assert rs.verdict_normalise("Unverified") == "unknown"
+    assert rs.verdict_normalise("Unknown") == "unknown"
     assert rs.verdict_normalise("") == ""
 
 
@@ -379,3 +383,81 @@ def test_score_authors_to_dict_serialisable():
         json.loads(json.dumps(d))
         assert set(d) >= {"author", "rank", "composite", "components",
                           "weights", "excluded", "excluded_reason"}
+
+
+# ── VRD-10f: parse_score_weights ──────────────────────────────────────────────
+
+
+def test_parse_score_weights_none_or_empty():
+    assert rs.parse_score_weights(None) is None
+    assert rs.parse_score_weights("") is None
+    assert rs.parse_score_weights("   ") is None
+
+
+def test_parse_score_weights_short_aliases():
+    out = rs.parse_score_weights("cov=0.3,comp=0.3,acc=0.3,cal=0.1")
+    assert out == {"coverage": 0.3, "completeness": 0.3,
+                   "accuracy": 0.3, "calibration": 0.1}
+
+
+def test_parse_score_weights_full_names_and_partial():
+    out = rs.parse_score_weights("accuracy=0.5")
+    assert out == {"accuracy": 0.5}
+
+
+def test_parse_score_weights_rejects_unknown_key():
+    with pytest.raises(ValueError, match="Unknown"):
+        rs.parse_score_weights("foo=1")
+
+
+def test_parse_score_weights_rejects_non_numeric():
+    with pytest.raises(ValueError, match="numeric"):
+        rs.parse_score_weights("acc=high")
+
+
+def test_parse_score_weights_rejects_negative():
+    with pytest.raises(ValueError, match="non-negative"):
+        rs.parse_score_weights("acc=-0.1")
+
+
+def test_parse_score_weights_rejects_zero_sum():
+    with pytest.raises(ValueError, match="sum to > 0"):
+        rs.parse_score_weights("cov=0,comp=0")
+
+
+def test_parse_score_weights_rejects_malformed_pair():
+    with pytest.raises(ValueError, match="key=value"):
+        rs.parse_score_weights("cov0.3")
+
+
+# ── VRD-10g: distinct unknown bucket ──────────────────────────────────────────
+
+
+def test_fact_counts_pads_legacy_5_to_6():
+    """Legacy 5-int counts must be zero-padded to 6 on read."""
+    fact = {"counts": [3, 2, 1, 1, 0]}
+    out = rs._fact_counts(fact)
+    assert out == (3, 2, 1, 1, 0, 0)
+
+
+def test_fact_counts_accepts_6_int_form():
+    fact = {"counts": [3, 2, 1, 1, 0, 4]}
+    out = rs._fact_counts(fact)
+    assert out == (3, 2, 1, 1, 0, 4)
+
+
+def test_score_authors_handles_legacy_5_int_counts():
+    """Pre-VRD-10g containers must keep ranking through score_authors()."""
+    container = {
+        "data": [{"make": "x", "model": "m"}, {"make": "y", "model": "m"}],
+        "story": [
+            {"make": "x", "model": "m", "text": "a " * 100,
+             "fact": [{"counts": [8, 1, 1, 0, 0], "score": 1.5}]},
+            {"make": "y", "model": "m", "text": "a " * 100,
+             "fact": [{"counts": [2, 1, 1, 3, 3], "score": -0.5}]},
+        ],
+    }
+    scores = rs.score_authors(container)
+    by = {s.make: s for s in scores}
+    assert by["x"].composite > by["y"].composite
+

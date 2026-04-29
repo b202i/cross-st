@@ -163,16 +163,21 @@ def get_flattened_fc_data_simple(data):
         for fact in story["fact"]:
             if not isinstance(fact.get("counts"), list) or len(fact["counts"]) < 5:
                 continue  # skip malformed / incomplete fact entries (e.g. st-fetch containers)
+            # VRD-10g: legacy containers wrote 5 ints; fresh writes after 0.8.0
+            # add a 6th "unknown" bucket. Pad-on-read so downstream code can
+            # always rely on an `unknown_count` column being present.
+            _c = list(fact["counts"]) + [0]
             flattened_data.append({
                 "evaluator_make": evaluator_make,
                 "evaluator_model": evaluator_model,
                 "target_make": fact["make"],
                 "target_model": fact["model"][:model_max_chars],
-                "true_count": fact["counts"][0],
-                "partially_true_count": fact["counts"][1],
-                "opinion_count": fact["counts"][2],
-                "partially_false_count": fact["counts"][3],
-                "false_count": fact["counts"][4],
+                "true_count": _c[0],
+                "partially_true_count": _c[1],
+                "opinion_count": _c[2],
+                "partially_false_count": _c[3],
+                "false_count": _c[4],
+                "unknown_count": _c[5],
                 "score": fact["score"],
                 "summary": fact["summary"]  # Optional, included for reference
             })
@@ -226,16 +231,19 @@ Efficient: Prioritizes targets with higher coverage to maximize the chance of fi
             target_key = f"{fact['make']}:{fact['model'][:model_max_chars]}"
             story_targets.add(target_key)
             all_targets.add(target_key)
+            # VRD-10g: pad legacy 5-int counts with a zero unknown_count.
+            _c = list(fact["counts"]) + [0]
             story_facts.append({
                 "evaluator_make": evaluator_make,
                 "evaluator_model": evaluator_model,
                 "target_make": fact["make"],
                 "target_model": fact["model"][:model_max_chars],
-                "true_count": fact["counts"][0],
-                "partially_true_count": fact["counts"][1],
-                "opinion_count": fact["counts"][2],
-                "partially_false_count": fact["counts"][3],
-                "false_count": fact["counts"][4],
+                "true_count": _c[0],
+                "partially_true_count": _c[1],
+                "opinion_count": _c[2],
+                "partially_false_count": _c[3],
+                "false_count": _c[4],
+                "unknown_count": _c[5],
                 "score": fact["score"],
                 "summary": fact.get("summary", "")
             })

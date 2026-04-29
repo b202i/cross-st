@@ -95,6 +95,10 @@ def get_verdict_by_target(df):
         "opinion_count":         "Opinion",
         "partially_false_count": "~False",
         "false_count":           "False",
+        # VRD-10g: distinct unknown bucket. Column may be absent on legacy
+        # dataframes that pre-date the bucket — `available` filter below
+        # silently drops missing keys so older code paths stay green.
+        "unknown_count":         "Unknown",
     }
     available = {k: v for k, v in col_map.items() if k in df.columns}
     grouped = df.groupby("target")[list(available.keys())].mean()
@@ -102,7 +106,18 @@ def get_verdict_by_target(df):
     return grouped
 
 
-def format_authors_for_prompt(container):
+def _total_claims(df):
+    """Sum every verdict column (incl. VRD-10g ``unknown_count`` when
+    present) across the dataframe."""
+    cols = [c for c in ("true_count", "partially_true_count", "opinion_count",
+                        "partially_false_count", "false_count", "unknown_count")
+            if c in df.columns]
+    if not cols:
+        return 0
+    return int(df[cols].sum().sum())
+
+
+def format_authors_for_prompt(container, weights=None):
     """Render the structured author/evaluator/winner block for the AI prompt.
 
     VRD-10b: explicit author vs. evaluator labelling + pre-computed winner
@@ -112,10 +127,13 @@ def format_authors_for_prompt(container):
     only judges (those that appear inside fact[*] but never authored).
 
     See cross-internal/st-verdict/ANALYSIS_scoring_flaws.md §A.5/§D.4.
+
+    VRD-10f: optional ``weights`` dict overrides the default scorer weights
+    (parsed by ``parse_score_weights``).
     """
     if not container:
         return ""
-    scores = score_authors(container)
+    scores = score_authors(container, weights=weights)
     if not scores:
         return ""
 
@@ -199,21 +217,22 @@ def format_authors_for_prompt(container):
     return "\n".join(lines)
 
 
-def format_verdicts_for_prompt(df, story_titles, container=None):
+def format_verdicts_for_prompt(df, story_titles, container=None, weights=None):
     """Format per-target average verdict breakdown for the AI prompt.
 
     VRD-10b: when `container` is provided, the structured author /
     evaluator / pre-computed-winner block from `format_authors_for_prompt()`
     is prepended so the AI cannot conflate evaluators with authors. The
     legacy verdict table follows for context.
+
+    VRD-10f: ``weights`` is forwarded into the scorer.
     """
     by_target    = get_verdict_by_target(df)
     n_evaluators = df["evaluator"].nunique()
-    total_claims = int(df[["true_count", "partially_true_count", "opinion_count",
-                            "partially_false_count", "false_count"]].sum().sum())
+    total_claims = _total_claims(df)
 
     sections = []
-    authors_block = format_authors_for_prompt(container)
+    authors_block = format_authors_for_prompt(container, weights=weights)
     if authors_block:
         sections.append(authors_block)
 
@@ -360,14 +379,19 @@ FORMAT: Plain text, clear paragraph breaks. No markdown headers."""
 
 
 def generate_ai_content(df, story_titles, ai_make, content_type,
-                        verbose=False, use_cache=True, container=None):
+                        verbose=False, use_cache=True, container=None,
+                        weights=None):
     """Generate an AI-written caption for the verdict data.
 
     VRD-10b: `container` is now passed through to format_verdicts_for_prompt
     so the structured author/evaluator/winner block is included in the
     prompt (prevents the "Gemini emerged as most accurate" hallucination).
+
+    VRD-10f: ``weights`` overrides the default scorer weights.
     """
-    verdicts_text = format_verdicts_for_prompt(df, story_titles, container=container)
+    verdicts_text = format_verdicts_for_prompt(df, story_titles,
+                                               container=container,
+                                               weights=weights)
     n_evaluators  = df["evaluator"].nunique() if "evaluator" in df.columns else 0
     n_targets     = df["target"].nunique()    if "target"    in df.columns else 0
     prompt        = build_ai_prompt(verdicts_text, n_evaluators, n_targets, content_type)
@@ -401,6 +425,7 @@ from _report_signals import (
     parse_claims        as parse_claims,
     collect_claims      as _collect_claims_shared,
     score_authors       as score_authors,        # VRD-10b
+    parse_score_weights as parse_score_weights,  # VRD-10f
 )
 
 
@@ -836,8 +861,12 @@ def get_prompt_text(container):
 
 # ── Chart ─────────────────────────────────────────────────────────────────────
 
-_VERDICT_CATEGORIES = ["True", "~True", "Opinion", "~False", "False"]
-_VERDICT_COLORS     = ["#2ecc71", "#a8d8a8", "#f0e68c", "#f4a460", "#e74c3c"]
+# VRD-10g: 6 categories now — "Unknown" sits at the end with a neutral grey
+# so True/False stay visually anchored at the green/red ends. The chart code
+# only draws the categories that actually appear in `by_target.columns`, so
+# legacy 5-bucket containers continue to render with the old 5-column palette.
+_VERDICT_CATEGORIES = ["True", "~True", "Opinion", "~False", "False", "Unknown"]
+_VERDICT_COLORS     = ["#2ecc71", "#a8d8a8", "#f0e68c", "#f4a460", "#e74c3c", "#bdc3c7"]
 
 
 def _short_label(target_str):
@@ -850,7 +879,7 @@ def _short_label(target_str):
 
 
 def render_verdict_bar(df, output_path, display, file_out, quiet, subject="",
-                       show=True, container=None):
+                       show=True, container=None, weights=None):
     """Render stacked verdict bar chart (avg claims per eval, per target AI).
 
     When show=True (default) and display=True, blocks until the user closes the
@@ -865,8 +894,7 @@ def render_verdict_bar(df, output_path, display, file_out, quiet, subject="",
     """
     by_target    = get_verdict_by_target(df)
     n_evaluators = df["evaluator"].nunique()
-    total_claims = int(df[["true_count", "partially_true_count", "opinion_count",
-                            "partially_false_count", "false_count"]].sum().sum())
+    total_claims = _total_claims(df)
 
     labels = [_short_label(t) for t in by_target.index]
     x      = range(len(labels))
@@ -898,7 +926,8 @@ def render_verdict_bar(df, output_path, display, file_out, quiet, subject="",
     excluded_authors: set = set()
     if container is not None:
         try:
-            excluded_authors = {s.author for s in score_authors(container)
+            excluded_authors = {s.author for s in score_authors(container,
+                                                                weights=weights)
                                 if s.excluded}
         except Exception:
             excluded_authors = set()
@@ -1015,8 +1044,19 @@ def main():
                         help='Disable API cache')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
     parser.add_argument('-q', '--quiet',   action='store_true', help='Minimal output')
+    parser.add_argument('--score-weights', type=str, default=None, metavar='SPEC',
+                        help=('Override composite-score weights, e.g. '
+                              '"cov=0.25,comp=0.25,acc=0.40,cal=0.10". '
+                              'Keys: cov, comp, acc, cal (or full names).'))
 
     args = parser.parse_args()
+
+    # ── VRD-10f: parse --score-weights once, fail fast on invalid input ──────
+    try:
+        score_weights = parse_score_weights(args.score_weights)
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(2)
 
     # ── VRD-1/3/6: lens-mode resolution ──────────────────────────────────────
     # The four lenses (--what-is-{false,true,missing} and --how-to-fix) are
@@ -1025,7 +1065,7 @@ def main():
                        args.lens_howtofix])
     if _lens_count > 1:
         print("Error: --what-is-false, --what-is-true, --what-is-missing, "
-              "and --how-to-fix are mutually exclusive.")
+              "--how-to-fix are mutually exclusive.")
         sys.exit(1)
     if args.lens_false:
         lens = "false"
@@ -1124,7 +1164,9 @@ def main():
             report_text = collect_lens_report(container, args.story)
         if lens == "howtofix":
             # Score summary is the verdict-by-target table the chart is built from
-            score_summary = format_verdicts_for_prompt(df, story_titles, container=container)
+            score_summary = format_verdicts_for_prompt(df, story_titles,
+                                                       container=container,
+                                                       weights=score_weights)
         if not lens_claims:
             if lens == "missing":
                 print(f"No parseable fact-check claims found in story {args.story} of {file_json}.")
@@ -1178,7 +1220,8 @@ def main():
                 def _generate(ctype=ctype):
                     ai_content[ctype] = generate_ai_content(
                         df, story_titles, content_ai, ctype,
-                        args.verbose, args.cache, container=container)
+                        args.verbose, args.cache, container=container,
+                        weights=score_weights)
             t = threading.Thread(target=_generate, daemon=True)
             ai_threads.append((t, ctype, label))
             t.start()
@@ -1188,7 +1231,8 @@ def main():
     if chart_requested:
         output_path = args.path if args.path.endswith(os.sep) else args.path + os.sep
         fig = render_verdict_bar(df, output_path, args.display, args.file, args.quiet,
-                                 subject=subject, show=False, container=container)
+                                 subject=subject, show=False, container=container,
+                                 weights=score_weights)
 
     # ── Display chart ─────────────────────────────────────────────────────────
     if fig is not None:

@@ -16,6 +16,7 @@ Public API:
     calendar_context()            -> str  (CALENDAR CONTEXT prefix block)
     score_authors(container, weights=None) -> list[AuthorScore]
                                   -> ranked composite "best author" scores (VRD-10)
+    parse_score_weights(text)     -> dict | None  (parses --score-weights CLI arg)
 
 Module-level constants kept public for use by callers:
     VERDICT_NORMALISE             -> dict[str, str]
@@ -46,8 +47,14 @@ VERDICT_NORMALISE = {
     "partially_false":  "partially_false",
     "partiallyfalse":   "partially_false",
     "false":            "false",
-    "unverifiable":     "opinion",   # treat as neutral for the lens
-    "unverified":       "opinion",
+    # VRD-10g: dedicated "unknown" bucket — was previously aliased to
+    # "opinion". Keeping it distinct lets the chart show "I don't know"
+    # answers separately from genuine subjective opinions, and stops the
+    # calibration sub-score from rewarding evaluators who hide ignorance
+    # under the opinion label.
+    "unknown":          "unknown",
+    "unverifiable":     "unknown",
+    "unverified":       "unknown",
 }
 
 LENS_VERDICTS = {
@@ -270,8 +277,12 @@ EXCLUSION_FRACTION = 0.5
 ACCURACY_MIN_FLOOR = 5
 
 # Counts list layout in fact[].counts as written by st-fact / st-cross.
+# VRD-10g: legacy containers wrote 5 ints (true … false). Fresh writes after
+# 0.8.0 append a 6th slot for the new "unknown" bucket. Readers MUST tolerate
+# either length — see ``_fact_counts`` for the padding logic.
 _COUNTS_INDEX = {"true": 0, "partially_true": 1, "opinion": 2,
-                 "partially_false": 3, "false": 4}
+                 "partially_false": 3, "false": 4, "unknown": 5}
+_COUNTS_LEN = 6
 
 
 @dataclass
@@ -323,17 +334,26 @@ def _segment_count(story: dict) -> int:
 
 
 def _fact_counts(fact: dict) -> tuple:
-    """Return (true, partially_true, opinion, partially_false, false) for one
-    evaluator's fact-check. Uses fact['counts'] when present (5 ints in
-    canonical order); falls back to re-parsing fact['report'] otherwise.
+    """Return (true, partially_true, opinion, partially_false, false, unknown)
+    for one evaluator's fact-check.
+
+    Uses fact['counts'] when present — accepts either the legacy 5-int form
+    (zero-padded to 6 for the new "unknown" slot) or the new 6-int form.
+    Falls back to re-parsing fact['report'] otherwise.
     """
     counts = fact.get("counts")
-    if isinstance(counts, list) and len(counts) == 5:
+    if isinstance(counts, list) and len(counts) >= 5:
         try:
-            return tuple(int(x) for x in counts)
+            ints = [int(x) for x in counts]
         except (TypeError, ValueError):
-            pass
-    tally = [0, 0, 0, 0, 0]
+            ints = None
+        if ints is not None:
+            # Pad legacy 5-element counts with a zero "unknown" bucket so all
+            # consumers can index ints[5] safely.
+            if len(ints) < _COUNTS_LEN:
+                ints = ints + [0] * (_COUNTS_LEN - len(ints))
+            return tuple(ints[:_COUNTS_LEN])
+    tally = [0] * _COUNTS_LEN
     for _n, _claim, verdict, _explanation in parse_claims(fact.get("report", "")):
         idx = _COUNTS_INDEX.get(verdict)
         if idx is not None:
@@ -387,7 +407,10 @@ def _accuracy(per_evaluator_counts: list, k_floor: int) -> float:
         return 0.0
     total_signed = 0.0
     total_weight = 0.0
-    for t, pt, _op, pf, f in per_evaluator_counts:
+    for c in per_evaluator_counts:
+        # Accept 5- or 6-element tuples (legacy / VRD-10g). "unknown" is
+        # neutral and never enters the accuracy formula.
+        t, pt, _op, pf, f = c[0], c[1], c[2], c[3], c[4]
         n_hard = t + pt + pf + f
         if n_hard <= 0:
             continue
@@ -412,8 +435,13 @@ def _calibration(per_evaluator_counts: list,
     """
     total = 0
     op = 0
-    for t, pt, o, pf, f in per_evaluator_counts:
-        total += t + pt + o + pf + f
+    for c in per_evaluator_counts:
+        # 5- or 6-element tuples (VRD-10g). Unknown counts toward total
+        # (it represents real evaluator output) but is not the same axis as
+        # opinion for the calibration target.
+        t, pt, o, pf, f = c[0], c[1], c[2], c[3], c[4]
+        u = c[5] if len(c) >= 6 else 0
+        total += t + pt + o + pf + f + u
         op += o
     if total <= 0:
         return 0.5
@@ -494,13 +522,14 @@ def score_authors(container: dict, weights=None) -> list:
     # promote another bad author.
     word_med = median([s["words"] for s in signals])
     seg_med = median([s["segments"] for s in signals])
-    claim_totals = [sum(t + pt + o + pf + f
-                        for t, pt, o, pf, f in s["per_eval_counts"])
+    # VRD-10g: per-eval count tuples are now 6-wide. Sum all categories
+    # (incl. "unknown") for the total-claims cohort statistic.
+    claim_totals = [sum(sum(c) for c in s["per_eval_counts"])
                     for s in signals]
     claim_med = median(claim_totals) if claim_totals else 0
 
     n_hard_per_author = [
-        sum(t + pt + pf + f for t, pt, _o, pf, f in s["per_eval_counts"])
+        sum(c[0] + c[1] + c[3] + c[4] for c in s["per_eval_counts"])
         for s in signals
     ]
     n_hard_med = median(n_hard_per_author) if n_hard_per_author else 0
@@ -511,8 +540,10 @@ def score_authors(container: dict, weights=None) -> list:
     for s in signals:
         total = 0
         op = 0
-        for t, pt, o, pf, f in s["per_eval_counts"]:
-            total += t + pt + o + pf + f
+        for c in s["per_eval_counts"]:
+            t, pt, o, pf, f = c[0], c[1], c[2], c[3], c[4]
+            u = c[5] if len(c) >= 6 else 0
+            total += t + pt + o + pf + f + u
             op += o
         if total > 0:
             opinion_shares.append(op / total)
@@ -588,4 +619,66 @@ def score_authors(container: dict, weights=None) -> list:
     for i, r in enumerate(included, start=1):
         r.rank = i
     return included + excluded_list
+
+
+# ── CLI helper: parse --score-weights ─────────────────────────────────────────
+
+# Short aliases accepted on the command line so users can write
+#   --score-weights cov=0.3,comp=0.3,acc=0.3,cal=0.1
+# instead of spelling out the full sub-score names.
+_WEIGHT_ALIASES = {
+    "cov":          "coverage",
+    "coverage":     "coverage",
+    "comp":         "completeness",
+    "completeness": "completeness",
+    "acc":          "accuracy",
+    "accuracy":     "accuracy",
+    "cal":          "calibration",
+    "calibration":  "calibration",
+}
+
+
+def parse_score_weights(text):
+    """Parse a ``--score-weights`` CLI argument into a dict for ``score_authors``.
+
+    Format: ``cov=0.25,comp=0.25,acc=0.40,cal=0.10``. Keys may use either the
+    short alias (``cov``/``comp``/``acc``/``cal``) or the full sub-score name.
+    Returns ``None`` for an empty/None input. Raises ``ValueError`` for any
+    malformed pair, unknown key, non-numeric or negative value, or weight set
+    that sums to zero.
+    """
+    if not text or not text.strip():
+        return None
+    out: dict = {}
+    for pair in text.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(
+                f"--score-weights entry {pair!r} must be in 'key=value' form")
+        k_raw, v_raw = pair.split("=", 1)
+        k = k_raw.strip().lower()
+        if k not in _WEIGHT_ALIASES:
+            raise ValueError(
+                f"Unknown --score-weights key: {k!r} "
+                f"(allowed: cov, comp, acc, cal)")
+        try:
+            v = float(v_raw.strip())
+        except ValueError:
+            raise ValueError(
+                f"--score-weights value for {k!r} must be numeric, "
+                f"got {v_raw!r}")
+        if v < 0:
+            raise ValueError(
+                f"--score-weights value for {k!r} must be non-negative, "
+                f"got {v}")
+        out[_WEIGHT_ALIASES[k]] = v
+    if not out:
+        return None
+    if sum(out.values()) <= 0:
+        raise ValueError(
+            "--score-weights must sum to > 0 across the supplied keys")
+    return out
+
 

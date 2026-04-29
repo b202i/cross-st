@@ -61,7 +61,7 @@ from typing import Optional
 from tabulate import tabulate
 
 from ai_handler import process_prompt, get_content_auto, get_default_ai
-from _report_signals import score_authors
+from _report_signals import score_authors, parse_score_weights
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 DEFAULT_W1        = 0.7    # accuracy weight
@@ -83,7 +83,7 @@ def _clr(text, *codes) -> str:
 
 # ── Core scoring (pure functions — no I/O) ────────────────────────────────────
 
-def compute_domain_scores(container: dict) -> dict:
+def compute_domain_scores(container: dict, weights=None) -> dict:
     """
     Extract per-AI fact-check scores and timing from a single domain container.
 
@@ -152,7 +152,7 @@ def compute_domain_scores(container: dict) -> dict:
     # Keep a make→AuthorScore map (first-wins on duplicate makes — matches
     # the existing "first non-cached entry wins" pattern for gen timing).
     try:
-        _author_scores = score_authors(container)
+        _author_scores = score_authors(container, weights=weights)
     except Exception:
         _author_scores = []
     _by_make: dict = {}
@@ -1131,6 +1131,12 @@ def main():
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-q", "--quiet", action="store_true")
+    parser.add_argument(
+        "--score-weights", type=str, default=None, metavar="SPEC",
+        help=("Override composite-score weights, e.g. "
+              "'cov=0.25,comp=0.25,acc=0.40,cal=0.10'. "
+              "Keys: cov, comp, acc, cal (or full names)."),
+    )
 
     # ── Historical tracking ────────────────────────────────────────────────────
     hist_group = parser.add_argument_group("historical tracking")
@@ -1193,6 +1199,13 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # ── VRD-10f: parse --score-weights once, fail fast on invalid input ──────
+    try:
+        score_weights = parse_score_weights(args.score_weights)
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(2)
 
     # Load .env (API keys etc.)
     load_cross_env()
@@ -1375,7 +1388,7 @@ def main():
             print(f"  Warning: failed to load {jf}: {e}", file=sys.stderr)
             continue
 
-        scores = compute_domain_scores(container)
+        scores = compute_domain_scores(container, weights=score_weights)
         has_facts = any(
             info.get("fact_avg") is not None
             for info in scores.values()

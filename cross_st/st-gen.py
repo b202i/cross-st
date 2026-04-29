@@ -266,6 +266,10 @@ def main():
     data = {
         "make": args.ai,
         "model": ai_model,
+        # VRD-10h: forward-compat hook for cross-ai-core multi-model. Read-side
+        # (e.g. score_authors) currently INFERS role from container shape, so
+        # older JSONs without this field still work.
+        "role": "author",
         "prompt": prompt_from_file,
         "gen_payload": gen_payload,
         "gen_response": gen_response,

@@ -188,6 +188,10 @@ def main():
     story = {
         "make":     select_make,
         "model":    select_model,
+        # VRD-10h: forward-compat hook for cross-ai-core multi-model. story[]
+        # entries are authored content; read-side score_authors() currently
+        # INFERS this from container shape, so older JSONs still work.
+        "role":     "author",
         "title":    file_title_content,
         "markdown": file_md_content,
         "text":     file_txt_content,

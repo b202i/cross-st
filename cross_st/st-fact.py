@@ -59,11 +59,15 @@ def get_fact_check_prompt(paragraph):
     For each statement in the paragraph:
     
     - Assign a number to each claim (e.g., Claim: 1, Claim: 2).
-    - Verify using only these 5 categories: True, False, Partially_true, Partially_false, Opinion.
+    - Verify using only these 6 categories: True, False, Partially_true, Partially_false, Opinion, Unverifiable.
     - Format as: "Claim [number]: '[claim text]' Verification:[category]"
     - Provide a concise explanation.
     - If a claim is partially true/false, clarify what’s correct/incorrect.
-    - If it’s an opinion or unverifiable, state why.
+    - If it’s an opinion, state why.
+    - If a claim is genuinely unknowable from your knowledge (e.g. very recent
+      events past your training cutoff, or data that simply does not exist
+      publicly), use `Unverifiable` rather than guessing True/False or
+      defaulting to Opinion.
     - If a paragraph is composed of multiple claims, break it into individual claims, and fact check each part.
 
     Example output:
@@ -77,14 +81,19 @@ def get_fact_check_prompt(paragraph):
     - If a claim cites a date, study, or document beyond your training-data
       cutoff but on or before {today}, mark it `Partially_true` (or
       `Unverifiable`) with an explanation noting the cutoff — do NOT mark it
-      `False` solely because you cannot independently verify it.
+      `False` solely because you cannot independently verify it. Reserve
+      `Unverifiable` for genuine knowledge gaps; do not use it as a default
+      escape hatch when the claim is checkable.
     """
     return prompt.strip()
 
 
 def insert_newlines(text):
+    # VRD-10g: accept the new 6th category (Unverifiable / Unverified /
+    # Unknown). They all tally into the dedicated "Unknown" bucket downstream
+    # — see verdict_normalise() in _report_signals.
     # Define the pattern to match the full Verification statement as one unit
-    pattern = r'(\s*Verification:\s*(?:True|False|Partially_true|Partially_false|Opinion)\s*)'
+    pattern = r'(\s*Verification:\s*(?:True|False|Partially_true|Partially_false|Opinion|Unverifiable|Unverified|Unknown)\s*)'
 
     # Split the text, keeping the delimiters
     parts = re.split(pattern, text, flags=re.IGNORECASE)
@@ -95,7 +104,7 @@ def insert_newlines(text):
         stripped_part = part.strip()
 
         # If this part is a verification statement
-        if re.match(r'Verification:\s*(True|False|Partially_true|Partially_false|Opinion)', stripped_part,
+        if re.match(r'Verification:\s*(True|False|Partially_true|Partially_false|Opinion|Unverifiable|Unverified|Unknown)', stripped_part,
                     re.IGNORECASE):
             # Add newline before if previous part doesn't end with one
             if i > 0 and not result.endswith('\n'):
@@ -571,7 +580,11 @@ def main():
 
             fact_check_text = get_content_auto(response) + "  "
 
-            valid_words = ["True", "False", "Partially_true", "Partially_false", "Opinion"]
+            # VRD-10g: include Unverifiable / Unverified / Unknown so segments
+            # whose AI returned only "Verification: Unverifiable" still count
+            # as a valid fact-check response.
+            valid_words = ["True", "False", "Partially_true", "Partially_false",
+                           "Opinion", "Unverifiable", "Unverified", "Unknown"]
             if not any(word in fact_check_text for word in valid_words):
                 continue
 
@@ -579,9 +592,20 @@ def main():
                 print(fact_check_text)
             report_lines.append("\n" + fact_check_text)
 
-            verdict_pattern = r'[\*]*\s*Verification:\s*(True|False|Partially_true|Partially_false|Opinion)\s*[\*]*'
+            # VRD-10g: capture the new Unverifiable/Unverified/Unknown verdicts
+            # then normalise them all into the "Unknown" tally bucket so the
+            # report summary table has a single "Unknown" column.
+            verdict_pattern = (r'[\*]*\s*Verification:\s*'
+                               r'(True|False|Partially_true|Partially_false|'
+                               r'Opinion|Unverifiable|Unverified|Unknown)'
+                               r'\s*[\*]*')
             statuses = re.findall(verdict_pattern, fact_check_text)
-            overall_tally.update(status.strip() for status in statuses)
+            _UNKNOWN_ALIAS = {"unverifiable": "Unknown",
+                              "unverified":   "Unknown",
+                              "unknown":      "Unknown"}
+            normalised = [_UNKNOWN_ALIAS.get(s.strip().lower(), s.strip())
+                          for s in statuses]
+            overall_tally.update(normalised)
 
             # ── Step 3: parse AI response into structured claims keyed to seg_id
             # Uses the shared CLAIM_BLOCK_RE from _report_signals so st-fact and
@@ -603,8 +627,12 @@ def main():
                 f.write(paragraph_test)
 
         if overall_tally:
-            custom_order = ["True", "Partially_true", "Opinion", "Partially_false", "False"]
-            score_mapping = {"True": 2, "Partially_true": 1, "Opinion": 0, "Partially_false": -1, "False": -2}
+            # VRD-10g: "Unknown" is the new dedicated bucket for unverifiable
+            # / unverified verdicts. It is neutral in the score (mapping 0)
+            # and does NOT count toward the accuracy denominator.
+            custom_order = ["True", "Partially_true", "Opinion", "Partially_false", "False", "Unknown"]
+            score_mapping = {"True": 2, "Partially_true": 1, "Opinion": 0,
+                             "Partially_false": -1, "False": -2, "Unknown": 0}
             overall_tally = {k: overall_tally.get(k, 0) for k in custom_order}
             headers_list = custom_order
             counts = [overall_tally[h] for h in headers_list]
@@ -616,9 +644,11 @@ def main():
             report_lines.append(summary_header)
             report_summary = tabulate([counts], headers=headers_list, tablefmt="pipe")
             report_lines.append(report_summary)
-            fact_checked_categories = ["True", "Partially_true", "Opinion", "Partially_false", "False"]
+            fact_checked_categories = custom_order
             fact_check_counts = [overall_tally[h] for h in fact_checked_categories]
-            total_fact_checked = sum(fact_check_counts) - fact_check_counts[2]
+            # total_fact_checked excludes both Opinion (idx 2) and Unknown
+            # (idx 5) — both are neutral and do not influence the score.
+            total_fact_checked = sum(fact_check_counts) - fact_check_counts[2] - fact_check_counts[5]
             if total_fact_checked > 0:
                 fact_check_score = sum(
                     score_mapping[h] * overall_tally[h] for h in fact_checked_categories) / total_fact_checked
@@ -676,6 +706,12 @@ def main():
             "score":   fact_check_score,
             "make":    get_ai_make(args.ai),
             "model":   get_ai_model(args.ai),
+            # VRD-10h: fact[] entries are always "evaluator" — they record
+            # one AI's verdict on another AI's authored story. Read-side code
+            # has historically inferred this from container shape; the
+            # explicit field is a forward-compat hook for cross-ai-core
+            # multi-model where one model may both author and evaluate.
+            "role":    "evaluator",
             "claims":  structured_claims,       # structured list, keyed by seg_id
             "timing":  timing,
         }

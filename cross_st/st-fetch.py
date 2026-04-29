@@ -423,6 +423,9 @@ def main():
     data = {
         "make":         source_make,
         "model":        source_model,
+        # VRD-10h: data[] entries are always "author" — st-fetch sourced
+        # documents are treated as authored content for downstream scoring.
+        "role":         "author",
         "title":        title,
         "text":         text,
         "markdown":     markdown_content,
