@@ -102,14 +102,122 @@ def get_verdict_by_target(df):
     return grouped
 
 
-def format_verdicts_for_prompt(df, story_titles):
-    """Format per-target average verdict breakdown for the AI prompt."""
+def format_authors_for_prompt(container):
+    """Render the structured author/evaluator/winner block for the AI prompt.
+
+    VRD-10b: explicit author vs. evaluator labelling + pre-computed winner
+    narrative drawn from `score_authors()`. Eliminates the "Gemini emerged
+    as most accurate" failure mode by telling the AI exactly which AIs are
+    candidates for "best author" (those in container.data[]) vs. which are
+    only judges (those that appear inside fact[*] but never authored).
+
+    See cross-internal/st-verdict/ANALYSIS_scoring_flaws.md §A.5/§D.4.
+    """
+    if not container:
+        return ""
+    scores = score_authors(container)
+    if not scores:
+        return ""
+
+    # Authors = whatever wrote a story (whether included or excluded)
+    author_lines = []
+    excluded_lines = []
+    for s in scores:
+        marker = "  [INCOMPLETE — excluded from best-author selection]" if s.excluded else ""
+        line = (f"  - {s.author}  "
+                f"(words={s.words}, segments={s.segments}, "
+                f"claims_fact_checked={s.claims_total}){marker}")
+        if s.excluded:
+            excluded_lines.append(f"{line}\n      reason: {s.excluded_reason}")
+        else:
+            author_lines.append(line)
+
+    # Evaluators = every fact[*].make:model that appears anywhere
+    evaluator_set = set()
+    for story in container.get("story", []):
+        for fact in story.get("fact", []):
+            ev_make = fact.get("make", "?")
+            ev_model = fact.get("model", "?")
+            evaluator_set.add(f"{ev_make}:{ev_model}")
+    evaluators_sorted = sorted(evaluator_set)
+
+    author_ids = {s.author for s in scores}
+    # Evaluators that are ALSO authors (they evaluated themselves and others)
+    # vs. evaluators that NEVER authored — the latter are the dangerous ones
+    # (gemini in the figma fixture). Call out non-author evaluators by name.
+    pure_evaluators = sorted(evaluator_set - author_ids)
+
+    lines = [
+        "STORY AUTHORS (the ONLY candidates for \"best AI author\"):",
+        *author_lines,
+    ]
+    if excluded_lines:
+        lines += ["", "STORY AUTHORS marked INCOMPLETE — these CANNOT be named as the winner:"]
+        lines += excluded_lines
+
+    lines += [
+        "",
+        "FACT-CHECK EVALUATORS (these AIs JUDGED the stories — they are NOT candidates):",
+        *(f"  - {e}" for e in evaluators_sorted),
+    ]
+    if pure_evaluators:
+        lines += [
+            "",
+            "⚠ The following AI(s) appear ONLY as fact-check evaluators and "
+            "MUST NOT be named as story authors:",
+            *(f"  - {e}" for e in pure_evaluators),
+        ]
+
+    # Pre-computed winner + components
+    included = [s for s in scores if not s.excluded]
+    if included:
+        winner = included[0]
+        runner_up = included[1] if len(included) > 1 else None
+        lines += [
+            "",
+            f"PRE-COMPUTED WINNER: {winner.author}  "
+            f"(composite {winner.composite:+.3f}, rank 1 of {len(included)})",
+            f"  {winner.narrative}",
+        ]
+        if runner_up:
+            lines += [
+                f"RUNNER-UP: {runner_up.author}  (composite {runner_up.composite:+.3f})",
+                f"  {runner_up.narrative}",
+            ]
+        # Brief "why winner won" delta
+        if runner_up:
+            biggest_gap = max(
+                winner.components.keys(),
+                key=lambda k: winner.components[k] - runner_up.components[k],
+            )
+            lines += [
+                "",
+                f"  Strongest sub-score gap: '{biggest_gap}' — "
+                f"winner {winner.components[biggest_gap]:+.2f} vs. "
+                f"runner-up {runner_up.components[biggest_gap]:+.2f}.",
+            ]
+    return "\n".join(lines)
+
+
+def format_verdicts_for_prompt(df, story_titles, container=None):
+    """Format per-target average verdict breakdown for the AI prompt.
+
+    VRD-10b: when `container` is provided, the structured author /
+    evaluator / pre-computed-winner block from `format_authors_for_prompt()`
+    is prepended so the AI cannot conflate evaluators with authors. The
+    legacy verdict table follows for context.
+    """
     by_target    = get_verdict_by_target(df)
     n_evaluators = df["evaluator"].nunique()
     total_claims = int(df[["true_count", "partially_true_count", "opinion_count",
                             "partially_false_count", "false_count"]].sum().sum())
 
-    lines = [
+    sections = []
+    authors_block = format_authors_for_prompt(container)
+    if authors_block:
+        sections.append(authors_block)
+
+    table_lines = [
         f"Per-story average verdict counts (each story evaluated by {n_evaluators} AIs):",
         f"Total claims analysed across all fact-checks: {total_claims}",
         "",
@@ -117,14 +225,16 @@ def format_verdicts_for_prompt(df, story_titles):
     categories = ["True", "~True", "Opinion", "~False", "False"]
     for target, row in by_target.iterrows():
         total = sum(row[c] for c in categories if c in row)
-        lines.append(f"  {target}:")
+        table_lines.append(f"  {target}:")
         for cat in categories:
             if cat in row:
                 val = row[cat]
                 pct = 100 * val / total if total else 0
-                lines.append(f"    {cat:<10} avg {val:5.1f}  ({pct:.0f}%)")
-    lines += ["", "Story titles (infer the subject domain from these):", story_titles]
-    return "\n".join(lines)
+                table_lines.append(f"    {cat:<10} avg {val:5.1f}  ({pct:.0f}%)")
+    table_lines += ["", "Story titles (infer the subject domain from these):", story_titles]
+    sections.append("\n".join(table_lines))
+
+    return "\n\n".join(sections)
 
 
 def build_ai_prompt(verdicts_text, n_evaluators, n_targets, content_type):
@@ -132,8 +242,15 @@ def build_ai_prompt(verdicts_text, n_evaluators, n_targets, content_type):
     context = f"""Cross-product AI fact-check verdict breakdown.
 {n_evaluators} AI evaluators each fact-checked stories written by {n_targets} AI authors.
 
-Scoring: True=+2  ~True=+1  Opinion=0 (excluded from score average)
-         ~False=-1  False=-2.  Score range: -2.0 (all False) to +2.0 (all True).
+Composite scoring (VRD-10): Coverage (prompt-aspect overlap) + Completeness
+(word/segment compliance) + Accuracy (volume-weighted with min-claim floor)
++ Calibration (cohort-relative opinion share). The PRE-COMPUTED WINNER
+section below is authoritative — do NOT recompute or override it.
+
+CRITICAL RULE: When you name the "best AI" or "winner", you MUST pick from
+the STORY AUTHORS list above. NEVER name a fact-check evaluator (an AI that
+only appears in the FACT-CHECK EVALUATORS list) as the winning author —
+those AIs judged the work, they did not author it.
 
 {verdicts_text}
 
@@ -147,7 +264,9 @@ HOW TO READ THIS CHART:
 
 THE KEY QUESTION TO ANSWER:
 Which AI author produced the most accurate, fact-verified stories on this topic,
-and what in the verdict breakdown explains why?
+and what in the verdict breakdown explains why?  Use the PRE-COMPUTED WINNER as
+your answer; explain WHY using the four sub-scores (coverage, completeness,
+accuracy, calibration) and the verdict bands.
 """
     audience = "Technical readers (12th grade+) interested in AI report quality."
 
@@ -240,9 +359,15 @@ FORMAT: Plain text, clear paragraph breaks. No markdown headers."""
         raise ValueError(f"Unknown content_type: {content_type}")
 
 
-def generate_ai_content(df, story_titles, ai_make, content_type, verbose=False, use_cache=True):
-    """Generate an AI-written caption for the verdict data."""
-    verdicts_text = format_verdicts_for_prompt(df, story_titles)
+def generate_ai_content(df, story_titles, ai_make, content_type,
+                        verbose=False, use_cache=True, container=None):
+    """Generate an AI-written caption for the verdict data.
+
+    VRD-10b: `container` is now passed through to format_verdicts_for_prompt
+    so the structured author/evaluator/winner block is included in the
+    prompt (prevents the "Gemini emerged as most accurate" hallucination).
+    """
+    verdicts_text = format_verdicts_for_prompt(df, story_titles, container=container)
     n_evaluators  = df["evaluator"].nunique() if "evaluator" in df.columns else 0
     n_targets     = df["target"].nunique()    if "target"    in df.columns else 0
     prompt        = build_ai_prompt(verdicts_text, n_evaluators, n_targets, content_type)
@@ -275,6 +400,7 @@ from _report_signals import (
     LENS_VERDICTS       as _LENS_VERDICTS,
     parse_claims        as parse_claims,
     collect_claims      as _collect_claims_shared,
+    score_authors       as score_authors,        # VRD-10b
 )
 
 
@@ -957,7 +1083,7 @@ def main():
             report_text = collect_lens_report(container, args.story)
         if lens == "howtofix":
             # Score summary is the verdict-by-target table the chart is built from
-            score_summary = format_verdicts_for_prompt(df, story_titles)
+            score_summary = format_verdicts_for_prompt(df, story_titles, container=container)
         if not lens_claims:
             if lens == "missing":
                 print(f"No parseable fact-check claims found in story {args.story} of {file_json}.")
@@ -1010,7 +1136,8 @@ def main():
             else:
                 def _generate(ctype=ctype):
                     ai_content[ctype] = generate_ai_content(
-                        df, story_titles, content_ai, ctype, args.verbose, args.cache)
+                        df, story_titles, content_ai, ctype,
+                        args.verbose, args.cache, container=container)
             t = threading.Thread(target=_generate, daemon=True)
             ai_threads.append((t, ctype, label))
             t.start()

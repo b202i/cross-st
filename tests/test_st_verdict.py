@@ -415,3 +415,111 @@ class TestCalendarContext:
         )
         assert self._today_iso() in prompt
 
+
+# ── VRD-10b: structured author/evaluator/winner block in caption prompt ──────
+
+import json as _json
+_FIXTURE = Path(__file__).parent / "fixtures" / "figma_generation_ai.json"
+
+
+def _load_figma_container():
+    with open(_FIXTURE) as fh:
+        return _json.load(fh)
+
+
+class TestVRD10bAuthorBlock:
+    """Locks in the §D.4 prompt-construction fix that prevents the
+    "Gemini emerged as most accurate" caption hallucination."""
+
+    def test_format_authors_block_lists_only_authors_as_candidates(self):
+        c = _load_figma_container()
+        block = st_verdict.format_authors_for_prompt(c)
+        # Authors header present, and exactly the 4 story authors listed
+        assert "STORY AUTHORS" in block
+        for author in ("perplexity:sonar-pro", "xai:grok-4-1-fast-reasoning",
+                       "openai:gpt-4o", "anthropic:claude-opus-4-5"):
+            assert author in block, f"missing author {author}"
+
+    def test_format_authors_block_calls_out_pure_evaluators(self):
+        c = _load_figma_container()
+        block = st_verdict.format_authors_for_prompt(c)
+        # The structured warning section must name gemini explicitly
+        assert "MUST NOT be named as story authors" in block
+        assert "gemini:gemini-2.5-flash" in block
+        # Make sure gemini is in the EVALUATORS section, not the AUTHORS section
+        authors_idx = block.find("STORY AUTHORS")
+        evaluators_idx = block.find("FACT-CHECK EVALUATORS")
+        warning_idx = block.find("MUST NOT be named")
+        # gemini must appear AFTER the authors header AND after the warning
+        gemini_first = block.find("gemini")
+        assert gemini_first > authors_idx
+        assert gemini_first > evaluators_idx or gemini_first > warning_idx
+
+    def test_format_authors_block_names_perplexity_as_winner(self):
+        c = _load_figma_container()
+        block = st_verdict.format_authors_for_prompt(c)
+        assert "PRE-COMPUTED WINNER: perplexity:sonar-pro" in block
+        # Sanity: gemini must NEVER appear as the winner
+        assert "PRE-COMPUTED WINNER: gemini" not in block
+
+    def test_format_authors_block_includes_runner_up_and_gap(self):
+        c = _load_figma_container()
+        block = st_verdict.format_authors_for_prompt(c)
+        assert "RUNNER-UP:" in block
+        assert "Strongest sub-score gap" in block
+
+    def test_format_authors_block_empty_container_returns_empty(self):
+        assert st_verdict.format_authors_for_prompt(None) == ""
+        assert st_verdict.format_authors_for_prompt({}) == ""
+
+    def test_format_verdicts_for_prompt_with_container_includes_block(self):
+        """Integration: format_verdicts_for_prompt(df, titles, container=...)
+        must prepend the structured author block before the legacy table."""
+        import pandas as pd
+        from mmd_data_analysis import get_flattened_fc_data_simple
+
+        c = _load_figma_container()
+        df = pd.DataFrame(get_flattened_fc_data_simple(c))
+        df["evaluator"] = df["evaluator_make"] + ":" + df["evaluator_model"]
+        df["target"]    = df["target_make"]    + ":" + df["target_model"]
+        titles = st_verdict.extract_story_titles(c)
+
+        text = st_verdict.format_verdicts_for_prompt(df, titles, container=c)
+        # Author block first, legacy table after
+        authors_idx = text.find("STORY AUTHORS")
+        table_idx   = text.find("Per-story average verdict counts")
+        assert 0 <= authors_idx < table_idx, (
+            f"author block must precede legacy table "
+            f"(got {authors_idx=}, {table_idx=})"
+        )
+        # Pre-computed winner must NOT be a pure evaluator
+        assert "PRE-COMPUTED WINNER: perplexity:sonar-pro" in text
+        assert "PRE-COMPUTED WINNER: gemini" not in text
+
+    def test_format_verdicts_for_prompt_without_container_back_compat(self):
+        """When container is omitted, behaviour falls back to the legacy
+        table-only format (no structured block)."""
+        import pandas as pd
+        from mmd_data_analysis import get_flattened_fc_data_simple
+
+        c = _load_figma_container()
+        df = pd.DataFrame(get_flattened_fc_data_simple(c))
+        df["evaluator"] = df["evaluator_make"] + ":" + df["evaluator_model"]
+        df["target"]    = df["target_make"]    + ":" + df["target_model"]
+        titles = st_verdict.extract_story_titles(c)
+
+        text = st_verdict.format_verdicts_for_prompt(df, titles)  # no container
+        assert "STORY AUTHORS" not in text
+        assert "PRE-COMPUTED WINNER" not in text
+        assert "Per-story average verdict counts" in text
+
+    def test_build_ai_prompt_carries_critical_rule(self):
+        """The CRITICAL RULE must be present so the AI knows to reject any
+        candidate not in the STORY AUTHORS list."""
+        prompt = st_verdict.build_ai_prompt(
+            verdicts_text="STORY AUTHORS:\n  - x:y\nFACT-CHECK EVALUATORS:\n  - z:w",
+            n_evaluators=4, n_targets=4, content_type="short")
+        assert "CRITICAL RULE" in prompt
+        assert "MUST pick from" in prompt or "MUST" in prompt
+        assert "PRE-COMPUTED WINNER" in prompt
+
