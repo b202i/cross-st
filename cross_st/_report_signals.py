@@ -14,6 +14,8 @@ Public API:
                                   -> list[dict]  (claim, verdict, explanation, evaluator)
     verdict_normalise(s)          -> str
     calendar_context()            -> str  (CALENDAR CONTEXT prefix block)
+    score_authors(container, weights=None) -> list[AuthorScore]
+                                  -> ranked composite "best author" scores (VRD-10)
 
 Module-level constants kept public for use by callers:
     VERDICT_NORMALISE             -> dict[str, str]
@@ -29,7 +31,9 @@ names):
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, asdict
 from datetime import date
+from statistics import median
 from typing import NamedTuple
 
 # ── Verdict normalisation + lens groupings ────────────────────────────────────
@@ -235,4 +239,353 @@ def calendar_context() -> str:
 
 # Backwards-compat alias
 _today_context_block = calendar_context
+
+
+# ── Composite "best author" scoring (VRD-10a) ─────────────────────────────────
+#
+# Replaces the legacy per-fact `score` in st-ls / st-verdict / st-stones with
+# a four-component composite incorporating Coverage, Completeness, Accuracy
+# (with min-claim floor) and Calibration. Hard-excludes structurally
+# incomplete authors. See cross-internal/st-verdict/VRD-10.md and
+# cross-internal/st-verdict/ANALYSIS_scoring_flaws.md for the rationale.
+#
+# Identity is `make:model` (NEVER `make` alone) so a future world where
+# `gemini-2.5-flash` evaluates and `gemini-3.0-pro` authors works without
+# any change to this scorer.
+
+DEFAULT_WEIGHTS: dict = {
+    "coverage":     0.25,
+    "completeness": 0.25,
+    "accuracy":     0.40,
+    "calibration":  0.10,
+}
+
+# Anti-gaming gate: any author whose words / segments / total claim count is
+# below this fraction of the cohort median is excluded from "best author"
+# selection (see analysis §F.1 Q6).
+EXCLUSION_FRACTION = 0.5
+
+# Minimum N_hard floor for accuracy denominator — kills the "few claims = easy
+# 100%" exploit (see analysis §C item 1 and §D.1 Accuracy row).
+ACCURACY_MIN_FLOOR = 5
+
+# Counts list layout in fact[].counts as written by st-fact / st-cross.
+_COUNTS_INDEX = {"true": 0, "partially_true": 1, "opinion": 2,
+                 "partially_false": 3, "false": 4}
+
+
+@dataclass
+class AuthorScore:
+    """Per-author composite score + component breakdown + exclusion reason.
+
+    `author` is the canonical `make:model` identity used everywhere in the
+    new scoring pipeline. `composite` is in roughly [-1, +1]; sub-scores are
+    in [0, 1] except `accuracy` which is in [-1, +1].
+
+    `excluded` authors are still returned (so the chart can show them with a
+    hatched/grey overlay per VRD-10e) but have rank=None and are listed
+    after all included authors.
+    """
+    author: str
+    make: str
+    model: str
+    rank: int | None
+    composite: float
+    components: dict
+    weights: dict
+    words: int
+    segments: int
+    claims_total: int
+    excluded: bool
+    excluded_reason: str | None
+    narrative: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def _author_id(make: str, model: str) -> str:
+    return f"{(make or '?').strip()}:{(model or '?').strip()}"
+
+
+def _word_count(story: dict) -> int:
+    md = story.get("markdown") or story.get("text") or ""
+    return len(md.split())
+
+
+def _segment_count(story: dict) -> int:
+    # Container shape uses `segments` (plural) per the figma fixture; some
+    # older containers used `segment` (singular) — accept either.
+    segs = story.get("segments")
+    if segs is None:
+        segs = story.get("segment", [])
+    return len(segs or [])
+
+
+def _fact_counts(fact: dict) -> tuple:
+    """Return (true, partially_true, opinion, partially_false, false) for one
+    evaluator's fact-check. Uses fact['counts'] when present (5 ints in
+    canonical order); falls back to re-parsing fact['report'] otherwise.
+    """
+    counts = fact.get("counts")
+    if isinstance(counts, list) and len(counts) == 5:
+        try:
+            return tuple(int(x) for x in counts)
+        except (TypeError, ValueError):
+            pass
+    tally = [0, 0, 0, 0, 0]
+    for _n, _claim, verdict, _explanation in parse_claims(fact.get("report", "")):
+        idx = _COUNTS_INDEX.get(verdict)
+        if idx is not None:
+            tally[idx] += 1
+    return tuple(tally)
+
+
+def _coverage(prompt_subjects: frozenset, story_markdown: str) -> float:
+    if not prompt_subjects:
+        return 1.0
+    tokens = report_tokens(story_markdown)
+    if not tokens:
+        return 0.0
+    hit = sum(1 for s in prompt_subjects if s in tokens)
+    return hit / len(prompt_subjects)
+
+
+def _completeness(words: int, segments: int,
+                  target_lo, median_segments: float,
+                  truncated: bool) -> float:
+    """Geometric mean of (word ratio, segment ratio, non-truncation).
+
+    word ratio  : 1.0 if words ≥ target_lo (or no contract); else words/target_lo
+    seg ratio   : 1.0 if segments ≥ cohort median; else segments/median
+    non-trunc   : 1.0 unless truncated, then 0.0 (kills the score)
+    """
+    if target_lo and target_lo > 0:
+        word_ratio = min(1.0, words / target_lo) if words > 0 else 0.0
+    else:
+        word_ratio = 1.0
+    if median_segments > 0:
+        seg_ratio = min(1.0, segments / median_segments) if segments > 0 else 0.0
+    else:
+        seg_ratio = 1.0
+    trunc_factor = 0.0 if truncated else 1.0
+    product = word_ratio * seg_ratio * trunc_factor
+    if product <= 0:
+        return 0.0
+    return product ** (1.0 / 3.0)
+
+
+def _accuracy(per_evaluator_counts: list, k_floor: int) -> float:
+    """Volume-weighted accuracy across evaluators with min-claim denominator.
+
+    Per evaluator: (2T + ~T − ~F − 2F) / max(N_hard, k_floor).
+    Aggregate: weight each evaluator's per-claim score by its N_hard so a
+    thorough evaluator contributes more than a sparse one. Returns 0.0 if no
+    evaluator produced any hard claims. Clamped to [-1, +1].
+    """
+    if not per_evaluator_counts:
+        return 0.0
+    total_signed = 0.0
+    total_weight = 0.0
+    for t, pt, _op, pf, f in per_evaluator_counts:
+        n_hard = t + pt + pf + f
+        if n_hard <= 0:
+            continue
+        signed = 2 * t + pt - pf - 2 * f
+        denom = max(n_hard, k_floor)
+        per_eval = signed / denom
+        total_signed += per_eval * n_hard
+        total_weight += n_hard
+    if total_weight <= 0:
+        return 0.0
+    raw = total_signed / total_weight
+    return max(-1.0, min(1.0, raw))
+
+
+def _calibration(per_evaluator_counts: list,
+                 cohort_median_opinion_share: float) -> float:
+    """1 − |opinion_share − cohort_median_opinion_share|, clamped to [0, 1].
+
+    Penalises both vagueness (high opinion share vs cohort) and
+    overconfidence (very low opinion share). Cohort median is the natural
+    neutral point because it reflects the prompt's intrinsic subjectivity.
+    """
+    total = 0
+    op = 0
+    for t, pt, o, pf, f in per_evaluator_counts:
+        total += t + pt + o + pf + f
+        op += o
+    if total <= 0:
+        return 0.5
+    share = op / total
+    return max(0.0, min(1.0, 1.0 - abs(share - cohort_median_opinion_share)))
+
+
+def _collect_author_signals(container: dict) -> list:
+    """One row per story author: identity, words, segments, per-eval counts."""
+    out = []
+    data_authors = {_author_id(d.get("make", ""), d.get("model", ""))
+                    for d in container.get("data", []) if isinstance(d, dict)}
+    for story in container.get("story", []):
+        if not isinstance(story, dict):
+            continue
+        make = story.get("make", "?")
+        model = story.get("model", "?")
+        author = _author_id(make, model)
+        per_eval = []
+        truncated_any = False
+        for fact in story.get("fact", []):
+            if not isinstance(fact, dict):
+                continue
+            per_eval.append(_fact_counts(fact))
+            if fact.get("_truncated") or fact.get("_error"):
+                truncated_any = True
+        out.append({
+            "author": author,
+            "make": make,
+            "model": model,
+            "in_data": author in data_authors,
+            "words": _word_count(story),
+            "segments": _segment_count(story),
+            "per_eval_counts": per_eval,
+            "markdown": story.get("markdown") or story.get("text") or "",
+            "truncated": truncated_any,
+        })
+    return out
+
+
+def _resolve_weights(weights):
+    if not weights:
+        return dict(DEFAULT_WEIGHTS)
+    out = dict(DEFAULT_WEIGHTS)
+    for k, v in weights.items():
+        if k not in DEFAULT_WEIGHTS:
+            raise ValueError(
+                f"Unknown score weight key: {k!r} "
+                f"(allowed: {sorted(DEFAULT_WEIGHTS)})")
+        if v is None or v < 0:
+            raise ValueError(
+                f"Score weight {k!r} must be non-negative, got {v!r}")
+        out[k] = float(v)
+    if sum(out.values()) <= 0:
+        raise ValueError("At least one score weight must be > 0")
+    return out
+
+
+def score_authors(container: dict, weights=None) -> list:
+    """Composite "best author" scoring (VRD-10).
+
+    Returns a list of AuthorScore, sorted by composite descending. Excluded
+    authors are appended after all included authors and have rank=None.
+
+    Identity is `make:model` (never `make` alone), so the scorer is
+    forward-compatible with multi-model-per-make in cross-ai-core.
+    """
+    w = _resolve_weights(weights)
+    signals = _collect_author_signals(container)
+    if not signals:
+        return []
+
+    prompt_text = get_prompt_text(container)
+    psig = parse_prompt(prompt_text)
+
+    # Cohort medians — computed across ALL signals (incl. would-be excluded)
+    # so a single tiny outlier doesn't pull the median down and accidentally
+    # promote another bad author.
+    word_med = median([s["words"] for s in signals])
+    seg_med = median([s["segments"] for s in signals])
+    claim_totals = [sum(t + pt + o + pf + f
+                        for t, pt, o, pf, f in s["per_eval_counts"])
+                    for s in signals]
+    claim_med = median(claim_totals) if claim_totals else 0
+
+    n_hard_per_author = [
+        sum(t + pt + pf + f for t, pt, _o, pf, f in s["per_eval_counts"])
+        for s in signals
+    ]
+    n_hard_med = median(n_hard_per_author) if n_hard_per_author else 0
+    k_floor = max(ACCURACY_MIN_FLOOR, int(0.5 * n_hard_med))
+
+    # Cohort median opinion share — the Calibration neutral point.
+    opinion_shares = []
+    for s in signals:
+        total = 0
+        op = 0
+        for t, pt, o, pf, f in s["per_eval_counts"]:
+            total += t + pt + o + pf + f
+            op += o
+        if total > 0:
+            opinion_shares.append(op / total)
+    median_opinion_share = median(opinion_shares) if opinion_shares else 0.0
+
+    results = []
+    for s, total_claims in zip(signals, claim_totals):
+        # ---- exclusion gate ----
+        reasons = []
+        if not s["in_data"]:
+            reasons.append("not present in container.data[] (evaluator-only)")
+        if word_med > 0 and s["words"] < EXCLUSION_FRACTION * word_med:
+            reasons.append(
+                f"words {s['words']} < {EXCLUSION_FRACTION:g}·median "
+                f"({word_med:g})")
+        if seg_med > 0 and s["segments"] < EXCLUSION_FRACTION * seg_med:
+            reasons.append(
+                f"segments {s['segments']} < {EXCLUSION_FRACTION:g}·median "
+                f"({seg_med:g})")
+        if claim_med > 0 and total_claims < EXCLUSION_FRACTION * claim_med:
+            reasons.append(
+                f"claims {total_claims} < {EXCLUSION_FRACTION:g}·median "
+                f"({claim_med:g})")
+        if s["truncated"]:
+            reasons.append("truncation marker present")
+        excluded = bool(reasons)
+        excluded_reason = "; ".join(reasons) if reasons else None
+
+        # ---- sub-scores ----
+        cov = _coverage(psig.subjects, s["markdown"])
+        comp = _completeness(s["words"], s["segments"],
+                             psig.target_lo, seg_med, s["truncated"])
+        acc = _accuracy(s["per_eval_counts"], k_floor)
+        cal = _calibration(s["per_eval_counts"], median_opinion_share)
+
+        composite = (w["coverage"] * cov
+                     + w["completeness"] * comp
+                     + w["accuracy"] * acc
+                     + w["calibration"] * cal)
+
+        narrative = (
+            f"coverage={cov:.2f} of {len(psig.subjects)} prompt subjects; "
+            f"completeness={comp:.2f} (words={s['words']}/"
+            f"target_lo={psig.target_lo}, segments={s['segments']}/"
+            f"cohort_median={seg_med:g}); "
+            f"accuracy={acc:+.2f} over {len(s['per_eval_counts'])} evaluators "
+            f"(min-claim floor K={k_floor}); "
+            f"calibration={cal:.2f} (opinion share vs cohort median "
+            f"{median_opinion_share:.2f})"
+        )
+
+        results.append(AuthorScore(
+            author=s["author"],
+            make=s["make"],
+            model=s["model"],
+            rank=None,
+            composite=composite,
+            components={"coverage": cov, "completeness": comp,
+                        "accuracy": acc, "calibration": cal},
+            weights=dict(w),
+            words=s["words"],
+            segments=s["segments"],
+            claims_total=total_claims,
+            excluded=excluded,
+            excluded_reason=excluded_reason,
+            narrative=narrative,
+        ))
+
+    included = sorted([r for r in results if not r.excluded],
+                      key=lambda r: r.composite, reverse=True)
+    excluded_list = sorted([r for r in results if r.excluded],
+                           key=lambda r: r.composite, reverse=True)
+    for i, r in enumerate(included, start=1):
+        r.rank = i
+    return included + excluded_list
 
