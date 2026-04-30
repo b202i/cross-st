@@ -91,6 +91,176 @@ def get_recommended_models(make: str) -> list[tuple[str, str, bool]]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Legacy `.ai_models` migration (CST-MM-j)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Pre-0.9.x dev installs stored per-provider model overrides as ``make=model``
+# lines in ``<project-root>/.ai_models`` (a repo-local file, never present in
+# pipx user installs).  The 0.9.x alias system supersedes that file:
+#
+#   ``~/.cross_ai_models.json`` is the canonical home for ``alias → (make,
+#   model)`` mappings, and ``<MAKE>_MODEL`` env vars override on a per-shell
+#   basis.
+#
+# Migration policy:
+#   * Run silently on every ``mmd_startup.load_cross_env()`` invocation.
+#   * No-op when ``.ai_models`` is absent (covers every pipx user).
+#   * For each parseable ``make=model`` line, add a user alias named
+#     ``<make>-<short>`` (the bare ``<make>`` name is reserved for the
+#     auto-seeded built-in self-alias).  ``<short>`` is a sanitised slice
+#     of the model id; collisions get a numeric suffix.
+#   * After successful processing, rename ``.ai_models`` to
+#     ``.ai_models.migrated`` so the next startup is a fast no-op.  The
+#     marker also acts as the audit trail — users can ``cat`` it to see
+#     what their old config looked like.
+#   * Print a one-line notice naming each new alias so the user knows
+#     to switch from ``--ai <make>`` (which now means handler default) to
+#     ``--ai <make>-<short>`` (which means the legacy model).
+#   * Any error (unreadable file, invalid line) → log to stderr and skip
+#     the offending line; never crashes the calling script.
+
+_MODEL_SHORT_MAX = 20
+
+
+def _model_short_id(model: str) -> str:
+    """Sanitise *model* into an alias-safe suffix (``a-z 0-9 -`` only)."""
+    out = []
+    for ch in model.lower():
+        if ch.isalnum() or ch == "-":
+            out.append(ch)
+        else:
+            out.append("-")
+    short = "".join(out).strip("-")
+    while "--" in short:
+        short = short.replace("--", "-")
+    return short[:_MODEL_SHORT_MAX] or "custom"
+
+
+def _legacy_ai_models_path() -> str:
+    """Path to the pre-0.9.x ``.ai_models`` file at the project root."""
+    from mmd_startup import _PROJECT_ROOT
+    return os.path.join(_PROJECT_ROOT, ".ai_models")
+
+
+def _migrated_marker_path() -> str:
+    return _legacy_ai_models_path() + ".migrated"
+
+
+def _parse_legacy_ai_models(path: str) -> list[tuple[str, str]]:
+    """Return ``[(make, model), …]`` from a legacy ``.ai_models`` file.
+
+    Lines starting with ``#`` and blank lines are skipped.  Lines without
+    an ``=`` are skipped (no exception — be lenient on user data).
+    """
+    pairs: list[tuple[str, str]] = []
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return pairs
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        make, _, model = line.partition("=")
+        make, model = make.strip(), model.strip()
+        if make and model:
+            pairs.append((make, model))
+    return pairs
+
+
+def migrate_legacy_ai_models() -> list[tuple[str, str, str]]:
+    """Idempotent one-shot migration.  Returns added ``[(alias, make, model), …]``.
+
+    Empty list = nothing migrated (file absent, already migrated, or every
+    line was unparseable / unknown make).  Caller may print a notice when
+    the list is non-empty.
+    """
+    legacy = _legacy_ai_models_path()
+    if not os.path.isfile(legacy):
+        return []
+
+    pairs = _parse_legacy_ai_models(legacy)
+    if not pairs:
+        # Empty / fully-commented file — still rename so we don't keep
+        # checking it on every startup.
+        try:
+            os.replace(legacy, _migrated_marker_path())
+        except OSError:
+            pass
+        return []
+
+    builtins = set(_builtin_makes())
+    file_data = read_alias_file()
+    added: list[tuple[str, str, str]] = []
+
+    for make, model in pairs:
+        if make not in builtins:
+            # Unknown provider — skip silently; user must have hand-edited
+            # an exotic name.
+            continue
+        # Skip if any existing user alias already has this exact (make, model).
+        already = any(
+            spec.get("make") == make and spec.get("model") == model
+            for spec in file_data.values()
+        )
+        if already:
+            continue
+        # Generate a unique alias name.
+        base  = f"{make}-{_model_short_id(model)}"
+        alias = base
+        n = 2
+        while alias in file_data or alias in builtins:
+            alias = f"{base}-{n}"
+            n += 1
+        file_data[alias] = {"make": make, "model": model}
+        added.append((alias, make, model))
+
+    if added:
+        try:
+            write_alias_file(file_data)
+        except Exception:
+            # Persist failed → leave the legacy file in place so we'll retry
+            # next startup (keeps the user's data safe).
+            return []
+
+    # Rename the legacy file regardless of how many lines were actionable —
+    # otherwise we'd keep re-parsing the same skip-listed entries.
+    try:
+        os.replace(legacy, _migrated_marker_path())
+    except OSError:
+        pass
+
+    return added
+
+
+def run_migration_with_notice() -> None:
+    """Run :func:`migrate_legacy_ai_models` and print a friendly one-liner.
+
+    Safe to call from ``mmd_startup.load_cross_env()`` — every failure mode
+    is swallowed and reported as a single warning line so the calling
+    ``st-*`` script never crashes mid-startup.
+    """
+    try:
+        added = migrate_legacy_ai_models()
+    except Exception as exc:  # pragma: no cover — defensive
+        print(
+            f"  ⚠️  Could not migrate legacy .ai_models: {exc}",
+            flush=True,
+        )
+        return
+    if not added:
+        return
+    aliases = ", ".join(f"{a}" for a, _, _ in added)
+    print(
+        f"  ✓ Migrated legacy .ai_models → ~/.cross_ai_models.json "
+        f"(new aliases: {aliases}). Use --ai <alias> to select; original "
+        "file kept as .ai_models.migrated for reference.",
+        flush=True,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # File I/O
 # ─────────────────────────────────────────────────────────────────────────────
 

@@ -115,7 +115,7 @@ menus = {
         }),
         "a": ("Analyze", {
             "f": "Fact-check current story, current AI",
-            "F": "Fact-check all stories, current AI",
+            "a": "Fact-check all stories, current AI",
             "@": "Fact-check current story, all AI",
             "c": "Cross-product fact-check — all stories  all AI",
             "C": "Generate Cross-Product report",
@@ -312,7 +312,7 @@ def execute_menu(menu_name, choice):
             match choice:
                 case "f":
                     cmd = f"st-fact --ai {ai} -s {story_sel} {file_json}"
-                case "F":
+                case "a":
                     cmd = f"st-fact --ai {ai} {file_json}"
                 case "@":
                     cmd = f"st-fact --ai all -s {story_sel} {file_json}"

@@ -7,6 +7,47 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **CST-MM-j — Silent legacy `.ai_models` migration.** On every
+  `mmd_startup.load_cross_env()` call (i.e. every `st-*` invocation), if a
+  pre-0.9.x `<project-root>/.ai_models` file is found, each `make=model` line
+  is converted into a user alias named `<make>-<model-short>` in
+  `~/.cross_ai_models.json`. The legacy file is renamed to
+  `.ai_models.migrated` so the next startup is a no-op. Unknown providers and
+  duplicate (make, model) pairs are skipped silently. Pipx and system-Python
+  users never had `.ai_models`, so the hook is a true no-op for them.
+  Migration helpers live in `cross_st/_alias_admin.py`
+  (`migrate_legacy_ai_models`, `run_migration_with_notice`).
+- **CST-MM-k — `st.py` `next_ai()` now cycles aliases.** The `A` key in
+  `st`'s interactive menu rotates through every entry returned by
+  `cross_ai_core.get_ai_list()` — which since CAC-10 includes user-defined
+  aliases as well as the 5 built-in providers. No code change required in
+  `next_ai()` itself; this entry confirms the behaviour is in place and adds
+  regression tests (`tests/test_st_next_ai_aliases.py`).
+
+### Fixed
+
+- **`st.py` reserved-key violation in Analyze submenu.** `F` was wired to
+  "Fact-check all stories, current AI" — but `F` is intercepted before menu
+  dispatch as the global `next_fact_check()` rotation key, so the binding was
+  dead. The shortcut moves to lowercase `a` ("all stories"). Restores the
+  AGENTS.md "A/S/F never used as menu shortcuts" contract.
+
+### Tests
+
+- `tests/test_alias_migration.py` (19 cases) — sanitiser, parser, full
+  migration, idempotency, unknown-make / duplicate skips, error swallowing,
+  `mmd_startup` wrapper.
+- `tests/test_st_next_ai_aliases.py` (6 cases) — `ai_opt` includes user
+  aliases, `next_ai()` visits them, wraps correctly, `--ai` argparse choices
+  accept aliases, A/S/F never reused as menu shortcuts.
+- Suite total: **946 passing** / 114 skipped / 0 failing (was 920).
+
+---
+
 ## [0.9.0] — 2026-04-30
 
 The **multi-model alias layer** lands in cross-st (CST-MM-a..e + CST-MM-f/g/h).

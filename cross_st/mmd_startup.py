@@ -324,6 +324,29 @@ def check_shadowed_install() -> None:
         pass  # never break a real command over a diagnostic
 
 
+def _migrate_legacy_ai_models_once() -> None:
+    """Run the CST-MM-j ``.ai_models`` → alias-file migration (best-effort).
+
+    Only fires when ``_PROJECT_ROOT/.ai_models`` exists, which is a dev-only
+    artefact — pipx and system-Python users never had the file, so this is
+    a no-op for them.  Wrapped in a broad try/except so a malformed legacy
+    file or a permissions issue cannot break startup of any ``st-*`` script.
+    """
+    legacy = os.path.join(_PROJECT_ROOT, ".ai_models")
+    if not os.path.isfile(legacy):
+        return  # nothing to do (covers every pipx user and most dev users)
+    try:
+        # Lazy import — _alias_admin lives in cross_st/ and may not always be
+        # on sys.path before mmd_startup runs (e.g. early import in a fresh
+        # venv).  Adding the directory keeps mmd_startup standalone.
+        if _CROSS_ST_DIR not in sys.path:
+            sys.path.insert(0, _CROSS_ST_DIR)
+        from _alias_admin import run_migration_with_notice  # type: ignore
+        run_migration_with_notice()
+    except Exception:
+        pass  # never break a real command over a one-shot migration
+
+
 def _in_project_venv() -> bool:
     """Return True when the running Python executable lives inside _PROJECT_ROOT.
 
@@ -374,3 +397,4 @@ def load_cross_env() -> None:
     load_dotenv(os.path.join(os.getcwd(), ".env"),    override=True)           # 3. CWD — highest
     check_for_updates()
     check_shadowed_install()
+    _migrate_legacy_ai_models_once()
