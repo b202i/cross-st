@@ -9,6 +9,14 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.9.1] — 2026-04-30
+
+Patch release. Bundles two CST-MM tail slices (j, k) that were on `main`
+but not in the 0.9.0 cut, plus a developer-environment dep-pin fix that
+was uncovered while auditing post-0.9.0 dependency drift.
+
 ### Added
 
 - **CST-MM-j — Silent legacy `.ai_models` migration.** On every
@@ -35,6 +43,16 @@ Cross uses [Semantic Versioning](https://semver.org/).
   dispatch as the global `next_fact_check()` rotation key, so the binding was
   dead. The shortcut moves to lowercase `a` ("all stories"). Restores the
   AGENTS.md "A/S/F never used as menu shortcuts" contract.
+- **Developer-install dep-pin drift** (`requirements.txt` /
+  `requirements-no-tts.txt`). Both files were pinning a stale
+  `cross-ai-core` version (`==0.6.0` and `==0.5.0` respectively, both
+  pre-multi-model) while `pyproject.toml` correctly required `>=0.7.0`.
+  PyPI installs were never affected — only fresh `pip install -r
+  requirements*.txt` developer venvs would have picked up the wrong
+  version. Both files now pin `cross-ai-core[all]==0.7.1`. Standard
+  release-checklist template in `cross-internal/SPRINT_CURRENT.md` now
+  includes a step to keep these pins synchronised; see
+  `cross-internal/distribution/BUGFIX_requirements_pin_drift.md`.
 
 ### Tests
 
