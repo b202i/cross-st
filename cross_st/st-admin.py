@@ -16,7 +16,10 @@ Non-interactive (scripting / shell):
   st-admin --show                 # print all settings and exit
   st-admin --get-default-ai       # print the current default AI name
   st-admin --set-default-ai NAME  # set default AI (writes DEFAULT_AI to .env)
-  st-admin --set-ai-model MAKE=MODEL  # set the model for a provider
+  st-admin --set-ai-model MAKE=MODEL  # set the model for a provider (legacy)
+  st-admin --add-alias NAME=MAKE[:MODEL]  # add / update an alias in ~/.cross_ai_models.json
+  st-admin --remove-alias NAME    # remove a user-defined alias
+  st-admin --list-aliases         # print the alias registry table
   st-admin --set-tts-voice VOICE  # set TTS voice (writes TTS_VOICE to .env)
   st-admin --set-template NAME    # set default prompt template
   st-admin --set-editor NAME      # set editor (writes EDITOR to .env)
@@ -2024,13 +2027,185 @@ def cache_cull(days: int) -> None:
           f"({len(files) - len(old)} remaining).\n")
 
 
+# ── Alias-management wizards (CST-MM-i) ──────────────────────────────────────
+#
+# Live model discovery (CAC-10h) is not yet implemented; these wizards
+# present a curated suggestion list (`_alias_admin.RECOMMENDED_MODELS`) and
+# always allow the user to type any provider model id directly.  When CAC-10h
+# ships, the picker logic gains an SDK-discovered list — the user-facing
+# prompts stay identical.
+
+def _pick_make() -> "str | None":
+    """Numbered picker for the built-in provider list.  ``None`` = cancel."""
+    from _alias_admin import _builtin_makes
+    makes = _builtin_makes()
+    print()
+    for i, make in enumerate(makes, 1):
+        print(f"    {i}. {make}")
+    raw = input("  Provider (number, or blank to cancel): ").strip()
+    if not raw:
+        return None
+    try:
+        idx = int(raw)
+    except ValueError:
+        if raw in makes:
+            return raw
+        print(f"  ✗  Not a number and not a known make: {raw!r}")
+        return None
+    if not (1 <= idx <= len(makes)):
+        print(f"  ✗  Choice out of range: {idx}")
+        return None
+    return makes[idx - 1]
+
+
+def _pick_model(make: str, current=None):
+    """Show curated picks + free-text fallback.
+
+    Returns ``(confirmed, model)``:
+        * ``(True, "<id>")`` — user picked or typed a model id.
+        * ``(True, None)``   — user picked "use handler default".
+        * ``(False, None)``  — user cancelled.
+    """
+    from _alias_admin import get_recommended_models
+    suggestions = get_recommended_models(make)
+    print(f"\n  Suggested models for {make}:")
+    if suggestions:
+        for i, (model_id, label, recommended) in enumerate(suggestions, 1):
+            star = "★" if recommended else " "
+            current_marker = "  (current)" if current == model_id else ""
+            print(f"    {i}. {star} {model_id:<32} {label}{current_marker}")
+    else:
+        print("    (no curated suggestions for this provider — type a model id)")
+    print("    0.   <use handler default (model = null)>")
+    print("    Or type any model id directly.")
+    raw = input("  Choice (blank to cancel): ").strip()
+    if not raw:
+        return (False, None)
+    if raw == "0":
+        return (True, None)
+    try:
+        idx = int(raw)
+        if 1 <= idx <= len(suggestions):
+            return (True, suggestions[idx - 1][0])
+    except ValueError:
+        pass
+    return (True, raw)
+
+
+def _alias_wizard_add() -> None:
+    """Interactive add-alias flow."""
+    from _alias_admin import add_alias, AliasError, read_alias_file
+    print("\n  Add a new AI alias.")
+    name = input("  Alias name (e.g. anthropic-opus, blank to cancel): ").strip()
+    if not name:
+        return
+    if name in read_alias_file():
+        print(f"  ⚠️  Alias {name!r} already exists — use 'Edit' to change its model.")
+        return
+    make = _pick_make()
+    if not make:
+        return
+    confirmed, model = _pick_model(make)
+    if not confirmed:
+        return
+    summary_model = model if model is not None else "<handler default>"
+    print(f"\n  Confirm: alias {name!r} → {make} · {summary_model}")
+    ans = input("  Save? [Y/n]: ").strip().lower()
+    if ans and ans != "y":
+        print("  Cancelled.")
+        return
+    try:
+        add_alias(name, make, model)
+    except AliasError as exc:
+        print(f"  ✗  {exc}")
+        return
+    print(f"  ✓  Written to {os.path.expanduser('~/.cross_ai_models.json')}")
+
+
+def _alias_wizard_remove() -> None:
+    """Interactive remove-alias flow.  User-defined aliases only."""
+    from _alias_admin import read_alias_file, remove_alias, AliasError
+    user_aliases = list(read_alias_file().keys())
+    if not user_aliases:
+        print("\n  (no user-defined aliases — nothing to remove)")
+        return
+    print("\n  User-defined aliases:")
+    for i, alias in enumerate(user_aliases, 1):
+        print(f"    {i}. {alias}")
+    raw = input("  Number to remove (or blank to cancel): ").strip()
+    if not raw:
+        return
+    try:
+        idx = int(raw)
+    except ValueError:
+        print(f"  ✗  Not a number: {raw!r}")
+        return
+    if not (1 <= idx <= len(user_aliases)):
+        print(f"  ✗  Choice out of range: {idx}")
+        return
+    name = user_aliases[idx - 1]
+    ans = input(f"  Remove alias {name!r}? [y/N]: ").strip().lower()
+    if ans != "y":
+        print("  Cancelled.")
+        return
+    try:
+        remove_alias(name)
+    except AliasError as exc:
+        print(f"  ✗  {exc}")
+        return
+    print(f"  ✓  Removed alias {name!r}.")
+
+
+def _alias_wizard_edit() -> None:
+    """Interactive edit-alias flow.  Changes only the model field."""
+    from _alias_admin import read_alias_file, edit_alias_model, AliasError
+    file_data = read_alias_file()
+    user_aliases = list(file_data.keys())
+    if not user_aliases:
+        print("\n  (no user-defined aliases — use 'Add alias' first)")
+        return
+    print("\n  User-defined aliases:")
+    for i, alias in enumerate(user_aliases, 1):
+        spec = file_data[alias]
+        cur  = spec.get("model") or "<handler default>"
+        print(f"    {i}. {alias:<22} ({spec.get('make')} · {cur})")
+    raw = input("  Number to edit (or blank to cancel): ").strip()
+    if not raw:
+        return
+    try:
+        idx = int(raw)
+    except ValueError:
+        print(f"  ✗  Not a number: {raw!r}")
+        return
+    if not (1 <= idx <= len(user_aliases)):
+        print(f"  ✗  Choice out of range: {idx}")
+        return
+    name = user_aliases[idx - 1]
+    spec = file_data[name]
+    confirmed, model = _pick_model(spec["make"], current=spec.get("model"))
+    if not confirmed:
+        return
+    try:
+        edit_alias_model(name, model)
+    except AliasError as exc:
+        print(f"  ✗  {exc}")
+        return
+    summary_model = model if model is not None else "<handler default>"
+    print(f"  ✓  Alias {name!r} now resolves to {spec['make']} · {summary_model}")
+
+
 # ── Interactive menu ───────────────────────────────────────────────────────────
 
 _MENU = {
     "a": ("AI", {
-        "d": "View / set default AI provider",
-        "m": "Set AI model for a provider",
-        "M": "View all AI models",
+        "d": "View / set default AI alias",
+        "m": ("Manage aliases", {
+            "a": "Add alias  (alias  →  make · model)",
+            "r": "Remove alias  (user-defined only)",
+            "e": "Edit alias model",
+            "R": "Refresh available models  (CAC-10h pending — type any model id for now)",
+        }),
+        "M": "View aliases",
         "v": "View TTS voice",
         "V": "Set TTS voice  (launches st-voice)",
     }),
@@ -2138,38 +2313,56 @@ def interactive_menu() -> None:
                     # ── AI ────────────────────────────────────────────────────
                     case ("AI", "d"):
                         current = settings_get_default_ai()
+                        # ai_list is captured at menu entry; refresh in case
+                        # an alias was just added in the Manage-aliases submenu.
+                        from ai_handler import get_ai_list as _gal
+                        ai_list = _gal()
                         rotation = "  ".join(
                             f"[{m}]" if m == current else m for m in ai_list
                         )
-                        print(f"\n  Current default AI: {current}")
+                        print(f"\n  Current default AI alias: {current}")
                         print(f"  Available: {rotation}")
-                        new_ai = input("  New default AI (blank to cancel): ").strip()
+                        new_ai = input("  New default AI alias (blank to cancel): ").strip()
                         if new_ai:
                             try:
                                 settings_set_default_ai(new_ai)
-                                print(f"  ✓  Default AI set to: {new_ai}  (written to .env)")
+                                print(f"  ✓  Default AI alias set to: {new_ai}  (written to .env)")
                             except ValueError as exc:
                                 print(f"  ✗  {exc}")
 
-                    case ("AI", "m"):
-                        print(f"\n  Available providers: {', '.join(ai_list)}")
-                        make = input("  Provider (blank to cancel): ").strip()
-                        if make:
-                            if make not in ai_list:
-                                print(f"  ✗  Unknown provider: {make!r}")
-                            else:
-                                current_model = settings_get_ai_model(make)
-                                print(f"  Current model for {make}: {current_model}")
-                                new_model = input("  New model (blank to cancel): ").strip()
-                                if new_model:
-                                    settings_set_ai_model(make, new_model)
-                                    print(f"  ✓  {make} model set to: {new_model}  (written to .ai_models)")
-
                     case ("AI", "M"):
-                        print(f"\n  {'Provider':<14}  Model")
-                        print(f"  {'─' * 14}  {'─' * 36}")
-                        for make in ai_list:
-                            print(f"  {make:<14}  {settings_get_ai_model(make)}")
+                        from _alias_admin import list_aliases, format_alias_table
+                        print()
+                        print(format_alias_table(list_aliases()))
+                        print(
+                            f"\n  Source: {os.path.expanduser('~/.cross_ai_models.json')}"
+                        )
+
+                    # ── Manage aliases (3rd-level submenu) ────────────────────
+                    case ("Manage aliases", "a"):
+                        _alias_wizard_add()
+
+                    case ("Manage aliases", "r"):
+                        _alias_wizard_remove()
+
+                    case ("Manage aliases", "e"):
+                        _alias_wizard_edit()
+
+                    case ("Manage aliases", "R"):
+                        print(
+                            "\n  ⚠️  Live model discovery (CAC-10h) is not yet "
+                            "released.\n"
+                            "      For now, type any provider model id directly "
+                            "in the Add/Edit\n"
+                            "      flows; the curated suggestions list is shown "
+                            "as a starting\n"
+                            "      point.  Provider docs:\n"
+                            "        anthropic  https://docs.anthropic.com/claude/docs/models-overview\n"
+                            "        openai     https://platform.openai.com/docs/models\n"
+                            "        xai        https://docs.x.ai/docs/models\n"
+                            "        gemini     https://ai.google.dev/gemini-api/docs/models\n"
+                            "        perplexity https://docs.perplexity.ai/guides/model-cards\n"
+                        )
 
                     case ("AI", "v"):
                         print(f"\n  TTS voice: {settings_get_tts_voice()}")
@@ -2319,6 +2512,20 @@ def main() -> None:
         help="Set a per-provider model override (e.g. xai=grok-3)",
     )
     parser.add_argument(
+        "--add-alias", metavar="NAME=MAKE[:MODEL]",
+        help="Add or update an AI alias in ~/.cross_ai_models.json "
+             "(e.g. anthropic-opus=anthropic:claude-opus-4-5; "
+             "omit :MODEL for handler default)",
+    )
+    parser.add_argument(
+        "--remove-alias", metavar="NAME",
+        help="Remove a user-defined alias from ~/.cross_ai_models.json",
+    )
+    parser.add_argument(
+        "--list-aliases", action="store_true",
+        help="Print the alias registry (one row per loaded alias)",
+    )
+    parser.add_argument(
         "--set-tts-voice", metavar="VOICE",
         help="Set the TTS voice string (written to TTS_VOICE in .env)",
     )
@@ -2398,6 +2605,45 @@ def main() -> None:
         make, _, model = args.set_ai_model.partition("=")
         settings_set_ai_model(make.strip(), model.strip())
         print(f"✓  {make.strip()} model set to: {model.strip()}")
+        return
+
+    if args.add_alias:
+        from _alias_admin import add_alias, AliasError
+        if "=" not in args.add_alias:
+            print(
+                "✗  Format must be NAME=MAKE[:MODEL] "
+                "(e.g. anthropic-opus=anthropic:claude-opus-4-5)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        name, _, target = args.add_alias.partition("=")
+        if ":" in target:
+            make, _, model = target.partition(":")
+            model = model.strip() or None
+        else:
+            make, model = target, None
+        try:
+            add_alias(name.strip(), make.strip(), model)
+        except AliasError as exc:
+            print(f"✗  {exc}", file=sys.stderr)
+            sys.exit(1)
+        summary_model = model if model is not None else "<handler default>"
+        print(f"✓  Alias {name.strip()!r} → {make.strip()} · {summary_model}")
+        return
+
+    if args.remove_alias:
+        from _alias_admin import remove_alias, AliasError
+        try:
+            remove_alias(args.remove_alias)
+        except AliasError as exc:
+            print(f"✗  {exc}", file=sys.stderr)
+            sys.exit(1)
+        print(f"✓  Removed alias {args.remove_alias!r}")
+        return
+
+    if args.list_aliases:
+        from _alias_admin import list_aliases, format_alias_table
+        print(format_alias_table(list_aliases()))
         return
 
     if args.set_tts_voice:
