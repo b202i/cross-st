@@ -210,8 +210,12 @@ class TestListAliases:
     def test_format_alias_table_renders(self, isolated_alias_file):
         _alias_admin.add_alias("anthropic-opus", "anthropic", "claude-opus-4-5")
         text = _alias_admin.format_alias_table(_alias_admin.list_aliases())
-        assert "Alias" in text and "Make" in text and "Model" in text
+        assert "Alias" in text and "Provider" in text and "Model" in text
+        assert "Type" in text and "Env override" in text
         assert "anthropic-opus" in text and "claude-opus-4-5" in text
+        # Custom aliases tagged "custom"; default ones tagged "default".
+        assert "custom"  in text
+        assert "default" in text
 
 
 # ── CLI flags — invoke st-admin as a subprocess ──────────────────────────────

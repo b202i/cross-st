@@ -2027,6 +2027,24 @@ def cache_cull(days: int) -> None:
           f"({len(files) - len(old)} remaining).\n")
 
 
+def _show_aliases_table() -> None:
+    """Print the alias table plus a short legend so the jargon is self-documenting."""
+    from _alias_admin import list_aliases, format_alias_table
+    print()
+    print(format_alias_table(list_aliases()))
+    print(
+        "\n  Legend:\n"
+        "    Provider  = the AI company (anthropic, openai, xai, gemini, perplexity)\n"
+        "    Model     = a specific LLM that provider hosts (e.g. claude-opus-4-5)\n"
+        "    Alias     = the short name you pass to --ai or that st cycles through;\n"
+        "                each alias is a (provider, model) pair.\n"
+        "    Type      = 'default' means an alias you got for free (one per provider,\n"
+        "                same name as the provider, uses the provider's recommended\n"
+        "                model);  'custom' means an alias you added yourself.\n"
+        f"\n  File: {os.path.expanduser('~/.cross_ai_models.json')}"
+    )
+
+
 # ── Alias-management wizards (CST-MM-i) ──────────────────────────────────────
 #
 # Model picker uses live SDK-side discovery via
@@ -2097,7 +2115,7 @@ def _pick_model(make: str, current=None):
             print(f"    {i:>2}. {star} {m.id}{current_marker}")
     else:
         print("    (no models discovered for this provider — type a model id)")
-    print("     0.   <use handler default (model = null)>")
+    print("     0.   <use the provider's recommended default (model = null)>")
     print("    Or type any model id directly.")
     raw = input("  Choice (blank to cancel): ").strip()
     if not raw:
@@ -2129,7 +2147,7 @@ def _alias_wizard_add() -> None:
     confirmed, model = _pick_model(make)
     if not confirmed:
         return
-    summary_model = model if model is not None else "<handler default>"
+    summary_model = model if model is not None else "<provider default>"
     print(f"\n  Confirm: alias {name!r} → {make} · {summary_model}")
     ans = input("  Save? [Y/n]: ").strip().lower()
     if ans and ans != "y":
@@ -2148,7 +2166,7 @@ def _alias_wizard_remove() -> None:
     from _alias_admin import read_alias_file, remove_alias, AliasError
     user_aliases = list(read_alias_file().keys())
     if not user_aliases:
-        print("\n  (no user-defined aliases — nothing to remove)")
+        print("\n  (no custom aliases — nothing to remove)")
         return
     print("\n  User-defined aliases:")
     for i, alias in enumerate(user_aliases, 1):
@@ -2183,12 +2201,12 @@ def _alias_wizard_edit() -> None:
     file_data = read_alias_file()
     user_aliases = list(file_data.keys())
     if not user_aliases:
-        print("\n  (no user-defined aliases — use 'Add alias' first)")
+        print("\n  (no custom aliases — use 'Add alias' first)")
         return
-    print("\n  User-defined aliases:")
+    print("\n  Custom aliases:")
     for i, alias in enumerate(user_aliases, 1):
         spec = file_data[alias]
-        cur  = spec.get("model") or "<handler default>"
+        cur  = spec.get("model") or "<provider default>"
         print(f"    {i}. {alias:<22} ({spec.get('make')} · {cur})")
     raw = input("  Number to edit (or blank to cancel): ").strip()
     if not raw:
@@ -2211,7 +2229,7 @@ def _alias_wizard_edit() -> None:
     except AliasError as exc:
         print(f"  ✗  {exc}")
         return
-    summary_model = model if model is not None else "<handler default>"
+    summary_model = model if model is not None else "<provider default>"
     print(f"  ✓  Alias {name!r} now resolves to {spec['make']} · {summary_model}")
 
 
@@ -2221,12 +2239,13 @@ _MENU = {
     "a": ("AI", {
         "d": "View / set default AI alias",
         "m": ("Manage aliases", {
-            "a": "Add alias  (alias  →  make · model)",
-            "r": "Remove alias  (user-defined only)",
+            "a": "Add alias  (alias  →  provider · model)",
+            "r": "Remove alias  (custom only)",
             "e": "Edit alias model",
+            "M": "View aliases  (table of every alias and the model it resolves to)",
             "R": "Refresh available models  (force fresh discovery for every provider)",
         }),
-        "M": "View aliases",
+        "M": "View aliases  (table of every alias and the model it resolves to)",
         "v": "View TTS voice",
         "V": "Set TTS voice  (launches st-voice)",
     }),
@@ -2333,31 +2352,44 @@ def interactive_menu() -> None:
 
                     # ── AI ────────────────────────────────────────────────────
                     case ("AI", "d"):
-                        current = settings_get_default_ai()
-                        # ai_list is captured at menu entry; refresh in case
-                        # an alias was just added in the Manage-aliases submenu.
+                        # Refresh in case an alias was just added in the
+                        # Manage-aliases submenu.
                         from ai_handler import get_ai_list as _gal
+                        from _alias_admin import list_aliases
                         ai_list = _gal()
-                        rotation = "  ".join(
-                            f"[{m}]" if m == current else m for m in ai_list
+                        current = settings_get_default_ai()
+                        rows = {r["alias"]: r for r in list_aliases()}
+                        cur_row = rows.get(current)
+                        cur_label = (
+                            f"{cur_row['make']} · {cur_row['model_label']}"
+                            if cur_row else "(unknown alias)"
                         )
-                        print(f"\n  Current default AI alias: {current}")
-                        print(f"  Available: {rotation}")
-                        new_ai = input("  New default AI alias (blank to cancel): ").strip()
+                        print(f"\n  Current default AI: [{current}]  →  {cur_label}\n")
+                        print("  Available aliases (default = recommended model):")
+                        # Width-align the alias column
+                        w = max(len(a) for a in ai_list)
+                        for alias in ai_list:
+                            r = rows.get(alias)
+                            marker = " ←" if alias == current else "  "
+                            if r:
+                                print(
+                                    f"    {alias:<{w}}  →  {r['make']:<10}  "
+                                    f"{r['model_label']}{marker}"
+                                )
+                            else:
+                                print(f"    {alias:<{w}}{marker}")
+                        new_ai = input(
+                            "\n  Type alias name to switch (blank = keep current): "
+                        ).strip()
                         if new_ai:
                             try:
                                 settings_set_default_ai(new_ai)
-                                print(f"  ✓  Default AI alias set to: {new_ai}  (written to .env)")
+                                print(f"  ✓  Default AI set to: {new_ai}  (written to .env)")
                             except ValueError as exc:
                                 print(f"  ✗  {exc}")
 
-                    case ("AI", "M"):
-                        from _alias_admin import list_aliases, format_alias_table
-                        print()
-                        print(format_alias_table(list_aliases()))
-                        print(
-                            f"\n  Source: {os.path.expanduser('~/.cross_ai_models.json')}"
-                        )
+                    case ("AI", "M") | ("Manage aliases", "M"):
+                        _show_aliases_table()
 
                     # ── Manage aliases (3rd-level submenu) ────────────────────
                     case ("Manage aliases", "a"):
@@ -2668,7 +2700,7 @@ def main() -> None:
         except AliasError as exc:
             print(f"✗  {exc}", file=sys.stderr)
             sys.exit(1)
-        summary_model = model if model is not None else "<handler default>"
+        summary_model = model if model is not None else "<provider default>"
         print(f"✓  Alias {name.strip()!r} → {make.strip()} · {summary_model}")
         return
 

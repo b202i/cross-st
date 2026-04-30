@@ -427,16 +427,25 @@ def env_override_for(alias: str, make: str) -> "str | None":
 def list_aliases() -> list[dict]:
     """Return one row per loaded alias.
 
-    Each row: ``{"alias", "make", "model_effective", "model_file",
-    "env_override", "is_builtin"}``.
+    Each row: ``{"alias", "make", "model_effective", "model_label",
+    "model_file", "env_override", "is_builtin"}``.
 
     * ``model_effective`` = what would actually be sent to the provider
-      (env override → file → handler default placeholder ``"<handler default>"``).
+      (env override → file → curated provider default → ``"<unknown>"``).
+    * ``model_label``      = display string for the wizard:
+        - ``"<id>"``                  when an explicit model is set
+        - ``"<id> (provider default)"`` when None resolves via curated default
+        - ``"<id> (override <ENV_VAR>)"`` when an env var wins
     * ``model_file``      = the value stored in the JSON file (or ``None``).
     * ``env_override``    = env var name overriding the file (or ``None``).
-    * ``is_builtin``      = ``True`` for auto-seeded self-aliases.
+    * ``is_builtin``      = ``True`` for auto-seeded self-aliases (one per
+      provider) — i.e. you didn't create this one yourself.
     """
     from cross_ai_core.aliases import get_aliases
+    try:
+        from cross_ai_core import get_recommended_default
+    except ImportError:  # cross-ai-core < 0.7.1
+        get_recommended_default = lambda _make: None  # noqa: E731
 
     file_data = read_alias_file()
     builtins  = set(_builtin_makes())
@@ -445,14 +454,25 @@ def list_aliases() -> list[dict]:
         env_var = env_override_for(alias, spec.make)
         if env_var:
             effective = os.environ[env_var]
+            label = f"{effective}  (override {env_var})"
         elif spec.model:
             effective = spec.model
+            label = effective
         else:
-            effective = "<handler default>"
+            # No explicit model — resolve to the provider's curated default
+            # so the user sees what will actually run, not "<handler default>".
+            curated = get_recommended_default(spec.make)
+            if curated:
+                effective = curated
+                label = f"{curated}  (provider default)"
+            else:
+                effective = "<unknown>"
+                label = "<provider default>"
         rows.append({
             "alias":           alias,
             "make":            spec.make,
             "model_effective": effective,
+            "model_label":     label,
             "model_file":      file_data.get(alias, {}).get("model"),
             "env_override":    env_var,
             "is_builtin":      alias in builtins and alias not in file_data,
@@ -465,32 +485,39 @@ def list_aliases() -> list[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def format_alias_table(rows: "Iterable[dict]") -> str:
-    """Render the alias rows as a fixed-width plain-text table."""
+    """Render the alias rows as a fixed-width plain-text table.
+
+    Columns: Alias · Provider · Model · Type · Env override.
+
+    *Type* is ``default`` for the auto-seeded one-per-provider aliases (the
+    ones you got for free) and ``custom`` for aliases you defined yourself
+    in ``~/.cross_ai_models.json``.  Provider replaces the internal "make"
+    jargon.  Model column shows the actual model id that will be sent to
+    the provider — never the placeholder string ``<handler default>``.
+    """
     rows = list(rows)
     if not rows:
         return "  (no aliases loaded)"
-    # Pre-compute the displayed alias string (with " (built-in)" suffix where
-    # applicable) so column widths and rendered cells stay in sync.
-    display = [
-        (r["alias"] + (" (built-in)" if r["is_builtin"] else ""), r)
+    # Each tuple: (alias, provider, model_label, type, env_override)
+    cells = [
+        (
+            r["alias"],
+            r["make"],
+            r["model_label"],
+            "default" if r["is_builtin"] else "custom",
+            r["env_override"] or "—",
+        )
         for r in rows
     ]
-    headers = ("Alias", "Make", "Model", "Env override")
+    headers = ("Alias", "Provider", "Model", "Type", "Env override")
     widths  = [
-        max(len(headers[0]), max(len(d)                     for d, _ in display)),
-        max(len(headers[1]), max(len(r["make"])             for _, r in display)),
-        max(len(headers[2]), max(len(r["model_effective"])  for _, r in display)),
-        max(len(headers[3]), max(len(r["env_override"] or "—") for _, r in display)),
+        max(len(headers[i]), max(len(c[i]) for c in cells))
+        for i in range(len(headers))
     ]
-    fmt = f"  {{:<{widths[0]}}}  {{:<{widths[1]}}}  {{:<{widths[2]}}}  {{:<{widths[3]}}}"
+    fmt = "  " + "  ".join(f"{{:<{w}}}" for w in widths)
     sep = "  " + "  ".join("─" * w for w in widths)
     lines = [fmt.format(*headers), sep]
-    for alias_disp, r in display:
-        lines.append(fmt.format(
-            alias_disp,
-            r["make"],
-            r["model_effective"],
-            r["env_override"] or "—",
-        ))
+    for c in cells:
+        lines.append(fmt.format(*c))
     return "\n".join(lines)
 
