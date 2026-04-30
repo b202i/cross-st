@@ -2075,9 +2075,14 @@ def _pick_model(make: str, current=None):
     """
     try:
         from cross_ai_core import get_available_models
+    except ImportError:
+        get_available_models = None
+    try:
+        if get_available_models is None:
+            raise ImportError("cross-ai-core < 0.7.1 — get_available_models unavailable")
         models = get_available_models(make)
     except Exception as exc:
-        print(f"  ⚠️  Live discovery failed ({exc}); using curated suggestions.")
+        print(f"  ⚠️  Live discovery unavailable ({exc}); using curated suggestions.")
         from _alias_admin import get_recommended_models
         models = [
             type("M", (), {"id": mid, "is_recommended": rec, "is_default": False})
@@ -2365,29 +2370,40 @@ def interactive_menu() -> None:
                         _alias_wizard_edit()
 
                     case ("Manage aliases", "R"):
-                        from cross_ai_core import get_available_models
-                        from _alias_admin import _builtin_makes
-                        print(
-                            "\n  Refreshing model lists from each provider "
-                            "(this may take a few seconds)…"
-                        )
-                        for make in _builtin_makes():
-                            try:
-                                models = get_available_models(make, refresh=True)
-                                rec = sum(
-                                    1 for m in models
-                                    if getattr(m, "is_recommended", False)
-                                )
-                                print(
-                                    f"    ✓  {make:<11} {len(models):>3} models "
-                                    f"({rec} recommended)"
-                                )
-                            except Exception as exc:
-                                print(f"    ✗  {make:<11} discovery failed: {exc}")
-                        print(
-                            f"\n  Cache: {os.path.expanduser('~/.cross_models_cache/')} "
-                            f"(7-day TTL)\n"
-                        )
+                        try:
+                            from cross_ai_core import get_available_models
+                        except ImportError:
+                            print(
+                                "\n  ⚠️  Live model discovery requires "
+                                "cross-ai-core >= 0.7.1.\n"
+                                "      Upgrade with:  pip install -U "
+                                "'cross-ai-core[all]>=0.7.1'\n"
+                                "      (or:  st-admin> u  to upgrade cross-st "
+                                "and its deps)\n"
+                            )
+                        else:
+                            from _alias_admin import _builtin_makes
+                            print(
+                                "\n  Refreshing model lists from each provider "
+                                "(this may take a few seconds)…"
+                            )
+                            for make in _builtin_makes():
+                                try:
+                                    models = get_available_models(make, refresh=True)
+                                    rec = sum(
+                                        1 for m in models
+                                        if getattr(m, "is_recommended", False)
+                                    )
+                                    print(
+                                        f"    ✓  {make:<11} {len(models):>3} models "
+                                        f"({rec} recommended)"
+                                    )
+                                except Exception as exc:
+                                    print(f"    ✗  {make:<11} discovery failed: {exc}")
+                            print(
+                                f"\n  Cache: {os.path.expanduser('~/.cross_models_cache/')} "
+                                f"(7-day TTL)\n"
+                            )
 
                     case ("AI", "v"):
                         print(f"\n  TTS voice: {settings_get_tts_voice()}")

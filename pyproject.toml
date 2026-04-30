@@ -164,4 +164,3 @@ cross_st = [
     "cross_stones/*.json",
     "data/*.txt",
 ]
-
