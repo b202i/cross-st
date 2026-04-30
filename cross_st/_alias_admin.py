@@ -469,20 +469,25 @@ def format_alias_table(rows: "Iterable[dict]") -> str:
     rows = list(rows)
     if not rows:
         return "  (no aliases loaded)"
+    # Pre-compute the displayed alias string (with " (built-in)" suffix where
+    # applicable) so column widths and rendered cells stay in sync.
+    display = [
+        (r["alias"] + (" (built-in)" if r["is_builtin"] else ""), r)
+        for r in rows
+    ]
     headers = ("Alias", "Make", "Model", "Env override")
     widths  = [
-        max(len(headers[0]), max(len(r["alias"])           for r in rows)),
-        max(len(headers[1]), max(len(r["make"])            for r in rows)),
-        max(len(headers[2]), max(len(r["model_effective"]) for r in rows)),
-        max(len(headers[3]), max(len(r["env_override"] or "—") for r in rows)),
+        max(len(headers[0]), max(len(d)                     for d, _ in display)),
+        max(len(headers[1]), max(len(r["make"])             for _, r in display)),
+        max(len(headers[2]), max(len(r["model_effective"])  for _, r in display)),
+        max(len(headers[3]), max(len(r["env_override"] or "—") for _, r in display)),
     ]
     fmt = f"  {{:<{widths[0]}}}  {{:<{widths[1]}}}  {{:<{widths[2]}}}  {{:<{widths[3]}}}"
     sep = "  " + "  ".join("─" * w for w in widths)
     lines = [fmt.format(*headers), sep]
-    for r in rows:
-        marker = " (built-in)" if r["is_builtin"] else ""
+    for alias_disp, r in display:
         lines.append(fmt.format(
-            r["alias"] + marker,
+            alias_disp,
             r["make"],
             r["model_effective"],
             r["env_override"] or "—",
