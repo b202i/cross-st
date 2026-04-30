@@ -7,7 +7,97 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.8.0] — 2026-04-29
+## [0.9.0] — 2026-04-30
+
+The **multi-model alias layer** lands in cross-st (CST-MM-a..e + CST-MM-f/g/h).
+Pairs with `cross-ai-core 0.7.0` (CAC-10) which introduced the alias registry,
+`resolve_alias()`, and `get_rate_limit_group()`. With a `~/.cross_ai_models.json`
+file you can now run **more than one model per provider** in the same matrix —
+e.g. `anthropic-opus` and `anthropic-sonnet` competing side-by-side, ranked
+independently by `score_authors()`, sharing one rate-limit semaphore. Without
+the file, every command behaves byte-for-byte the same as 0.8.0 — the layer is
+strictly additive.
+
+### Added
+- **`docs/wiki/Multi-Model.md`** — new wiki page documenting the
+  `~/.cross_ai_models.json` file format, the `_alias` / `_model` / `_make`
+  stamping contract, the resolution chain for `<ALIAS>_MODEL` /
+  `<MAKE>_MODEL` env overrides, the shared-semaphore guarantee for
+  same-make aliases, and migration notes from the legacy `.ai_models`
+  file. Linked from `Home.md`, `ai-providers.md`, `st-cross.md`,
+  `st-fix.md`, `st-speed.md`, and `st-verdict.md`.
+- **`st-cross` matrix iterates aliases** (CST-MM-b). The semaphore dict
+  is now keyed on the rate-limit group returned by
+  `cross_ai_core.get_rate_limit_group(alias)` (= the resolved make), so
+  two aliases sharing a make share one semaphore. Resume detection in
+  `_stories_complete()` and the fact-row preload now match on
+  `(make, model)` instead of `make` alone, so adding a new alias mid-
+  project leaves the new cells pending while existing entries are
+  preserved (use `--force` to clear and re-run all cells).
+- **`st-fix` rewriter alias-defaulting** (CST-MM-d). When `--ai` is
+  omitted, the rewriter is set to the alias whose
+  `(get_ai_make(alias), get_ai_model(alias))` matches the source story's
+  `(primary_make, primary_model)`. Falls back to the bare make when no
+  alias matches. Same logic applies to synthesise-mode on `(base_make,
+  base_model)`.
+- **`st-speed` per-alias rows** (CST-MM-e). `summarize_generation()` and
+  `summarize_fact_checks()` group on `(make, model)` so two same-make
+  aliases get distinct rows. New `_label(make, model)` helper renders
+  `make:model` only when more than one model exists for that make in the
+  current dataset; otherwise the bare make is preserved (single-model
+  containers stay byte-identical). New `_filter_by_alias_or_make()`
+  helper makes `--ai anthropic-opus` filter on the resolved (make,
+  model) pair while `--ai anthropic` keeps all anthropic rows.
+- **9 new tests in `tests/test_st_cross_alias_matrix.py`** covering the
+  semaphore-sharing, alias collision rejection, and resume-on-(make,
+  model) behaviour.
+- **3 new tests in `tests/test_score_authors_multi_model.py`** locking
+  the property that two same-make aliases appear as distinct authors in
+  the composite scorer (which was already alias-ready post-VRD-10).
+- **4 new tests in `tests/test_st_speed_alias_rows.py`** covering the
+  per-alias row rendering, label disambiguation, and alias-vs-make
+  filter precedence.
+
+### Changed
+- **`pyproject.toml`** — `cross-ai-core[all]` floor bumped from `>=0.6.0`
+  to `>=0.7.0` (CST-MM-a). `version` bumped from `0.8.0` to `0.9.0`.
+- **`cross_st/ai_handler.py`** (compatibility shim) — re-exports the new
+  `cross_ai_core` symbols (`AliasSpec`, `resolve_alias`,
+  `get_rate_limit_group`, `get_ai_make_list`, `get_aliases`,
+  `get_alias_load_error`, `reload_aliases`, `did_you_mean`) so existing
+  cross-st imports continue to work without touching consumer code.
+- **Wiki refresh** — `Home.md`, `ai-providers.md`, `st-cross.md`,
+  `st-fix.md`, `st-speed.md`, `st-verdict.md` each carry a one-line
+  multi-model note plus a link to the new `Multi-Model` page. The
+  `st-cross-pipeline.svg` graphic still depicts a fixed 5-column matrix;
+  refresh tracked separately in `graphics/SPRINT_graphics.md`.
+
+### Verified
+- **869 → 885 passing** in `cross-st` (+16 new) / 114 skipped / 0
+  failing.
+- `cross-ai-core` 144 → **175 passing** (+31 alias tests).
+- Legacy fixture run with no `~/.cross_ai_models.json` produces output
+  identical to 0.8.0 (locks the additive-only contract).
+
+### Deferred to 0.9.x or later
+- **CST-MM-i** — `st-admin> AI > m` alias-management submenu (add /
+  remove / edit / refresh). The JSON file is hand-editable today; the
+  wizard is a UX nicety, not a release blocker.
+- **CST-MM-j** — silent migration of legacy `.ai_models` →
+  `~/.cross_ai_models.json` on first 0.9.0 startup.
+- **CST-MM-k** — explicit smoke test that `st.py`'s `next_ai()` rotation
+  cycles aliases (already works through `get_ai_list()`; one-line
+  verification only).
+- **CAC-10h** — provider-side model discovery (`list_models()` per
+  provider, cached 7-day in `~/.cross_models_cache/`). Tracked
+  separately in `cross-ai-core/MULTI_MODEL_PLAN.md`.
+- **Live-API integration smoke (CST-MM-g)** — described in
+  `../cross-internal/cross-ai-core/IMPLEMENTATION_CST_MM_a_to_e.md`
+  with re-runnable commands; deferred to operator-driven dogfood
+  pre-release rather than gating the publish step (synthetic fixtures
+  in the new test suites lock the equivalent properties).
+
+
 
 ### Added
 - **VRD-10 — composite "best author" scoring.** A new

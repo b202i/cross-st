@@ -2,7 +2,7 @@
 
 *AI checking AI.*
 
-Cross generates research reports using up to 5 AI providers simultaneously, then cross-checks every report against all others — a 5×5 fact-check matrix. Reports can be published to Discourse.
+Cross generates research reports using up to 5 AI providers simultaneously (or more via [model aliases](Multi-Model)), then cross-checks every report against all others — a 5×5 fact-check matrix by default. Reports can be published to Discourse.
 
 ---
 
@@ -55,6 +55,7 @@ New user? Start here: **[Onboarding](Onboarding)** — set up your API keys and 
 - [Showcase Workflows](Showcase-Workflows) — three killer workflows: "Is this fake news?", "What's missing?", "What can I trust?"
 - [Container Format](Container-Format) — anatomy of `subject.json`: `data[]`, `story[]`, `fact[]`, timing
 - [AI Providers](ai-providers) — all 5 providers, models, free vs paid tiers
+- [Multi-Model](Multi-Model) — run more than one model per provider via aliases (`anthropic-opus` + `anthropic-sonnet` side-by-side)
 - [Cross-Stones Benchmark](cross-stones) — benchmark suite: scoring, domains, leaderboard
 - [FAQ](faq) — common questions and troubleshooting
 

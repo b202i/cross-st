@@ -2,7 +2,9 @@
 
 Reads fact-check data from a container and produces two outputs: a **stacked bar chart** comparing each AI's accuracy (true · ~true · opinion · ~false · false breakdown per author), and an optional **written analysis** — a short caption on by default, or a longer caption, summary, or story via the `--ai-*` flags. Run after `st-fact` for a single-AI verdict, or after `st-cross` to compare all providers head-to-head.
 
-**Run after:** `st-fact` · `st-cross`
+**Run after:** `st-fact`  `st-cross`
+
+> **Multi-model (0.9.0+):** when same-make aliases author distinct stories in the same container, the chart and `score_authors()` rank each alias as a separate author (Opus and Sonnet rated independently). See [Multi-Model](Multi-Model).
 
 ![st-verdict workflow](st-verdict-flow.svg)
 

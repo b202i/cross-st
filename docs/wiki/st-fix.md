@@ -4,9 +4,11 @@ Rewrites the weak parts of a story using its fact-check results. Only sentences
 scored False or Partially False are touched — everything that checked out stays
 exactly as the AI wrote it.
 
-**Run after:** `st-fact`  ·  **Run before:** `st-post`
+**Run after:** `st-fact`    **Run before:** `st-post`
 
-**Related:** [st-fact](st-fact.md) · [st-merge](st-merge.md) · [st-post](st-post.md)
+**Related:** [st-fact](st-fact.md)  [st-merge](st-merge.md)  [st-post](st-post.md)  [Multi-Model](Multi-Model)
+
+> **Multi-model (0.9.0+):** when `--ai` is omitted, `st-fix` defaults the rewriter to the alias whose `(make, model)` matches the source story — an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. See [Multi-Model](Multi-Model).
 
 ---
 

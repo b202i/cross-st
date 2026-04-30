@@ -4,6 +4,8 @@ Cross supports five AI providers simultaneously. Each brings different strengths
 
 For first-time setup (getting API keys, running `st-admin --setup`), see [Onboarding](Onboarding.md).
 
+> **Multi-model:** since `cross-st 0.9.0` you can also run **more than one model per provider** in the same matrix (e.g. `anthropic-opus` and `anthropic-sonnet` competing side-by-side). See **[Multi-Model](Multi-Model)** for the alias file format.
+
 ---
 
 ## Quick-pick guide

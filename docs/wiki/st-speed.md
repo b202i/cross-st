@@ -3,9 +3,11 @@
 Compares AI provider performance across a container: generation time, tokens per second,
 fact-checking throughput, and consistency. Useful for choosing a provider when speed matters.
 
-**Run after:** `st-bang` · `st-cross`
+**Run after:** `st-bang`  `st-cross`
 
-**Related:** [st-stones](st-stones) · [st-cross](st-cross) · [st-heatmap](st-heatmap)
+**Related:** [st-stones](st-stones)  [st-cross](st-cross)  [st-heatmap](st-heatmap)  [Multi-Model](Multi-Model)
+
+> **Multi-model (0.9.0+):** when same-make aliases (e.g. `anthropic-opus` and `anthropic-sonnet`) appear in a container, `st-speed` shows one row per alias with `make:model` labels for disambiguation. See [Multi-Model](Multi-Model).
 
 ---
 
