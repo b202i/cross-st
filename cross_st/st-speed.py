@@ -136,29 +136,71 @@ def format_time(seconds):
     return f"{mins:02d}:{secs:02d}"
 
 
+def _filter_by_alias_or_make(timing_data, ai_filter):
+    """Filter ``timing_data`` rows by alias *or* bare make.
+
+    CST-MM-e: ``ai_filter`` may be either a built-in make string
+    (``"anthropic"``) or a user alias (``"anthropic-opus"``).  When the value
+    resolves to an alias with an explicit model, the filter matches on
+    (make, model) so two same-make aliases can be filtered individually.
+    Falls back to a bare-make match when the alias has no model or cannot
+    be resolved (e.g. legacy ``--ai`` value that isn't a registered alias).
+    """
+    try:
+        from cross_ai_core.aliases import resolve_alias
+        spec = resolve_alias(ai_filter)
+        target_make  = spec.make
+        target_model = spec.model
+    except Exception:
+        target_make, target_model = ai_filter, None
+    if target_model:
+        return [t for t in timing_data
+                if t["ai"] == target_make and t.get("model") == target_model]
+    return [t for t in timing_data if t["ai"] == target_make]
+
+
 def summarize_generation(timing_data, ai_filter=None):
     """Summarize story generation performance."""
     if not timing_data:
         return None
     
-    # Filter by AI if requested
+    # Filter by AI if requested.  CST-MM-e: ai_filter may be an alias
+    # (e.g. ``anthropic-opus``) — resolve to (make, model) and match on the
+    # pair so two aliases sharing a make can each be filtered individually.
     if ai_filter:
-        timing_data = [t for t in timing_data if t["ai"] == ai_filter]
+        timing_data = _filter_by_alias_or_make(timing_data, ai_filter)
         if not timing_data:
             return None
     
-    # Group by AI
+    # CST-MM-e: group by (make, model) so two same-make aliases each get
+    # their own row.  Pre-alias data (single model per make) keeps a single
+    # row whose label degenerates to the bare make.
     by_ai = {}
     for entry in timing_data:
-        ai = entry["ai"]
-        if ai not in by_ai:
-            by_ai[ai] = []
-        by_ai[ai].append(entry)
-    
+        make  = entry["ai"]
+        model = entry.get("model", "")
+        # Distinct row per (make, model); label is "make:model" when more
+        # than one model exists for the make in this dataset, else bare make.
+        key = (make, model)
+        if key not in by_ai:
+            by_ai[key] = []
+        by_ai[key].append(entry)
+
+    # Decide labels: only disambiguate with model when needed.
+    makes_with_multiple_models = {
+        m for m in {k[0] for k in by_ai}
+        if sum(1 for (mk, _) in by_ai if mk == m) > 1
+    }
+    def _label(make, model):
+        if make in makes_with_multiple_models and model:
+            return f"{make}:{model}"
+        return make
+
     # Build summary table
     rows = []
     cached_rows = []   # held separately so they sort after fresh rows
-    for ai, entries in sorted(by_ai.items()):
+    for (make, model), entries in sorted(by_ai.items()):
+        ai = _label(make, model)
         # Exclude cached entries from performance metrics
         fresh_entries = [e for e in entries if not e["cached"]]
         if fresh_entries:
@@ -207,21 +249,30 @@ def summarize_fact_checks(timing_data, ai_filter=None):
     
     # Filter by AI if requested
     if ai_filter:
-        timing_data = [t for t in timing_data if t["ai"] == ai_filter]
+        timing_data = _filter_by_alias_or_make(timing_data, ai_filter)
         if not timing_data:
             return None
     
-    # Group by AI
+    # CST-MM-e: group by (make, model) so two same-make aliases get
+    # distinct rows; disambiguate the label only when needed.
     by_ai = {}
     for entry in timing_data:
-        ai = entry["ai"]
-        if ai not in by_ai:
-            by_ai[ai] = []
-        by_ai[ai].append(entry)
-    
+        key = (entry["ai"], entry.get("model", ""))
+        by_ai.setdefault(key, []).append(entry)
+
+    makes_with_multiple_models = {
+        m for m in {k[0] for k in by_ai}
+        if sum(1 for (mk, _) in by_ai if mk == m) > 1
+    }
+    def _label(make, model):
+        if make in makes_with_multiple_models and model:
+            return f"{make}:{model}"
+        return make
+
     # Build summary table
     rows = []
-    for ai, entries in sorted(by_ai.items()):
+    for (make, model), entries in sorted(by_ai.items()):
+        ai = _label(make, model)
         # Exclude cached entries
         fresh_entries = [e for e in entries if not e["cached"]]
         if not fresh_entries:

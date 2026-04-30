@@ -31,7 +31,7 @@ import time
 from mmd_startup import require_config
 from pathlib import Path
 
-from ai_handler import get_ai_list, get_ai_make, get_ai_model, get_rate_limit_concurrency
+from ai_handler import get_ai_list, get_ai_make, get_ai_model, get_rate_limit_concurrency, get_rate_limit_group
 from mmd_util import get_tmp_dir, tmp_safe_name, build_segments, progress_file_path
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
@@ -239,17 +239,32 @@ def _draw_cross_table(cells: dict, ai_list: list, file_prefix: str,
 # ── Segment pre-build helper ─────────────────────────────────────────────────
 
 def _stories_complete(json_path: str, ai_list: list) -> bool:
-    """Return True if *json_path* has a story entry for every AI make in *ai_list*.
+    """Return True if *json_path* has a story entry for every AI alias in *ai_list*.
 
-    Used to auto-skip Step 1 when all N stories already exist in the container.
-    Missing file or malformed JSON → False (start fresh).
+    Compared on the (make, model) pair so that two aliases sharing a make
+    (e.g. ``anthropic-opus`` + ``anthropic-sonnet``) each count as a distinct
+    needed entry.  Missing file or malformed JSON → False (start fresh).
     """
+    from cross_ai_core.aliases import resolve_alias
     try:
         with open(json_path) as f:
             c = json.load(f)
-        existing_makes = {s.get("make") for s in c.get("story", [])}
-        needed_makes   = {get_ai_make(a) for a in ai_list}
-        return needed_makes.issubset(existing_makes)
+        existing_pairs = {(s.get("make"), s.get("model")) for s in c.get("story", [])}
+        for alias in ai_list:
+            spec = resolve_alias(alias)
+            need_make = spec.make
+            # If the alias has an explicit model in the registry, require an
+            # exact (make, model) match.  Bare-make aliases (spec.model is
+            # None — the handler default applies) are satisfied by *any*
+            # entry sharing the make, preserving legacy "one story per
+            # make" semantics for no-alias containers.
+            if spec.model is not None:
+                if (need_make, spec.model) not in existing_pairs:
+                    return False
+            else:
+                if not any(m == need_make for (m, _) in existing_pairs):
+                    return False
+        return True
     except (OSError, json.JSONDecodeError):
         return False
 
@@ -293,10 +308,14 @@ def _ensure_segments(file_json: str, n_stories: int, quiet: bool = False) -> Non
         print(f"  Segments built for {_clr(built, GREEN, BOLD)} stories.")
 
 
-# ── PAR-1: per-provider concurrency cap ───────────────────────────────────────
-# A semaphore per fact-checker make caps the number of concurrent st-fact
-# spawns hitting that provider's API. Sized by cross_ai_core.get_rate_limit_concurrency
-# (CAC-5) unless overridden by --max-concurrency, or pinned to 1 by --sequential.
+# ── PAR-1 / CST-MM-b: per-rate-limit-group concurrency cap ───────────────────
+# A semaphore per rate-limit group caps the number of concurrent st-fact
+# spawns hitting that provider's API. The group key is the *resolved make*
+# (CAC-10 get_rate_limit_group), so multiple aliases that share a make
+# (e.g. anthropic-opus + anthropic-sonnet) share one semaphore — preventing
+# alias-multiplication from blowing through the per-provider rate limit.
+# Sized by cross_ai_core.get_rate_limit_concurrency (CAC-5) unless overridden
+# by --max-concurrency, or pinned to 1 by --sequential.
 #
 # Note: subprocess.run() blocks the calling thread, so capping spawn = capping
 # in-flight subprocess count = capping concurrent API calls to that provider.
@@ -305,21 +324,26 @@ _semaphores_lock = threading.Lock()
 _sequential_semaphore = threading.Semaphore(1)
 
 
-def _get_provider_semaphore(make: str, max_override, sequential: bool) -> threading.Semaphore:
-    """Return the semaphore that gates spawns for *make*.
+def _get_provider_semaphore(alias: str, max_override, sequential: bool) -> threading.Semaphore:
+    """Return the semaphore that gates spawns for *alias*'s rate-limit group.
 
-    * --sequential       --> single global Semaphore(1) shared across every provider.
-    * --max-concurrency N --> Semaphore(N), per provider.
-    * default            --> Semaphore(get_rate_limit_concurrency(make)).
+    * --sequential        --> single global Semaphore(1) shared across every provider.
+    * --max-concurrency N --> Semaphore(N), per rate-limit group.
+    * default             --> Semaphore(get_rate_limit_concurrency(group)).
+
+    The group key is the resolved make (CAC-10), so aliases that share a make
+    share one semaphore — protecting the per-provider rate-limit budget when
+    a user defines multiple aliases against the same provider.
     """
     if sequential:
         return _sequential_semaphore
 
-    key = f"{make}:{max_override}" if max_override is not None else make
+    group_key, group_cap = get_rate_limit_group(alias)
+    key = f"{group_key}:{max_override}" if max_override is not None else group_key
     with _semaphores_lock:
         sem = _provider_semaphores.get(key)
         if sem is None:
-            size = max_override if max_override is not None else get_rate_limit_concurrency(make)
+            size = max_override if max_override is not None else group_cap
             sem = threading.Semaphore(size)
             _provider_semaphores[key] = sem
         return sem
@@ -703,10 +727,18 @@ def main() -> None:
                 existing = json.load(f)
             for si, story in enumerate(existing.get("story", [])[:N]):
                 for fact in story.get("fact", []):
-                    fc_make = fact.get("make", "")
-                    # Match fact-checker make to column index
+                    fc_make  = fact.get("make", "")
+                    fc_model = fact.get("model", "")
+                    # CST-MM-b: match on (make, model) so two aliases that
+                    # share a make resolve to distinct columns.  Falls back
+                    # to make-only when an alias has no explicit model
+                    # (legacy "one alias per make" containers).
                     for fi, ai_key in enumerate(ai_list):
-                        if get_ai_make(ai_key) == fc_make:
+                        col_make  = get_ai_make(ai_key)
+                        col_model = get_ai_model(ai_key)
+                        same_make  = (col_make == fc_make)
+                        same_model = (col_model == fc_model) or not col_model or not fc_model
+                        if same_make and same_model:
                             if cells[(si, fi)]["status"] == ST_PENDING:
                                 cells[(si, fi)]["status"]   = ST_DONE
                                 cells[(si, fi)]["start_time"] = 0.0
@@ -876,18 +908,18 @@ def main() -> None:
         cell["start_time"] = time.time()
         cell["status"]     = ST_RUNNING
 
-        fc_make = ai_list[fi]
+        fc_alias = ai_list[fi]
         cmd = [
             "st-fact",
             "--silent",
-            "--ai", fc_make,
+            "--ai", fc_alias,
             "--story", str(si + 1),
             "--timeout", str(args.timeout),
             "--retry-budget", str(args.retry_budget),
             cache_flag,
             file_json,
         ]
-        sem = _get_provider_semaphore(fc_make, args.max_concurrency, not args.parallel)
+        sem = _get_provider_semaphore(fc_alias, args.max_concurrency, not args.parallel)
         # NOTE: the per-cell "Starting" line is printed by the LAUNCH loop
         # below, not here.  Doing it here would race across all NN worker
         # threads and the user would see all NN lines in microseconds —
@@ -944,7 +976,7 @@ def main() -> None:
                 print(
                     f"  {_idx_prefix(n_done_so_far)} "
                     f"{_clr(mark, color)} "
-                    f"{ai_list[si]} → {fc_make}  "
+                    f"{ai_list[si]} → {fc_alias}  "
                     f"{_clr(f'({_fmt(elapsed)})', DIM)}",
                     flush=True,
                 )

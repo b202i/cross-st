@@ -1496,10 +1496,26 @@ Modes:
 
     # ── Resolve rewriter AI ───────────────────────────────────────────────────
     # Default to the story's own AI (same voice, better results).
+    # CST-MM-d: when the story was authored by a multi-model alias (e.g.
+    # ``anthropic-opus`` vs ``anthropic-sonnet``), match on (make, model) so
+    # the rewriter uses the same model — not just the same make.
     # Fall back to get_default_ai() if the story's AI is not in the registry
     # (e.g. make="url" for fetched stories).
     if args.ai is None:
-        if primary_make in get_ai_list():
+        ai_list_now = get_ai_list()
+        # First, try to find an alias whose resolved (make, model) matches.
+        matching_alias = None
+        for alias in ai_list_now:
+            try:
+                if (get_ai_make(alias) == primary_make
+                        and get_ai_model(alias) == primary_model):
+                    matching_alias = alias
+                    break
+            except Exception:
+                continue
+        if matching_alias is not None:
+            args.ai = matching_alias
+        elif primary_make in ai_list_now:
             args.ai = primary_make
         else:
             args.ai = get_default_ai()
@@ -1526,8 +1542,20 @@ Modes:
         base_make  = base_story.get("make", "")
         base_model = base_story.get("model", "")
 
-        # Lock the rewriter to the base story's author — single voice throughout
-        rewriter_ai = base_make if base_make in get_ai_list() else args.ai
+        # Lock the rewriter to the base story's author — single voice throughout.
+        # CST-MM-d: prefer an alias whose (make, model) matches so two
+        # same-make aliases each pick the right rewriter.
+        rewriter_ai = None
+        for alias in get_ai_list():
+            try:
+                if (get_ai_make(alias) == base_make
+                        and get_ai_model(alias) == base_model):
+                    rewriter_ai = alias
+                    break
+            except Exception:
+                continue
+        if rewriter_ai is None:
+            rewriter_ai = base_make if base_make in get_ai_list() else args.ai
         if rewriter_ai != args.ai and not args.quiet:
             print(f"  Rewriter: {rewriter_ai} (author of best story — overrides --ai)")
 
