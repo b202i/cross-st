@@ -12,10 +12,10 @@ the read-only ``cross_ai_core.aliases`` API:
     * list_aliases()         — every loaded alias + env override label
     * env_override_for(...)  — which env var (if any) overrides this alias
 
-A small curated ``RECOMMENDED_MODELS`` dict provides the "common picks" the
-interactive picker shows when CAC-10h's live ``list_models()`` discovery is
-not yet wired up.  Users can always type any model id directly; recommendations
-are ordering hints, never restrictions.
+A small curated ``RECOMMENDED_MODELS`` dict provides the "common picks" used
+as a fallback when ``cross_ai_core.get_available_models()`` (CAC-10h, shipped
+in cross-ai-core 0.7.1) cannot reach a provider.  Users can always type any
+model id directly; recommendations are ordering hints, never restrictions.
 """
 
 from __future__ import annotations
@@ -43,16 +43,18 @@ def aliases_file_path() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Curated recommendations — placeholder until CAC-10h ships
+# Curated recommendations — offline fallback for CAC-10h discovery
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Each entry is an ordered list of (model_id, label, recommended_bool).
 # Recommended models are shown first with a ★ marker.  This dict is hand-
 # maintained — when a new flagship lands, edit here and ship.
 #
-# Resolution: once CAC-10h provides ``get_available_models(make)``, this dict
-# becomes a static *override* layer ranking SDK-discovered ids; not the
-# source of truth.
+# As of cross-ai-core 0.7.1, ``cross_ai_core.get_available_models(make)``
+# returns SDK-discovered ids annotated with ``is_recommended`` / ``is_default``
+# from ``cross_ai_core.recommendations.RECOMMENDED_MODELS`` (the upstream
+# source of truth).  This local dict is kept as a *secondary* fallback for
+# offline / SDK-error paths in the interactive add-alias wizard.
 
 RECOMMENDED_MODELS: "OrderedDict[str, list[tuple[str, str, bool]]]" = OrderedDict({
     "anthropic": [

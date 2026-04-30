@@ -2029,11 +2029,14 @@ def cache_cull(days: int) -> None:
 
 # ── Alias-management wizards (CST-MM-i) ──────────────────────────────────────
 #
-# Live model discovery (CAC-10h) is not yet implemented; these wizards
-# present a curated suggestion list (`_alias_admin.RECOMMENDED_MODELS`) and
-# always allow the user to type any provider model id directly.  When CAC-10h
-# ships, the picker logic gains an SDK-discovered list — the user-facing
-# prompts stay identical.
+# Model picker uses live SDK-side discovery via
+# ``cross_ai_core.get_available_models(make)`` (CAC-10h, shipped in
+# cross-ai-core 0.7.1).  Results are cached for 7 days under
+# ``~/.cross_models_cache/``; the curated ``RECOMMENDED_MODELS`` list is
+# spliced in as a fallback when a provider's SDK returns nothing or errors.
+# Users can always type any model id directly — the live list is a hint, not
+# a restriction.  The "Refresh available models" menu action forces a fresh
+# provider call (``refresh=True``) for every built-in make.
 
 def _pick_make() -> "str | None":
     """Numbered picker for the built-in provider list.  ``None`` = cancel."""
@@ -2059,24 +2062,37 @@ def _pick_make() -> "str | None":
 
 
 def _pick_model(make: str, current=None):
-    """Show curated picks + free-text fallback.
+    """Show live + curated picks + free-text fallback.
+
+    Calls ``cross_ai_core.get_available_models(make)`` (CAC-10h) which
+    returns SDK-discovered models annotated with ``is_recommended`` /
+    ``is_default``, falling back to the curated list on SDK error.
 
     Returns ``(confirmed, model)``:
         * ``(True, "<id>")`` — user picked or typed a model id.
         * ``(True, None)``   — user picked "use handler default".
         * ``(False, None)``  — user cancelled.
     """
-    from _alias_admin import get_recommended_models
-    suggestions = get_recommended_models(make)
-    print(f"\n  Suggested models for {make}:")
-    if suggestions:
-        for i, (model_id, label, recommended) in enumerate(suggestions, 1):
-            star = "★" if recommended else " "
-            current_marker = "  (current)" if current == model_id else ""
-            print(f"    {i}. {star} {model_id:<32} {label}{current_marker}")
+    try:
+        from cross_ai_core import get_available_models
+        models = get_available_models(make)
+    except Exception as exc:
+        print(f"  ⚠️  Live discovery failed ({exc}); using curated suggestions.")
+        from _alias_admin import get_recommended_models
+        models = [
+            type("M", (), {"id": mid, "is_recommended": rec, "is_default": False})
+            for mid, _label, rec in get_recommended_models(make)
+        ]
+
+    print(f"\n  Available models for {make}:")
+    if models:
+        for i, m in enumerate(models, 1):
+            star = "★" if getattr(m, "is_recommended", False) else " "
+            current_marker = "  (current)" if current == m.id else ""
+            print(f"    {i:>2}. {star} {m.id}{current_marker}")
     else:
-        print("    (no curated suggestions for this provider — type a model id)")
-    print("    0.   <use handler default (model = null)>")
+        print("    (no models discovered for this provider — type a model id)")
+    print("     0.   <use handler default (model = null)>")
     print("    Or type any model id directly.")
     raw = input("  Choice (blank to cancel): ").strip()
     if not raw:
@@ -2085,8 +2101,8 @@ def _pick_model(make: str, current=None):
         return (True, None)
     try:
         idx = int(raw)
-        if 1 <= idx <= len(suggestions):
-            return (True, suggestions[idx - 1][0])
+        if 1 <= idx <= len(models):
+            return (True, models[idx - 1].id)
     except ValueError:
         pass
     return (True, raw)
@@ -2203,7 +2219,7 @@ _MENU = {
             "a": "Add alias  (alias  →  make · model)",
             "r": "Remove alias  (user-defined only)",
             "e": "Edit alias model",
-            "R": "Refresh available models  (CAC-10h pending — type any model id for now)",
+            "R": "Refresh available models  (force fresh discovery for every provider)",
         }),
         "M": "View aliases",
         "v": "View TTS voice",
@@ -2349,19 +2365,28 @@ def interactive_menu() -> None:
                         _alias_wizard_edit()
 
                     case ("Manage aliases", "R"):
+                        from cross_ai_core import get_available_models
+                        from _alias_admin import _builtin_makes
                         print(
-                            "\n  ⚠️  Live model discovery (CAC-10h) is not yet "
-                            "released.\n"
-                            "      For now, type any provider model id directly "
-                            "in the Add/Edit\n"
-                            "      flows; the curated suggestions list is shown "
-                            "as a starting\n"
-                            "      point.  Provider docs:\n"
-                            "        anthropic  https://docs.anthropic.com/claude/docs/models-overview\n"
-                            "        openai     https://platform.openai.com/docs/models\n"
-                            "        xai        https://docs.x.ai/docs/models\n"
-                            "        gemini     https://ai.google.dev/gemini-api/docs/models\n"
-                            "        perplexity https://docs.perplexity.ai/guides/model-cards\n"
+                            "\n  Refreshing model lists from each provider "
+                            "(this may take a few seconds)…"
+                        )
+                        for make in _builtin_makes():
+                            try:
+                                models = get_available_models(make, refresh=True)
+                                rec = sum(
+                                    1 for m in models
+                                    if getattr(m, "is_recommended", False)
+                                )
+                                print(
+                                    f"    ✓  {make:<11} {len(models):>3} models "
+                                    f"({rec} recommended)"
+                                )
+                            except Exception as exc:
+                                print(f"    ✗  {make:<11} discovery failed: {exc}")
+                        print(
+                            f"\n  Cache: {os.path.expanduser('~/.cross_models_cache/')} "
+                            f"(7-day TTL)\n"
                         )
 
                     case ("AI", "v"):
