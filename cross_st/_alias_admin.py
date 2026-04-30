@@ -487,18 +487,19 @@ def list_aliases() -> list[dict]:
 def format_alias_table(rows: "Iterable[dict]") -> str:
     """Render the alias rows as a fixed-width plain-text table.
 
-    Columns: Alias · Provider · Model · Type · Env override.
+    Columns: Agent · Provider · Model · Type · Env override.
 
-    *Type* is ``default`` for the auto-seeded one-per-provider aliases (the
-    ones you got for free) and ``custom`` for aliases you defined yourself
-    in ``~/.cross_ai_models.json``.  Provider replaces the internal "make"
-    jargon.  Model column shows the actual model id that will be sent to
-    the provider — never the placeholder string ``<handler default>``.
+    *Agent* is the user-facing name for what the codebase calls an "alias"
+    — a short label (e.g. ``anthropic``, ``anthropic-opus``) that resolves
+    to one ``(provider, model)`` pair.  *Type* is ``default`` for the
+    one-per-provider agents that ship with cross-st and ``custom`` for
+    agents the user defined in ``~/.cross_ai_models.json``.  Both call the
+    provider's API at the provider's published rate — neither is "free".
     """
     rows = list(rows)
     if not rows:
-        return "  (no aliases loaded)"
-    # Each tuple: (alias, provider, model_label, type, env_override)
+        return "  (no agents loaded)"
+    # Each tuple: (agent_name, provider, model_label, type, env_override)
     cells = [
         (
             r["alias"],
@@ -509,7 +510,7 @@ def format_alias_table(rows: "Iterable[dict]") -> str:
         )
         for r in rows
     ]
-    headers = ("Alias", "Provider", "Model", "Type", "Env override")
+    headers = ("Agent", "Provider", "Model", "Type", "Env override")
     widths  = [
         max(len(headers[i]), max(len(c[i]) for c in cells))
         for i in range(len(headers))

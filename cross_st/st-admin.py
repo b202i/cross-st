@@ -2028,7 +2028,7 @@ def cache_cull(days: int) -> None:
 
 
 def _show_aliases_table() -> None:
-    """Print the alias table plus a short legend so the jargon is self-documenting."""
+    """Print the agent table plus a short legend so the jargon is self-documenting."""
     from _alias_admin import list_aliases, format_alias_table
     print()
     print(format_alias_table(list_aliases()))
@@ -2036,11 +2036,13 @@ def _show_aliases_table() -> None:
         "\n  Legend:\n"
         "    Provider  = the AI company (anthropic, openai, xai, gemini, perplexity)\n"
         "    Model     = a specific LLM that provider hosts (e.g. claude-opus-4-5)\n"
-        "    Alias     = the short name you pass to --ai or that st cycles through;\n"
-        "                each alias is a (provider, model) pair.\n"
-        "    Type      = 'default' means an alias you got for free (one per provider,\n"
-        "                same name as the provider, uses the provider's recommended\n"
-        "                model);  'custom' means an alias you added yourself.\n"
+        "    Agent     = the short name you pass to --ai or that st cycles through;\n"
+        "                each agent is a (provider, model) pair.\n"
+        "    Type      = 'default' means an agent that ships with cross-st (one per\n"
+        "                provider, named after the provider, pointing at that\n"
+        "                provider's recommended model);  'custom' means an agent you\n"
+        "                added yourself.  Both types call the provider's API at the\n"
+        "                provider's published rate — neither is free.\n"
         f"\n  File: {os.path.expanduser('~/.cross_ai_models.json')}"
     )
 
@@ -2132,14 +2134,14 @@ def _pick_model(make: str, current=None):
 
 
 def _alias_wizard_add() -> None:
-    """Interactive add-alias flow."""
+    """Interactive add-agent flow."""
     from _alias_admin import add_alias, AliasError, read_alias_file
-    print("\n  Add a new AI alias.")
-    name = input("  Alias name (e.g. anthropic-opus, blank to cancel): ").strip()
+    print("\n  Add a new AI agent.")
+    name = input("  Agent name (e.g. anthropic-opus, blank to cancel): ").strip()
     if not name:
         return
     if name in read_alias_file():
-        print(f"  ⚠️  Alias {name!r} already exists — use 'Edit' to change its model.")
+        print(f"  ⚠️  Agent {name!r} already exists — use 'Edit' to change its model.")
         return
     make = _pick_make()
     if not make:
@@ -2148,7 +2150,7 @@ def _alias_wizard_add() -> None:
     if not confirmed:
         return
     summary_model = model if model is not None else "<provider default>"
-    print(f"\n  Confirm: alias {name!r} → {make} · {summary_model}")
+    print(f"\n  Confirm: agent {name!r} → {make} · {summary_model}")
     ans = input("  Save? [Y/n]: ").strip().lower()
     if ans and ans != "y":
         print("  Cancelled.")
@@ -2162,13 +2164,13 @@ def _alias_wizard_add() -> None:
 
 
 def _alias_wizard_remove() -> None:
-    """Interactive remove-alias flow.  User-defined aliases only."""
+    """Interactive remove-agent flow.  Custom agents only."""
     from _alias_admin import read_alias_file, remove_alias, AliasError
     user_aliases = list(read_alias_file().keys())
     if not user_aliases:
-        print("\n  (no custom aliases — nothing to remove)")
+        print("\n  (no custom agents — nothing to remove)")
         return
-    print("\n  User-defined aliases:")
+    print("\n  Custom agents:")
     for i, alias in enumerate(user_aliases, 1):
         print(f"    {i}. {alias}")
     raw = input("  Number to remove (or blank to cancel): ").strip()
@@ -2183,7 +2185,7 @@ def _alias_wizard_remove() -> None:
         print(f"  ✗  Choice out of range: {idx}")
         return
     name = user_aliases[idx - 1]
-    ans = input(f"  Remove alias {name!r}? [y/N]: ").strip().lower()
+    ans = input(f"  Remove agent {name!r}? [y/N]: ").strip().lower()
     if ans != "y":
         print("  Cancelled.")
         return
@@ -2192,18 +2194,18 @@ def _alias_wizard_remove() -> None:
     except AliasError as exc:
         print(f"  ✗  {exc}")
         return
-    print(f"  ✓  Removed alias {name!r}.")
+    print(f"  ✓  Removed agent {name!r}.")
 
 
 def _alias_wizard_edit() -> None:
-    """Interactive edit-alias flow.  Changes only the model field."""
+    """Interactive edit-agent flow.  Changes only the model field."""
     from _alias_admin import read_alias_file, edit_alias_model, AliasError
     file_data = read_alias_file()
     user_aliases = list(file_data.keys())
     if not user_aliases:
-        print("\n  (no custom aliases — use 'Add alias' first)")
+        print("\n  (no custom agents — use 'Add agent' first)")
         return
-    print("\n  Custom aliases:")
+    print("\n  Custom agents:")
     for i, alias in enumerate(user_aliases, 1):
         spec = file_data[alias]
         cur  = spec.get("model") or "<provider default>"
@@ -2230,22 +2232,22 @@ def _alias_wizard_edit() -> None:
         print(f"  ✗  {exc}")
         return
     summary_model = model if model is not None else "<provider default>"
-    print(f"  ✓  Alias {name!r} now resolves to {spec['make']} · {summary_model}")
+    print(f"  ✓  Agent {name!r} now resolves to {spec['make']} · {summary_model}")
 
 
 # ── Interactive menu ───────────────────────────────────────────────────────────
 
 _MENU = {
     "a": ("AI", {
-        "d": "View / set default AI alias",
-        "m": ("Manage aliases", {
-            "a": "Add alias  (alias  →  provider · model)",
-            "r": "Remove alias  (custom only)",
-            "e": "Edit alias model",
-            "M": "View aliases  (table of every alias and the model it resolves to)",
+        "d": "View / set default agent",
+        "m": ("Manage agents", {
+            "a": "Add agent  (agent  →  provider · model)",
+            "r": "Remove agent  (custom only)",
+            "e": "Edit agent's model",
+            "M": "View agents  (table of every agent and the model it resolves to)",
             "R": "Refresh available models  (force fresh discovery for every provider)",
         }),
-        "M": "View aliases  (table of every alias and the model it resolves to)",
+        "M": "View agents  (table of every agent and the model it resolves to)",
         "v": "View TTS voice",
         "V": "Set TTS voice  (launches st-voice)",
     }),
@@ -2352,8 +2354,8 @@ def interactive_menu() -> None:
 
                     # ── AI ────────────────────────────────────────────────────
                     case ("AI", "d"):
-                        # Refresh in case an alias was just added in the
-                        # Manage-aliases submenu.
+                        # Refresh in case an agent was just added in the
+                        # Manage-agents submenu.
                         from ai_handler import get_ai_list as _gal
                         from _alias_admin import list_aliases
                         ai_list = _gal()
@@ -2362,11 +2364,11 @@ def interactive_menu() -> None:
                         cur_row = rows.get(current)
                         cur_label = (
                             f"{cur_row['make']} · {cur_row['model_label']}"
-                            if cur_row else "(unknown alias)"
+                            if cur_row else "(unknown agent)"
                         )
-                        print(f"\n  Current default AI: [{current}]  →  {cur_label}\n")
-                        print("  Available aliases (default = recommended model):")
-                        # Width-align the alias column
+                        print(f"\n  Current default agent: [{current}]  →  {cur_label}\n")
+                        print("  Available agents (default = ships with cross-st, points at provider's recommended model):")
+                        # Width-align the agent column
                         w = max(len(a) for a in ai_list)
                         for alias in ai_list:
                             r = rows.get(alias)
@@ -2379,12 +2381,12 @@ def interactive_menu() -> None:
                             else:
                                 print(f"    {alias:<{w}}{marker}")
                         new_ai = input(
-                            "\n  Type alias name to switch (blank = keep current): "
+                            "\n  Type agent name to switch (blank = keep current): "
                         ).strip()
                         if new_ai:
                             try:
                                 settings_set_default_ai(new_ai)
-                                print(f"  ✓  Default AI set to: {new_ai}  (written to .env)")
+                                print(f"  ✓  Default agent set to: {new_ai}  (written to .env)")
                             except ValueError as exc:
                                 print(f"  ✗  {exc}")
 

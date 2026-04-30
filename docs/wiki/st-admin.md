@@ -14,12 +14,12 @@ st-admin                        # interactive menu
 st-admin --setup                # first-time wizard
 st-admin --show                 # print current config
 st-admin --version              # print installed version
-st-admin --get-default-ai       # print current default AI alias
-st-admin --set-default-ai NAME  # switch default AI alias (e.g. gemini, anthropic-opus)
-st-admin --list-aliases         # table of every alias → provider · model
+st-admin --get-default-ai       # print current default agent
+st-admin --set-default-ai NAME  # switch default agent (e.g. gemini, anthropic-opus)
+st-admin --list-aliases         # table of every agent → provider · model
 st-admin --add-alias NAME=PROVIDER:MODEL    # e.g. anthropic-opus=anthropic:claude-opus-4-5
 st-admin --add-alias NAME=PROVIDER          # uses provider's recommended model
-st-admin --remove-alias NAME    # remove a custom alias
+st-admin --remove-alias NAME    # remove a custom agent
 st-admin --set-tts-voice VOICE  # set TTS voice string (written to TTS_VOICE)
 st-admin --set-template NAME    # set default prompt template name
 st-admin --set-editor NAME      # set editor (written to EDITOR)

@@ -210,7 +210,7 @@ class TestListAliases:
     def test_format_alias_table_renders(self, isolated_alias_file):
         _alias_admin.add_alias("anthropic-opus", "anthropic", "claude-opus-4-5")
         text = _alias_admin.format_alias_table(_alias_admin.list_aliases())
-        assert "Alias" in text and "Provider" in text and "Model" in text
+        assert "Agent" in text and "Provider" in text and "Model" in text
         assert "Type" in text and "Env override" in text
         assert "anthropic-opus" in text and "claude-opus-4-5" in text
         # Custom aliases tagged "custom"; default ones tagged "default".
@@ -306,8 +306,8 @@ class TestCliListAliases:
             env_extra={"CROSS_AI_ALIASES_FILE": str(f)},
         )
         assert proc.returncode == 0, proc.stderr
-        # Header + at least the new alias and the built-ins are present.
-        assert "Alias" in proc.stdout
+        # Header + at least the new agent and the built-ins are present.
+        assert "Agent" in proc.stdout
         assert "anthropic-opus" in proc.stdout
         assert "claude-opus-4-5" in proc.stdout
 
@@ -321,14 +321,16 @@ class TestMenuDefinition:
         # 'm' is now a sub-submenu (tuple), not a leaf string.
         assert isinstance(ai_sub["m"], tuple)
         manage_label, manage_sub = ai_sub["m"]
-        assert manage_label == "Manage aliases"
-        for k in ("a", "r", "e", "R"):
+        assert manage_label == "Manage agents"
+        # All four mutation actions are bound (a/r/e/R) plus the table
+        # view (M) which is also surfaced one level up.
+        for k in ("a", "r", "e", "R", "M"):
             assert k in manage_sub
 
     def test_ai_submenu_has_view_aliases_leaf(self):
         ai_label, ai_sub = st_admin._MENU["a"]
         assert isinstance(ai_sub["M"], str)
-        assert "alias" in ai_sub["M"].lower()
+        assert "agent" in ai_sub["M"].lower()
 
 
 # ── Recommended-models curated list ──────────────────────────────────────────
