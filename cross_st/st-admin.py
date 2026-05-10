@@ -2575,8 +2575,10 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Without flags, opens the interactive settings panel.\n\n"
-            "Settings are stored in .env (DEFAULT_AGENT, TTS_VOICE, DEFAULT_TEMPLATE,\n"
-            "EDITOR) and .ai_models (per-provider model overrides).\n\n"
+            "Settings are stored in ~/.crossenv (DEFAULT_AGENT, TTS_VOICE,\n"
+            "DEFAULT_TEMPLATE, EDITOR, API keys) and ~/.cross_ai_models.json\n"
+            "(agent registry — manage via the AI submenu or --add-alias /\n"
+            "--remove-alias / --list-aliases).\n\n"
             "The DEFAULT_AGENT value is used by all st-* tools as the agent for\n"
             "caption / report generation whenever --agent is not explicitly passed."
         ),
