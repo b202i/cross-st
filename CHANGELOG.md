@@ -9,8 +9,48 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.10.0] — 2026-05-10  *(unreleased — Agents v2)*
+
+> Atomic paired release with `cross-ai-core 0.8.0`. Spec:
+> `cross-internal/cross-ai-core/DESIGN_agents_v2.md`. Migration runs
+> once on first 0.10.x startup; existing per-provider model overrides
+> are preserved.
+
 ### Changed
 
+- **AGT-2 — First-run migration to Agents v2 schema.** New
+  `cross_st/_alias_admin.migrate_to_agents_v2()` runs once on first
+  0.10.x startup (hooked from `mmd_startup.load_cross_env()`). Three
+  branches: existing v1 file → re-emit as v2 envelope (no agent names
+  change); fresh install with API keys → seed one starter agent per
+  detected provider using `cross_ai_core.get_recommended_default()`;
+  fresh install with no keys → silent no-op (user runs
+  `st-admin --setup`). Idempotent — gated by the
+  `_migrated_to_agents_v2: true` marker in the v2 envelope. Errors are
+  swallowed by `run_agents_v2_migration_with_notice()` so a malformed
+  agents file cannot crash startup.
+- **AGT-5 — API-key availability filtering.**
+  `cross_ai_core.has_api_key()` (AGT-1c) is wired into four cross-st
+  surfaces so users never see (or accidentally select) an agent whose
+  provider key is unset:
+  * `_alias_admin.list_aliases(filter_by_keys=True)` drops keyless rows
+    and adds a `has_api_key` field to every row regardless of the filter.
+  * New `_alias_admin.agents_missing_keys()` and
+    `providers_with_unused_keys()` helpers drive the new hint blocks.
+  * `st-admin > AI > M` now shows only callable agents, then prints one
+    `⚠️` per hidden agent ("uses XAI but XAI_API_KEY is unset") and one
+    note per provider with a key but no agent ("you have
+    ANTHROPIC_API_KEY but no agent uses anthropic").
+  * `st.py` builds `ai_opt` from the filtered list, so the `A`-key
+    rotation, the `agent:…` status-line prefix, and the embedded
+    `--agent` argparse choices all honour the filter. Falls open (full
+    list) when every provider lacks a key, so a fresh-install user
+    still sees a meaningful prompt.
+  * `st-cross.py` drops keyless agents from the matrix with a one-line
+    warning, so columns are only spawned for agents the user can
+    actually run.
 - **AGT-3 — `--ai` flag fully retired; `--agent` everywhere.** Across all
   14 affected scripts (`st.py`, `st-stones`, plus the 12 already-renamed
   in the AGT-1 cut), every remaining `--ai` reference — argparse
@@ -47,6 +87,34 @@ Cross uses [Semantic Versioning](https://semver.org/).
   resolution order, the `DEFAULT_AGENT` env var, four worked examples,
   and the migration story. Linked from `Home.md`. `DEFAULT_AI`
   references in wiki copy now read `DEFAULT_AGENT`.
+- **`st-admin --help` epilog refreshed.** Now points users at the
+  current home-directory layout (`~/.crossenv` for settings,
+  `~/.cross_ai_models.json` for the agent registry) and the
+  agent-management flags / AI submenu — instead of the pre-0.9.0
+  `.env` + `.ai_models` references that were silently migrated by
+  CST-MM-j.
+
+### Dependencies
+
+- **`cross-ai-core[all]>=0.8.0`** (was `>=0.7.0`).  Required for the
+  new `has_api_key()`, `get_agents()`, `migrate_v1_to_v2()`,
+  `write_agents_file()`, and `PROVIDER_API_KEY_ENV` exports.
+  `requirements.txt` and `requirements-no-tts.txt` both pinned to
+  `==0.8.0`.
+
+### Migration
+
+- **`--ai` callers**: rewrite scripts in one pass —
+  `sed -i 's/--ai /--agent /g' my-scripts/*.sh`. There is no `--ai`
+  back-compat alias. Wiki: see `docs/wiki/Agents.md`.
+- **`DEFAULT_AI` env var**: still read; setting `DEFAULT_AGENT` takes
+  precedence. New writes go to `DEFAULT_AGENT` only.
+- **`~/.cross_ai_models.json`**: existing v1 files (cross-st 0.9.x)
+  are upgraded in place to the v2 envelope on first 0.10.x startup;
+  no agent names change. A one-line notice prints once.
+- **Fresh installs**: `mmd_startup.load_cross_env()` seeds one starter
+  agent per provider whose `*_API_KEY` is detected. Run
+  `st-admin --setup` if the registry is empty.
 
 ---
 
