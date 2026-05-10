@@ -11,7 +11,73 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.10.0] — 2026-05-10  *(unreleased — Agents v2)*
+## [0.11.0] — 2026-05-10  *(AGT-9 alias → agent cleanup)*
+
+> Atomic paired release with `cross-ai-core 0.9.0`. Cleanup-only — no
+> behavioural change beyond the deprecation warnings noted below.
+> Anything that worked in 0.10.0 keeps working unmodified for one
+> release via the back-compat shims; full removal in 0.12.0.
+
+### Renamed
+- **Internal module**: `cross_st._alias_admin` → `cross_st._agent_admin`.
+  The legacy import path still works for one release via a thin shim
+  that emits :class:`DeprecationWarning` on import.
+- **CLI flags** on `st-admin`: `--add-alias` → `--add-agent`,
+  `--remove-alias` → `--remove-agent`, `--list-aliases` → `--list-agents`.
+  Legacy spellings remain registered as **hidden** back-compat (sharing
+  the same argparse `dest=`) for one release.
+- **Test fixtures**: `alias_file` → `agent_file`;
+  `_seed_legacy_alias_registry` → `_seed_legacy_agent_registry`. Five
+  test files renamed (`test_alias_migration.py` → `test_agent_migration.py`,
+  etc.).
+- **Symbol renames** flow through `_report_signals`, `ai_handler`,
+  `discourse`, `mmd_startup`, `st-admin`, `st-cross`, `st-fix`, `st-man`,
+  `st-speed`, `st.py`: `read_alias_file` → `read_agents_file`,
+  `write_alias_file` → `write_agents_file`,
+  `aliases_file_path` → `agents_file_path`,
+  `format_alias_table` → `format_agent_table`,
+  `reload_aliases` → `reload_agents`,
+  `resolve_alias` → `resolve_agent`,
+  `AliasSpec` → `AgentSpec`, `AliasError` → `AgentError`.
+
+### Added
+- `cross_st/cli_agent.py` — shared `--agent` parser/resolver helper for
+  new scripts to standardise on (`add_agent_arg(parser)` /
+  `resolve_agent(value)`). The existing 12 `--agent`-bearing scripts
+  continue to register their own argparse stanzas — wiring them through
+  the helper is left as a follow-up since each has slightly different
+  defaults/`choices=`.
+
+### Removed
+- `CROSS_AI_ALIASES_FILE` env-var read-path. `CROSS_AI_AGENTS_FILE` is
+  now the only honoured override; setting the legacy var triggers a
+  one-time stderr warning so power-users discover the new name.
+
+### Preserved (intentional, not in scope)
+- The on-disk JSON schema (`~/.cross_ai_models.json`) is unchanged.
+- The `_alias` field stamped onto response containers by cross-ai-core
+  is unchanged — renaming would invalidate every existing report
+  container in the wild.
+
+### Wiki
+- Word-level alias → agent prose sweep across `Multi-Model.md`,
+  `Agents.md`, `Home.md`, `ai-providers.md`, `st-admin.md`, `st-cross.md`,
+  `st-fix.md`, `st-speed.md`, `st-verdict.md`. The `st-admin` "AI
+  providers, models and agents" section dropped the misleading "free"
+  framing — all agents call the provider API at the provider's regular
+  rate. `Multi-Model.md` rewrote the "auto-seeded" claim to match the
+  AGT-2 first-run-migration behaviour shipped in 0.10.0.
+
+### Migration
+One-line script update: `sed -i 's/--add-alias /--add-agent /g; s/--remove-alias /--remove-agent /g; s/--list-aliases/--list-agents/g' my-scripts/*.sh`. The legacy spellings keep working for one release.
+
+### Tests
+- cross-st: 1015 passing / 114 skipped / 0 failing.
+- cross-ai-core: 223 passing.
+
+---
+
+## [0.10.0] — 2026-05-10  *(Agents v2)*
 
 > Atomic paired release with `cross-ai-core 0.8.0`. Spec:
 > `cross-internal/cross-ai-core/DESIGN_agents_v2.md`. Migration runs
