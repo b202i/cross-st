@@ -51,6 +51,42 @@ if str(_CROSS_AI) not in sys.path:
     sys.path.insert(0, str(_CROSS_AI))
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AGT-1 / AGT-2 — module-level alias-registry seed
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# cross-ai-core 0.8.0 stopped auto-seeding built-in providers as
+# self-aliases.  On a fresh CI runner there is no ``~/.cross_ai_models.json``
+# and no API keys, so ``get_ai_list()`` returns ``[]`` at module-import
+# time of any test that captures it eagerly (e.g. tests/test_st_admin.py
+# does ``AI_LIST = get_ai_list()`` at the top).
+#
+# The autouse ``_seed_legacy_alias_registry`` fixture below runs *per-test*
+# and is therefore too late to fix that import-time capture.  We replicate
+# the same seed at conftest module level — it executes once, before any
+# test module is imported, so eager AI_LIST captures see the full provider
+# set on CI just as they do on a developer machine.
+import os as _os
+import tempfile as _tempfile
+
+_TMP_AGENTS = Path(_tempfile.mkdtemp(prefix="cross-test-agents-")) / "cross_ai_models.json"
+# Set only the legacy env-var name.  cross-ai-core 0.8.0 reads
+# CROSS_AI_AGENTS_FILE first, then CROSS_AI_ALIASES_FILE — by setting only
+# the legacy name we leave the new-name slot free so individual tests can
+# monkeypatch CROSS_AI_ALIASES_FILE to swap registries without our default
+# winning over them.
+_os.environ.setdefault("CROSS_AI_ALIASES_FILE", str(_TMP_AGENTS))
+
+try:
+    from cross_ai_core.aliases import _AI_ALIASES, AliasSpec  # type: ignore
+    from cross_ai_core.ai_handler import AI_LIST as _BUILTIN_AI_LIST  # type: ignore
+    for _make in _BUILTIN_AI_LIST:
+        _AI_ALIASES[_make] = AliasSpec(make=_make, model=None)
+except Exception:
+    # cross-ai-core too old / not installed — let the per-test fixture try.
+    pass
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--slow",

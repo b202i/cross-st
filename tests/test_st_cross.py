@@ -185,13 +185,16 @@ class TestCLISurface:
         # argparse may wrap "0 = unlimited" across lines; collapse whitespace.
         assert "0 = unlimited" in " ".join(out.split())
 
-    def test_parallel_and_sequential_are_mutually_exclusive(self):
+    def test_parallel_and_sequential_are_mutually_exclusive(self, tmp_path):
         """argparse must reject `--parallel --sequential` simultaneously."""
         import subprocess
+        # CI runners have no ~/.crossenv; provide a CWD .env so the
+        # mmd_startup.require_config() guard passes and argparse runs.
+        (tmp_path / ".env").write_text("XAI_API_KEY=test\n")
         path = Path(__file__).parent.parent / "cross_st" / "st-cross.py"
         result = subprocess.run(
             [sys.executable, str(path), "--parallel", "--sequential", "dummy.json"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, cwd=str(tmp_path),
         )
         assert result.returncode != 0
         assert "not allowed with" in result.stderr or "mutually exclusive" in result.stderr.lower()
