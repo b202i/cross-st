@@ -136,19 +136,19 @@ def format_time(seconds):
     return f"{mins:02d}:{secs:02d}"
 
 
-def _filter_by_alias_or_make(timing_data, ai_filter):
-    """Filter ``timing_data`` rows by alias *or* bare make.
+def _filter_by_agent_or_make(timing_data, ai_filter):
+    """Filter ``timing_data`` rows by agent *or* bare make.
 
     CST-MM-e: ``ai_filter`` may be either a built-in make string
-    (``"anthropic"``) or a user alias (``"anthropic-opus"``).  When the value
-    resolves to an alias with an explicit model, the filter matches on
-    (make, model) so two same-make aliases can be filtered individually.
-    Falls back to a bare-make match when the alias has no model or cannot
-    be resolved (e.g. legacy ``--agent`` value that isn't a registered alias).
+    (``"anthropic"``) or a user agent (``"anthropic-opus"``).  When the value
+    resolves to an agent with an explicit model, the filter matches on
+    (make, model) so two same-make agents can be filtered individually.
+    Falls back to a bare-make match when the agent has no model or cannot
+    be resolved (e.g. legacy ``--agent`` value that isn't a registered agent).
     """
     try:
-        from cross_ai_core.aliases import resolve_alias
-        spec = resolve_alias(ai_filter)
+        from cross_ai_core.agents import resolve_agent
+        spec = resolve_agent(ai_filter)
         target_make  = spec.make
         target_model = spec.model
     except Exception:
@@ -164,16 +164,16 @@ def summarize_generation(timing_data, ai_filter=None):
     if not timing_data:
         return None
     
-    # Filter by AI if requested.  CST-MM-e: ai_filter may be an alias
+    # Filter by AI if requested.  CST-MM-e: ai_filter may be an agent
     # (e.g. ``anthropic-opus``) — resolve to (make, model) and match on the
-    # pair so two aliases sharing a make can each be filtered individually.
+    # pair so two agents sharing a make can each be filtered individually.
     if ai_filter:
-        timing_data = _filter_by_alias_or_make(timing_data, ai_filter)
+        timing_data = _filter_by_agent_or_make(timing_data, ai_filter)
         if not timing_data:
             return None
     
-    # CST-MM-e: group by (make, model) so two same-make aliases each get
-    # their own row.  Pre-alias data (single model per make) keeps a single
+    # CST-MM-e: group by (make, model) so two same-make agents each get
+    # their own row.  Pre-agent data (single model per make) keeps a single
     # row whose label degenerates to the bare make.
     by_ai = {}
     for entry in timing_data:
@@ -249,11 +249,11 @@ def summarize_fact_checks(timing_data, ai_filter=None):
     
     # Filter by AI if requested
     if ai_filter:
-        timing_data = _filter_by_alias_or_make(timing_data, ai_filter)
+        timing_data = _filter_by_agent_or_make(timing_data, ai_filter)
         if not timing_data:
             return None
     
-    # CST-MM-e: group by (make, model) so two same-make aliases get
+    # CST-MM-e: group by (make, model) so two same-make agents get
     # distinct rows; disambiguate the label only when needed.
     by_ai = {}
     for entry in timing_data:
@@ -707,7 +707,7 @@ def export_to_csv(gen_data, fact_data, output_path):
             writer.writerows(fact_data)
 
 
-# ── Backward-compatible aliases (original simple two-mode API) ─────────────
+# ── Backward-compatible agents (original simple two-mode API) ─────────────
 
 
 def build_caption_prompt(gen_summary, fact_summary, short_caption=False):

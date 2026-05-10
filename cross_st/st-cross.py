@@ -239,25 +239,25 @@ def _draw_cross_table(cells: dict, ai_list: list, file_prefix: str,
 # ── Segment pre-build helper ─────────────────────────────────────────────────
 
 def _stories_complete(json_path: str, ai_list: list) -> bool:
-    """Return True if *json_path* has a story entry for every AI alias in *ai_list*.
+    """Return True if *json_path* has a story entry for every AI agent in *ai_list*.
 
-    Compared on the (make, model) pair so that two aliases sharing a make
+    Compared on the (make, model) pair so that two agents sharing a make
     (e.g. ``anthropic-opus`` + ``anthropic-sonnet``) each count as a distinct
     needed entry.  Missing file or malformed JSON → False (start fresh).
     """
-    from cross_ai_core.aliases import resolve_alias
+    from cross_ai_core.agents import resolve_agent
     try:
         with open(json_path) as f:
             c = json.load(f)
         existing_pairs = {(s.get("make"), s.get("model")) for s in c.get("story", [])}
-        for alias in ai_list:
-            spec = resolve_alias(alias)
+        for agent in ai_list:
+            spec = resolve_agent(agent)
             need_make = spec.make
-            # If the alias has an explicit model in the registry, require an
-            # exact (make, model) match.  Bare-make aliases (spec.model is
+            # If the agent has an explicit model in the registry, require an
+            # exact (make, model) match.  Bare-make agents (spec.model is
             # None — the handler default applies) are satisfied by *any*
             # entry sharing the make, preserving legacy "one story per
-            # make" semantics for no-alias containers.
+            # make" semantics for no-agent containers.
             if spec.model is not None:
                 if (need_make, spec.model) not in existing_pairs:
                     return False
@@ -311,9 +311,9 @@ def _ensure_segments(file_json: str, n_stories: int, quiet: bool = False) -> Non
 # ── PAR-1 / CST-MM-b: per-rate-limit-group concurrency cap ───────────────────
 # A semaphore per rate-limit group caps the number of concurrent st-fact
 # spawns hitting that provider's API. The group key is the *resolved make*
-# (CAC-10 get_rate_limit_group), so multiple aliases that share a make
+# (CAC-10 get_rate_limit_group), so multiple agents that share a make
 # (e.g. anthropic-opus + anthropic-sonnet) share one semaphore — preventing
-# alias-multiplication from blowing through the per-provider rate limit.
+# agent-multiplication from blowing through the per-provider rate limit.
 # Sized by cross_ai_core.get_rate_limit_concurrency (CAC-5) unless overridden
 # by --max-concurrency, or pinned to 1 by --sequential.
 #
@@ -324,21 +324,21 @@ _semaphores_lock = threading.Lock()
 _sequential_semaphore = threading.Semaphore(1)
 
 
-def _get_provider_semaphore(alias: str, max_override, sequential: bool) -> threading.Semaphore:
-    """Return the semaphore that gates spawns for *alias*'s rate-limit group.
+def _get_provider_semaphore(agent: str, max_override, sequential: bool) -> threading.Semaphore:
+    """Return the semaphore that gates spawns for *agent*'s rate-limit group.
 
     * --sequential        --> single global Semaphore(1) shared across every provider.
     * --max-concurrency N --> Semaphore(N), per rate-limit group.
     * default             --> Semaphore(get_rate_limit_concurrency(group)).
 
-    The group key is the resolved make (CAC-10), so aliases that share a make
+    The group key is the resolved make (CAC-10), so agents that share a make
     share one semaphore — protecting the per-provider rate-limit budget when
-    a user defines multiple aliases against the same provider.
+    a user defines multiple agents against the same provider.
     """
     if sequential:
         return _sequential_semaphore
 
-    group_key, group_cap = get_rate_limit_group(alias)
+    group_key, group_cap = get_rate_limit_group(agent)
     key = f"{group_key}:{max_override}" if max_override is not None else group_key
     with _semaphores_lock:
         sem = _provider_semaphores.get(key)
@@ -439,12 +439,12 @@ def main() -> None:
     # who haven't upgraded the core yet.
     try:
         from cross_ai_core import api_key_env_var, has_api_key
-        from cross_ai_core.aliases import get_aliases
-        _aliases = get_aliases()
+        from cross_ai_core.agents import get_agents
+        _agents = get_agents()
         _kept: list[str] = []
         _dropped: list[tuple[str, str, str]] = []
         for _name in ai_list:
-            _spec = _aliases.get(_name)
+            _spec = _agents.get(_name)
             if _spec is None or has_api_key(_spec.make):
                 _kept.append(_name)
             else:
@@ -757,10 +757,10 @@ def main() -> None:
                 for fact in story.get("fact", []):
                     fc_make  = fact.get("make", "")
                     fc_model = fact.get("model", "")
-                    # CST-MM-b: match on (make, model) so two aliases that
+                    # CST-MM-b: match on (make, model) so two agents that
                     # share a make resolve to distinct columns.  Falls back
-                    # to make-only when an alias has no explicit model
-                    # (legacy "one alias per make" containers).
+                    # to make-only when an agent has no explicit model
+                    # (legacy "one agent per make" containers).
                     for fi, ai_key in enumerate(ai_list):
                         col_make  = get_ai_make(ai_key)
                         col_model = get_ai_model(ai_key)
@@ -936,18 +936,18 @@ def main() -> None:
         cell["start_time"] = time.time()
         cell["status"]     = ST_RUNNING
 
-        fc_alias = ai_list[fi]
+        fc_agent = ai_list[fi]
         cmd = [
             "st-fact",
             "--silent",
-            "--agent", fc_alias,
+            "--agent", fc_agent,
             "--story", str(si + 1),
             "--timeout", str(args.timeout),
             "--retry-budget", str(args.retry_budget),
             cache_flag,
             file_json,
         ]
-        sem = _get_provider_semaphore(fc_alias, args.max_concurrency, not args.parallel)
+        sem = _get_provider_semaphore(fc_agent, args.max_concurrency, not args.parallel)
         # NOTE: the per-cell "Starting" line is printed by the LAUNCH loop
         # below, not here.  Doing it here would race across all NN worker
         # threads and the user would see all NN lines in microseconds —
@@ -1004,7 +1004,7 @@ def main() -> None:
                 print(
                     f"  {_idx_prefix(n_done_so_far)} "
                     f"{_clr(mark, color)} "
-                    f"{ai_list[si]} → {fc_alias}  "
+                    f"{ai_list[si]} → {fc_agent}  "
                     f"{_clr(f'({_fmt(elapsed)})', DIM)}",
                     flush=True,
                 )

@@ -1,5 +1,5 @@
 """
-tests/test_score_authors_multi_model.py — CST-MM-c: alias-aware scorer audit.
+tests/test_score_authors_multi_model.py — CST-MM-c: agent-aware scorer audit.
 
 Verifies that `score_authors()` and `_collect_author_signals()` already treat
 two same-make stories with different models as **distinct authors**, since
@@ -25,7 +25,7 @@ def rs_mod():
     return mod
 
 
-def _build_two_alias_container():
+def _build_two_agent_container():
     """A minimal container with two same-make authors and one evaluator each."""
     prompt = (
         "Write a 200-word report on the Eiffel Tower. "
@@ -69,13 +69,13 @@ def _build_two_alias_container():
 
 class TestSameMakeAliasesScoredDistinctly:
     def test_two_authors_appear_with_distinct_make_model_ids(self, rs_mod):
-        scores = rs_mod.score_authors(_build_two_alias_container())
+        scores = rs_mod.score_authors(_build_two_agent_container())
         author_ids = {s.author for s in scores}
         assert "anthropic:claude-opus-4-5"   in author_ids
         assert "anthropic:claude-sonnet-4-5" in author_ids
 
     def test_two_authors_get_distinct_composite_scores(self, rs_mod):
-        scores = rs_mod.score_authors(_build_two_alias_container())
+        scores = rs_mod.score_authors(_build_two_agent_container())
         by_id = {s.author: s for s in scores}
         opus    = by_id["anthropic:claude-opus-4-5"]
         sonnet  = by_id["anthropic:claude-sonnet-4-5"]
@@ -85,7 +85,7 @@ class TestSameMakeAliasesScoredDistinctly:
         assert opus.composite > sonnet.composite
 
     def test_collect_author_signals_keys_on_make_model(self, rs_mod):
-        signals = rs_mod._collect_author_signals(_build_two_alias_container())
+        signals = rs_mod._collect_author_signals(_build_two_agent_container())
         ids = [s["author"] for s in signals]
         # Must be two distinct entries, not one collapsed "anthropic" row.
         assert len(ids) == 2

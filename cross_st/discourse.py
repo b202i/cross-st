@@ -38,7 +38,7 @@ from dotenv import load_dotenv
 # `private` is special-cased — it resolves to site["private_category_id"]
 # on every site.
 CROSSAI_NAMED_CATEGORIES = {
-    # alias       -> (category_id, display_name)
+    # agent       -> (category_id, display_name)
     "test":       (6,  "Test (cleared daily)"),
     "reports":    (16, "📄 Reports"),
     "prompt-lab": (17, "🧪 Prompt Lab"),

@@ -1,15 +1,15 @@
 """
 tests/test_agents_v2_migration.py — AGT-2 regression tests.
 
-Covers ``_alias_admin.migrate_to_agents_v2`` and the
+Covers ``_agent_admin.migrate_to_agents_v2`` and the
 ``mmd_startup._migrate_to_agents_v2_once`` startup hook:
 
   * No file + no API keys     → "empty"  (no write, no notice)
   * No file + some API keys   → "seeded" (one starter agent per detected provider)
   * Existing v1 flat dict     → "v1_to_v2" (envelope written, names preserved)
   * Existing v2 envelope      → "noop"   (idempotent on second run)
-  * write_alias_file always wraps in v2 envelope on disk
-  * read_alias_file flattens both v1 and v2 inputs back to flat shape
+  * write_agents_file always wraps in v2 envelope on disk
+  * read_agents_file flattens both v1 and v2 inputs back to flat shape
 """
 
 from __future__ import annotations
@@ -26,9 +26,9 @@ _CROSS_ST = str(Path(__file__).parent.parent / "cross_st")
 if _CROSS_ST not in sys.path:
     sys.path.insert(0, _CROSS_ST)
 
-import _alias_admin  # noqa: E402
+import _agent_admin  # noqa: E402
 import mmd_startup   # noqa: E402
-from cross_ai_core.aliases import reload_aliases  # noqa: E402
+from cross_ai_core.agents import reload_agents  # noqa: E402
 from cross_ai_core.keys import PROVIDER_API_KEY_ENV  # noqa: E402
 
 
@@ -36,28 +36,28 @@ from cross_ai_core.keys import PROVIDER_API_KEY_ENV  # noqa: E402
 
 @pytest.fixture
 def isolated_agents_file(tmp_path, monkeypatch):
-    """Tmp alias JSON path; clear every API-key env var by default."""
-    alias_file = tmp_path / "cross_ai_models.json"
-    monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(alias_file))
+    """Tmp agent JSON path; clear every API-key env var by default."""
+    agent_file = tmp_path / "cross_ai_models.json"
+    monkeypatch.setenv("CROSS_AI_AGENTS_FILE", str(agent_file))
     # Strip every provider's API-key env vars so seeding starts from a clean slate.
     for env_names in PROVIDER_API_KEY_ENV.values():
         for var in env_names:
             monkeypatch.delenv(var, raising=False)
-    reload_aliases()
-    yield alias_file
-    monkeypatch.delenv("CROSS_AI_ALIASES_FILE", raising=False)
-    reload_aliases()
+    reload_agents()
+    yield agent_file
+    monkeypatch.delenv("CROSS_AI_AGENTS_FILE", raising=False)
+    reload_agents()
 
 
 def _read_envelope(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
-# ── read_alias_file / write_alias_file round-trip ────────────────────────────
+# ── read_agents_file / write_agents_file round-trip ────────────────────────────
 
 class TestEnvelopeRoundTrip:
     def test_write_emits_v2_envelope(self, isolated_agents_file):
-        _alias_admin.write_alias_file({
+        _agent_admin.write_agents_file({
             "myxai": {"make": "xai", "model": "grok-3"},
         })
         env = _read_envelope(isolated_agents_file)
@@ -72,7 +72,7 @@ class TestEnvelopeRoundTrip:
             "agents": {"a1": {"provider": "anthropic", "model": "claude-x"}},
             "_migrated_to_agents_v2": True,
         }))
-        flat = _alias_admin.read_alias_file()
+        flat = _agent_admin.read_agents_file()
         assert flat == OrderedDict([
             ("a1", {"make": "anthropic", "model": "claude-x"}),
         ])
@@ -82,7 +82,7 @@ class TestEnvelopeRoundTrip:
         isolated_agents_file.write_text(json.dumps({
             "old": {"make": "openai", "model": "gpt-4o"},
         }))
-        flat = _alias_admin.read_alias_file()
+        flat = _agent_admin.read_agents_file()
         assert flat == OrderedDict([
             ("old", {"make": "openai", "model": "gpt-4o"}),
         ])
@@ -93,7 +93,7 @@ class TestEnvelopeRoundTrip:
             ("a", {"make": "anthropic", "model": None}),
             ("m", {"make": "openai",    "model": None}),
         ])
-        _alias_admin.write_alias_file(data)
+        _agent_admin.write_agents_file(data)
         env = _read_envelope(isolated_agents_file)
         assert list(env["agents"].keys()) == ["z", "a", "m"]
 
@@ -102,7 +102,7 @@ class TestEnvelopeRoundTrip:
 
 class TestMigrate:
     def test_no_file_no_keys_is_empty(self, isolated_agents_file):
-        action, names = _alias_admin.migrate_to_agents_v2()
+        action, names = _agent_admin.migrate_to_agents_v2()
         assert action == "empty"
         assert names == []
         assert not isolated_agents_file.exists()
@@ -110,7 +110,7 @@ class TestMigrate:
     def test_no_file_with_keys_seeds(self, isolated_agents_file, monkeypatch):
         monkeypatch.setenv("XAI_API_KEY",       "x-test")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "a-test")
-        action, names = _alias_admin.migrate_to_agents_v2()
+        action, names = _agent_admin.migrate_to_agents_v2()
         assert action == "seeded"
         assert set(names) == {"xai", "anthropic"}
         env = _read_envelope(isolated_agents_file)
@@ -126,7 +126,7 @@ class TestMigrate:
             "anthropic":      {"make": "anthropic", "model": None},
             "anthropic-opus": {"make": "anthropic", "model": "claude-opus-4-5"},
         }))
-        action, names = _alias_admin.migrate_to_agents_v2()
+        action, names = _agent_admin.migrate_to_agents_v2()
         assert action == "v1_to_v2"
         assert set(names) == {"anthropic", "anthropic-opus"}
         env = _read_envelope(isolated_agents_file)
@@ -143,7 +143,7 @@ class TestMigrate:
             "_migrated_to_agents_v2": True,
         }))
         mtime_before = isolated_agents_file.stat().st_mtime_ns
-        action, names = _alias_admin.migrate_to_agents_v2()
+        action, names = _agent_admin.migrate_to_agents_v2()
         assert action == "noop"
         assert names == []
         # File untouched
@@ -151,9 +151,9 @@ class TestMigrate:
 
     def test_idempotent_after_seed(self, isolated_agents_file, monkeypatch):
         monkeypatch.setenv("XAI_API_KEY", "x-test")
-        first_action, _ = _alias_admin.migrate_to_agents_v2()
+        first_action, _ = _agent_admin.migrate_to_agents_v2()
         assert first_action == "seeded"
-        second_action, second_names = _alias_admin.migrate_to_agents_v2()
+        second_action, second_names = _agent_admin.migrate_to_agents_v2()
         assert second_action == "noop"
         assert second_names == []
 
@@ -161,15 +161,15 @@ class TestMigrate:
         isolated_agents_file.write_text(json.dumps({
             "x": {"make": "xai", "model": "grok-3"},
         }))
-        first_action, _ = _alias_admin.migrate_to_agents_v2()
+        first_action, _ = _agent_admin.migrate_to_agents_v2()
         assert first_action == "v1_to_v2"
-        second_action, second_names = _alias_admin.migrate_to_agents_v2()
+        second_action, second_names = _agent_admin.migrate_to_agents_v2()
         assert second_action == "noop"
         assert second_names == []
 
     def test_mixed_keys_only_seeds_present(self, isolated_agents_file, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "o-test")
-        action, names = _alias_admin.migrate_to_agents_v2()
+        action, names = _agent_admin.migrate_to_agents_v2()
         assert action == "seeded"
         assert names == ["openai"]
         env = _read_envelope(isolated_agents_file)
@@ -180,7 +180,7 @@ class TestMigrate:
 
 class TestNotice:
     def test_silent_when_empty(self, isolated_agents_file, capsys):
-        _alias_admin.run_agents_v2_migration_with_notice()
+        _agent_admin.run_agents_v2_migration_with_notice()
         out = capsys.readouterr()
         assert out.out == ""
         assert out.err == ""
@@ -191,12 +191,12 @@ class TestNotice:
             "agents": {},
             "_migrated_to_agents_v2": True,
         }))
-        _alias_admin.run_agents_v2_migration_with_notice()
+        _agent_admin.run_agents_v2_migration_with_notice()
         assert capsys.readouterr().out == ""
 
     def test_prints_seeded_summary(self, isolated_agents_file, monkeypatch, capsys):
         monkeypatch.setenv("XAI_API_KEY", "x-test")
-        _alias_admin.run_agents_v2_migration_with_notice()
+        _agent_admin.run_agents_v2_migration_with_notice()
         out = capsys.readouterr().out
         assert "Created 1 starter agent" in out
         assert "xai" in out
@@ -206,7 +206,7 @@ class TestNotice:
             "x": {"make": "xai", "model": "grok-3"},
             "y": {"make": "openai", "model": "gpt-4o"},
         }))
-        _alias_admin.run_agents_v2_migration_with_notice()
+        _agent_admin.run_agents_v2_migration_with_notice()
         out = capsys.readouterr().out
         assert "Upgraded" in out and "Agents v2" in out
         assert "2 agents preserved" in out
@@ -214,9 +214,9 @@ class TestNotice:
     def test_swallows_exceptions(self, isolated_agents_file, monkeypatch, capsys):
         def boom():
             raise RuntimeError("kaboom")
-        monkeypatch.setattr(_alias_admin, "migrate_to_agents_v2", boom)
+        monkeypatch.setattr(_agent_admin, "migrate_to_agents_v2", boom)
         # Must NOT raise
-        _alias_admin.run_agents_v2_migration_with_notice()
+        _agent_admin.run_agents_v2_migration_with_notice()
         out = capsys.readouterr().out
         assert "Could not migrate agents file to v2" in out
         assert "kaboom" in out
@@ -249,7 +249,7 @@ class TestStartupHook:
         def boom():
             raise RuntimeError("startup boom")
         monkeypatch.setattr(
-            _alias_admin, "run_agents_v2_migration_with_notice", boom,
+            _agent_admin, "run_agents_v2_migration_with_notice", boom,
         )
         # Must NOT raise; output is irrelevant here.
         mmd_startup._migrate_to_agents_v2_once()

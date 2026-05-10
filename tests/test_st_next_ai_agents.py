@@ -2,8 +2,8 @@
 tests/test_st_next_ai_aliases.py — CST-MM-k regression test.
 
 One-line behaviour confirmation: ``st.py``'s ``next_ai()`` cycles through
-the alias registry returned by ``cross_ai_core.get_ai_list()``, which now
-includes user-defined aliases (CST-MM-i + CAC-10).
+the agent registry returned by ``cross_ai_core.get_ai_list()``, which now
+includes user-defined agents (CST-MM-i + CAC-10).
 
 Also asserts the global ``A`` / ``S`` / ``F`` reserved-key contract is
 intact at the menu-dispatch level (these keys must remain bound to the
@@ -25,12 +25,12 @@ if _CROSS_ST not in sys.path:
     sys.path.insert(0, _CROSS_ST)
 
 
-def _load_st(monkeypatch, alias_file: Path):
-    """Load cross_st/st.py as a fresh module under an isolated alias file."""
-    monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(alias_file))
-    # Force cross-ai-core to re-read the alias file
-    from cross_ai_core.aliases import reload_aliases
-    reload_aliases()
+def _load_st(monkeypatch, agent_file: Path):
+    """Load cross_st/st.py as a fresh module under an isolated agent file."""
+    monkeypatch.setenv("CROSS_AI_AGENTS_FILE", str(agent_file))
+    # Force cross-ai-core to re-read the agent file
+    from cross_ai_core.agents import reload_agents
+    reload_agents()
     spec = importlib.util.spec_from_file_location(
         "st_under_test", Path(_CROSS_ST) / "st.py"
     )
@@ -40,8 +40,8 @@ def _load_st(monkeypatch, alias_file: Path):
 
 
 @pytest.fixture
-def alias_file(tmp_path):
-    """Alias file with built-in self-aliases + two user aliases.
+def agent_file(tmp_path):
+    """Agent file with built-in self-agents + two user agents.
 
     The five bare-make entries mirror what the AGT-2 first-run migration
     would create on any install with all five provider API keys present.
@@ -61,16 +61,16 @@ def alias_file(tmp_path):
     return f
 
 
-def test_ai_opt_includes_user_aliases(monkeypatch, alias_file):
-    st = _load_st(monkeypatch, alias_file)
-    # Built-in 5 + 2 user aliases = 7
+def test_ai_opt_includes_user_aliases(monkeypatch, agent_file):
+    st = _load_st(monkeypatch, agent_file)
+    # Built-in 5 + 2 user agents = 7
     assert "anthropic-opus" in st.ai_opt
     assert "anthropic-sonnet" in st.ai_opt
     assert len(st.ai_opt) >= 7
 
 
-def test_next_ai_eventually_visits_user_alias(monkeypatch, alias_file):
-    st = _load_st(monkeypatch, alias_file)
+def test_next_ai_eventually_visits_user_alias(monkeypatch, agent_file):
+    st = _load_st(monkeypatch, agent_file)
     # Cycle exactly len(ai_opt) times — must cover every entry.
     visited = set()
     for _ in range(len(st.ai_opt)):
@@ -80,8 +80,8 @@ def test_next_ai_eventually_visits_user_alias(monkeypatch, alias_file):
     assert "anthropic-sonnet" in visited
 
 
-def test_next_ai_wraps_around(monkeypatch, alias_file):
-    st = _load_st(monkeypatch, alias_file)
+def test_next_ai_wraps_around(monkeypatch, agent_file):
+    st = _load_st(monkeypatch, agent_file)
     n = len(st.ai_opt)
     start = st.ai_select
     for _ in range(n):
@@ -90,17 +90,17 @@ def test_next_ai_wraps_around(monkeypatch, alias_file):
     assert st.ai == st.ai_opt[start]
 
 
-def test_next_ai_advances_one_step(monkeypatch, alias_file):
-    st = _load_st(monkeypatch, alias_file)
+def test_next_ai_advances_one_step(monkeypatch, agent_file):
+    st = _load_st(monkeypatch, agent_file)
     before = st.ai_select
     st.next_ai()
     assert st.ai_select == (before + 1) % len(st.ai_opt)
     assert st.ai == st.ai_opt[st.ai_select]
 
 
-def test_ASF_keys_not_reused_in_menu(monkeypatch, alias_file):
+def test_ASF_keys_not_reused_in_menu(monkeypatch, agent_file):
     """Reserved-key contract: A/S/F never used as menu shortcuts in st.py."""
-    st = _load_st(monkeypatch, alias_file)
+    st = _load_st(monkeypatch, agent_file)
 
     def walk(menu):
         for key, val in menu.items():
@@ -116,9 +116,9 @@ def test_ASF_keys_not_reused_in_menu(monkeypatch, alias_file):
             walk(top_menu)
 
 
-def test_argparse_choices_include_aliases(monkeypatch, alias_file):
+def test_argparse_choices_include_aliases(monkeypatch, agent_file):
     """The --ai CLI flag's choices list must come from get_ai_list()."""
-    st = _load_st(monkeypatch, alias_file)
+    st = _load_st(monkeypatch, agent_file)
     parser = st.argparse.ArgumentParser()
     # Re-mirror the argument from st.py (line 420) using the live ai_opt
     parser.add_argument("-a", "--ai", choices=st.ai_opt)

@@ -22,7 +22,7 @@ Module-level constants kept public for use by callers:
     VERDICT_NORMALISE             -> dict[str, str]
     LENS_VERDICTS                 -> dict[str, set[str] | None]
 
-Backwards-compat aliases (st-verdict still imports the leading-underscore
+Backwards-compat agents (st-verdict still imports the leading-underscore
 names):
     _VERDICT_NORMALISE = VERDICT_NORMALISE
     _LENS_VERDICTS     = LENS_VERDICTS
@@ -65,7 +65,7 @@ LENS_VERDICTS = {
     "howtofix": None,
 }
 
-# Backwards-compat aliases for callers that imported the old names
+# Backwards-compat agents for callers that imported the old names
 _VERDICT_NORMALISE = VERDICT_NORMALISE
 _LENS_VERDICTS     = LENS_VERDICTS
 
@@ -244,7 +244,7 @@ def calendar_context() -> str:
     )
 
 
-# Backwards-compat alias
+# Backwards-compat agent
 _today_context_block = calendar_context
 
 
@@ -623,7 +623,7 @@ def score_authors(container: dict, weights=None) -> list:
 
 # ── CLI helper: parse --score-weights ─────────────────────────────────────────
 
-# Short aliases accepted on the command line so users can write
+# Short agents accepted on the command line so users can write
 #   --score-weights cov=0.3,comp=0.3,acc=0.3,cal=0.1
 # instead of spelling out the full sub-score names.
 _WEIGHT_ALIASES = {
@@ -642,7 +642,7 @@ def parse_score_weights(text):
     """Parse a ``--score-weights`` CLI argument into a dict for ``score_authors``.
 
     Format: ``cov=0.25,comp=0.25,acc=0.40,cal=0.10``. Keys may use either the
-    short alias (``cov``/``comp``/``acc``/``cal``) or the full sub-score name.
+    short agent (``cov``/``comp``/``acc``/``cal``) or the full sub-score name.
     Returns ``None`` for an empty/None input. Raises ``ValueError`` for any
     malformed pair, unknown key, non-numeric or negative value, or weight set
     that sums to zero.

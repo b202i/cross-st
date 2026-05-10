@@ -36,7 +36,7 @@ WIKI_PAGES  = {
     "tts-audio":    "tts-audio",
 }
 
-# Keep WIKI_BASE as a public alias for any external callers
+# Keep WIKI_BASE as a public agent for any external callers
 WIKI_BASE = _WIKI_BASE
 _HERE       = os.path.dirname(os.path.abspath(__file__))
 

@@ -1,18 +1,18 @@
 """
-tests/test_alias_migration.py — CST-MM-j regression tests.
+tests/test_agent_migration.py — CST-MM-j regression tests.
 
 Covers the silent ``.ai_models`` → ``~/.cross_ai_models.json`` migration:
 
-  * ``_alias_admin._model_short_id``        — sanitiser
-  * ``_alias_admin._parse_legacy_ai_models``— file parser (lenient)
-  * ``_alias_admin.migrate_legacy_ai_models``— full migration helper
-  * ``_alias_admin.run_migration_with_notice``— prints + swallows errors
+  * ``_agent_admin._model_short_id``        — sanitiser
+  * ``_agent_admin._parse_legacy_ai_models``— file parser (lenient)
+  * ``_agent_admin.migrate_legacy_ai_models``— full migration helper
+  * ``_agent_admin.run_migration_with_notice``— prints + swallows errors
   * Idempotency — second invocation is a no-op (legacy file renamed to
     ``.ai_models.migrated``).
   * Skip rules — unknown make, exact (make, model) duplicate already in
-    the alias file, blank/comment lines.
+    the agent file, blank/comment lines.
 
-Isolation: ``CROSS_AI_ALIASES_FILE`` redirects the alias JSON to tmp;
+Isolation: ``CROSS_AI_AGENTS_FILE`` redirects the agent JSON to tmp;
 ``mmd_startup._PROJECT_ROOT`` is monkeypatched so the legacy file lives
 under tmp_path, never touching the real repo root.
 """
@@ -30,23 +30,23 @@ _CROSS_ST = str(Path(__file__).parent.parent / "cross_st")
 if _CROSS_ST not in sys.path:
     sys.path.insert(0, _CROSS_ST)
 
-import _alias_admin  # noqa: E402
+import _agent_admin  # noqa: E402
 import mmd_startup   # noqa: E402
-from cross_ai_core.aliases import reload_aliases  # noqa: E402
+from cross_ai_core.agents import reload_agents  # noqa: E402
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def isolated_env(tmp_path, monkeypatch):
-    """Tmp alias JSON + tmp project root for the legacy file."""
-    alias_file = tmp_path / "cross_ai_models.json"
-    monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(alias_file))
+    """Tmp agent JSON + tmp project root for the legacy file."""
+    agent_file = tmp_path / "cross_ai_models.json"
+    monkeypatch.setenv("CROSS_AI_AGENTS_FILE", str(agent_file))
     monkeypatch.setattr(mmd_startup, "_PROJECT_ROOT", str(tmp_path))
-    reload_aliases()
+    reload_agents()
     yield tmp_path
-    monkeypatch.delenv("CROSS_AI_ALIASES_FILE", raising=False)
-    reload_aliases()
+    monkeypatch.delenv("CROSS_AI_AGENTS_FILE", raising=False)
+    reload_agents()
 
 
 def _write_legacy(tmp_path: Path, body: str) -> Path:
@@ -59,20 +59,20 @@ def _write_legacy(tmp_path: Path, body: str) -> Path:
 
 class TestModelShortId:
     def test_sanitises_dots_to_dash(self):
-        assert _alias_admin._model_short_id("claude-opus-4.5") == "claude-opus-4-5"
+        assert _agent_admin._model_short_id("claude-opus-4.5") == "claude-opus-4-5"
 
     def test_collapses_runs(self):
-        assert _alias_admin._model_short_id("a..b__c") == "a-b-c"
+        assert _agent_admin._model_short_id("a..b__c") == "a-b-c"
 
     def test_lowercases(self):
-        assert _alias_admin._model_short_id("GPT-4o-MINI") == "gpt-4o-mini"
+        assert _agent_admin._model_short_id("GPT-4o-MINI") == "gpt-4o-mini"
 
     def test_truncates(self):
         long = "x" * 100
-        assert len(_alias_admin._model_short_id(long)) <= _alias_admin._MODEL_SHORT_MAX
+        assert len(_agent_admin._model_short_id(long)) <= _agent_admin._MODEL_SHORT_MAX
 
     def test_empty_falls_back(self):
-        assert _alias_admin._model_short_id("***") == "custom"
+        assert _agent_admin._model_short_id("***") == "custom"
 
 
 # ── parser ───────────────────────────────────────────────────────────────────
@@ -80,76 +80,76 @@ class TestModelShortId:
 class TestParser:
     def test_skips_blanks_and_comments(self, tmp_path):
         p = _write_legacy(tmp_path, "# comment\n\nxai=grok-3\n   \nopenai=gpt-4o\n")
-        pairs = _alias_admin._parse_legacy_ai_models(str(p))
+        pairs = _agent_admin._parse_legacy_ai_models(str(p))
         assert pairs == [("xai", "grok-3"), ("openai", "gpt-4o")]
 
     def test_skips_lines_without_equals(self, tmp_path):
         p = _write_legacy(tmp_path, "junkline\nxai=grok-3\n")
-        assert _alias_admin._parse_legacy_ai_models(str(p)) == [("xai", "grok-3")]
+        assert _agent_admin._parse_legacy_ai_models(str(p)) == [("xai", "grok-3")]
 
     def test_missing_file_returns_empty(self, tmp_path):
-        assert _alias_admin._parse_legacy_ai_models(str(tmp_path / "nope")) == []
+        assert _agent_admin._parse_legacy_ai_models(str(tmp_path / "nope")) == []
 
 
 # ── migrate_legacy_ai_models ────────────────────────────────────────────────
 
 class TestMigrate:
     def test_no_legacy_file_is_noop(self, isolated_env):
-        assert _alias_admin.migrate_legacy_ai_models() == []
+        assert _agent_admin.migrate_legacy_ai_models() == []
         assert not (isolated_env / ".ai_models.migrated").exists()
 
-    def test_creates_aliases_and_renames(self, isolated_env):
+    def test_creates_agents_and_renames(self, isolated_env):
         _write_legacy(isolated_env,
                       "anthropic=claude-opus-4-5\nxai=grok-3\n")
-        added = _alias_admin.migrate_legacy_ai_models()
+        added = _agent_admin.migrate_legacy_ai_models()
         names = {a for a, _, _ in added}
         assert names == {"anthropic-claude-opus-4-5", "xai-grok-3"}
         # Legacy file renamed
         assert not (isolated_env / ".ai_models").exists()
         assert (isolated_env / ".ai_models.migrated").exists()
-        # Aliases persisted
-        data = _alias_admin.read_alias_file()
+        # Agents persisted
+        data = _agent_admin.read_agents_file()
         assert data["anthropic-claude-opus-4-5"] == {
             "make": "anthropic", "model": "claude-opus-4-5"
         }
 
     def test_idempotent_second_run(self, isolated_env):
         _write_legacy(isolated_env, "xai=grok-3\n")
-        first = _alias_admin.migrate_legacy_ai_models()
+        first = _agent_admin.migrate_legacy_ai_models()
         assert len(first) == 1
         # Second invocation — no legacy file → empty
-        second = _alias_admin.migrate_legacy_ai_models()
+        second = _agent_admin.migrate_legacy_ai_models()
         assert second == []
 
     def test_unknown_make_skipped(self, isolated_env):
         _write_legacy(isolated_env, "bogus=some-model\nxai=grok-3\n")
-        added = _alias_admin.migrate_legacy_ai_models()
+        added = _agent_admin.migrate_legacy_ai_models()
         names = {a for a, _, _ in added}
         assert names == {"xai-grok-3"}
 
     def test_duplicate_skipped(self, isolated_env):
-        # Pre-seed alias file with the exact pair
-        _alias_admin.write_alias_file({
+        # Pre-seed agent file with the exact pair
+        _agent_admin.write_agents_file({
             "myxai": {"make": "xai", "model": "grok-3"},
         })
         _write_legacy(isolated_env, "xai=grok-3\n")
-        added = _alias_admin.migrate_legacy_ai_models()
+        added = _agent_admin.migrate_legacy_ai_models()
         assert added == []  # nothing new
         # Legacy still renamed
         assert (isolated_env / ".ai_models.migrated").exists()
 
     def test_collision_appends_suffix(self, isolated_env):
-        _alias_admin.write_alias_file({
+        _agent_admin.write_agents_file({
             "xai-grok-3": {"make": "xai", "model": "different-model"},
         })
         _write_legacy(isolated_env, "xai=grok-3\n")
-        added = _alias_admin.migrate_legacy_ai_models()
+        added = _agent_admin.migrate_legacy_ai_models()
         names = {a for a, _, _ in added}
         assert names == {"xai-grok-3-2"}
 
     def test_empty_legacy_renamed(self, isolated_env):
         _write_legacy(isolated_env, "# only comments\n\n")
-        added = _alias_admin.migrate_legacy_ai_models()
+        added = _agent_admin.migrate_legacy_ai_models()
         assert added == []
         assert (isolated_env / ".ai_models.migrated").exists()
 
@@ -158,14 +158,14 @@ class TestMigrate:
 
 class TestNotice:
     def test_silent_when_nothing_to_do(self, isolated_env, capsys):
-        _alias_admin.run_migration_with_notice()
+        _agent_admin.run_migration_with_notice()
         out = capsys.readouterr()
         assert out.out == ""
         assert out.err == ""
 
     def test_prints_summary_on_success(self, isolated_env, capsys):
         _write_legacy(isolated_env, "anthropic=claude-opus-4-5\n")
-        _alias_admin.run_migration_with_notice()
+        _agent_admin.run_migration_with_notice()
         out = capsys.readouterr().out
         assert "Migrated legacy .ai_models" in out
         assert "anthropic-claude-opus-4-5" in out
@@ -173,9 +173,9 @@ class TestNotice:
     def test_swallows_exceptions(self, isolated_env, capsys, monkeypatch):
         def boom():
             raise RuntimeError("kaboom")
-        monkeypatch.setattr(_alias_admin, "migrate_legacy_ai_models", boom)
+        monkeypatch.setattr(_agent_admin, "migrate_legacy_ai_models", boom)
         # Must NOT raise
-        _alias_admin.run_migration_with_notice()
+        _agent_admin.run_migration_with_notice()
         out = capsys.readouterr().out
         assert "Could not migrate" in out
         assert "kaboom" in out

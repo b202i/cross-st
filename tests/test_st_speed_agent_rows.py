@@ -1,5 +1,5 @@
 """
-tests/test_st_speed_alias_rows.py — CST-MM-e: per-alias rows in st-speed.
+tests/test_st_speed_alias_rows.py — CST-MM-e: per-agent rows in st-speed.
 
 Verifies that when timing data contains two same-make entries with different
 models, st-speed produces one row per (make, model) and labels the rows
@@ -58,14 +58,14 @@ class TestPerAliasRows:
         assert ais == ["openai", "anthropic"] or set(ais) == {"openai", "anthropic"}
 
     def test_filter_by_alias_resolves_to_make_model(self, st_speed_mod, tmp_path, monkeypatch):
-        # Register a real alias so the filter has something to resolve against.
-        alias_file = tmp_path / "cross_ai_models.json"
-        alias_file.write_text(
+        # Register a real agent so the filter has something to resolve against.
+        agent_file = tmp_path / "cross_ai_models.json"
+        agent_file.write_text(
             '{"anthropic-opus": {"make": "anthropic", "model": "claude-opus-4-5"}}'
         )
-        monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(alias_file))
-        from cross_ai_core.aliases import reload_aliases
-        reload_aliases()
+        monkeypatch.setenv("CROSS_AI_AGENTS_FILE", str(agent_file))
+        from cross_ai_core.agents import reload_agents
+        reload_agents()
         try:
             data = [
                 _row("anthropic", "claude-opus-4-5",   60),
@@ -73,12 +73,12 @@ class TestPerAliasRows:
             ]
             rows = st_speed_mod.summarize_generation(data, ai_filter="anthropic-opus")
             assert rows is not None
-            # Filter narrows to the one (make, model) matching the alias.
+            # Filter narrows to the one (make, model) matching the agent.
             assert len(rows) == 1
             assert rows[0]["AI"] == "anthropic"  # only one model in surviving set
         finally:
-            monkeypatch.delenv("CROSS_AI_ALIASES_FILE", raising=False)
-            reload_aliases()
+            monkeypatch.delenv("CROSS_AI_AGENTS_FILE", raising=False)
+            reload_agents()
 
     def test_filter_by_make_keeps_all_models_for_make(self, st_speed_mod):
         data = [

@@ -26,7 +26,7 @@ import sys
 # _PROJECT_ROOT  — parent of cross_st/; the repo root for dev installs,
 #                  site-packages/ for pip installs (no .env there — no-op).
 _CROSS_ST_DIR = os.path.dirname(os.path.realpath(__file__))
-_CROSS_AI_DIR = _CROSS_ST_DIR  # legacy alias — do not use in new code
+_CROSS_AI_DIR = _CROSS_ST_DIR  # legacy agent — do not use in new code
 _PROJECT_ROOT = os.path.dirname(_CROSS_ST_DIR)
 
 
@@ -325,7 +325,7 @@ def check_shadowed_install() -> None:
 
 
 def _migrate_legacy_ai_models_once() -> None:
-    """Run the CST-MM-j ``.ai_models`` → alias-file migration (best-effort).
+    """Run the CST-MM-j ``.ai_models`` → agent-file migration (best-effort).
 
     Only fires when ``_PROJECT_ROOT/.ai_models`` exists, which is a dev-only
     artefact — pipx and system-Python users never had the file, so this is
@@ -336,19 +336,19 @@ def _migrate_legacy_ai_models_once() -> None:
     if not os.path.isfile(legacy):
         return  # nothing to do (covers every pipx user and most dev users)
     try:
-        # Lazy import — _alias_admin lives in cross_st/ and may not always be
+        # Lazy import — _agent_admin lives in cross_st/ and may not always be
         # on sys.path before mmd_startup runs (e.g. early import in a fresh
         # venv).  Adding the directory keeps mmd_startup standalone.
         if _CROSS_ST_DIR not in sys.path:
             sys.path.insert(0, _CROSS_ST_DIR)
-        from _alias_admin import run_migration_with_notice  # type: ignore
+        from _agent_admin import run_migration_with_notice  # type: ignore
         run_migration_with_notice()
     except Exception:
         pass  # never break a real command over a one-shot migration
 
 
 def _migrate_to_agents_v2_once() -> None:
-    """AGT-2: ensure the alias file is in Agents v2 shape (best-effort).
+    """AGT-2: ensure the agent file is in Agents v2 shape (best-effort).
 
     Three paths, all idempotent:
       * existing v1 file → re-emit as v2 envelope (no entries lost)
@@ -362,7 +362,7 @@ def _migrate_to_agents_v2_once() -> None:
     try:
         if _CROSS_ST_DIR not in sys.path:
             sys.path.insert(0, _CROSS_ST_DIR)
-        from _alias_admin import run_agents_v2_migration_with_notice  # type: ignore
+        from _agent_admin import run_agents_v2_migration_with_notice  # type: ignore
         run_agents_v2_migration_with_notice()
     except Exception:
         pass  # never break a real command over a one-shot migration

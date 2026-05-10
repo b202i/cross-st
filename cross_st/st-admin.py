@@ -17,9 +17,9 @@ Non-interactive (scripting / shell):
   st-admin --get-default-ai       # print the current default agent name
   st-admin --set-default-ai NAME  # set default agent (writes DEFAULT_AGENT to .env)
   st-admin --set-ai-model MAKE=MODEL  # set the model for a provider (legacy)
-  st-admin --add-alias NAME=MAKE[:MODEL]  # add / update an agent in ~/.cross_ai_models.json
-  st-admin --remove-alias NAME    # remove a user-defined agent
-  st-admin --list-aliases         # print the agent registry table
+  st-admin --add-agent NAME=MAKE[:MODEL]  # add / update an agent in ~/.cross_ai_models.json
+  st-admin --remove-agent NAME    # remove a user-defined agent
+  st-admin --list-agents         # print the agent registry table
   st-admin --set-tts-voice VOICE  # set TTS voice (writes TTS_VOICE to .env)
   st-admin --set-template NAME    # set default prompt template
   st-admin --set-editor NAME      # set editor (writes EDITOR to .env)
@@ -2037,7 +2037,7 @@ def cache_cull(days: int) -> None:
           f"({len(files) - len(old)} remaining).\n")
 
 
-def _show_aliases_table() -> None:
+def _show_agents_table() -> None:
     """Print the agent table plus a short legend so the jargon is self-documenting.
 
     AGT-5: filters out agents whose provider has no API key in the
@@ -2047,20 +2047,20 @@ def _show_aliases_table() -> None:
       * One line per provider that has a key but no agent uses it
         ("you have ANTHROPIC_API_KEY but no agent uses it").
     """
-    from _alias_admin import (
-        agents_missing_keys, format_alias_table, list_aliases,
+    from _agent_admin import (
+        agents_missing_keys, format_agent_table, list_agents,
         providers_with_unused_keys,
     )
     print()
-    rows = list_aliases(filter_by_keys=True)
-    print(format_alias_table(rows))
+    rows = list_agents(filter_by_keys=True)
+    print(format_agent_table(rows))
 
     missing = agents_missing_keys()
     if missing:
         print()
-        for alias, make, env_var in missing:
+        for agent, make, env_var in missing:
             print(
-                f"  ⚠️  Agent '{alias}' uses {make} but {env_var} is unset — "
+                f"  ⚠️  Agent '{agent}' uses {make} but {env_var} is unset — "
                 "hidden from the list above."
             )
 
@@ -2084,7 +2084,7 @@ def _show_aliases_table() -> None:
     )
 
 
-# ── Alias-management wizards (CST-MM-i) ──────────────────────────────────────
+# ── Agent-management wizards (CST-MM-i) ──────────────────────────────────────
 #
 # Model picker uses live SDK-side discovery via
 # ``cross_ai_core.get_available_models(make)`` (CAC-10h, shipped in
@@ -2097,7 +2097,7 @@ def _show_aliases_table() -> None:
 
 def _pick_make() -> "str | None":
     """Numbered picker for the built-in provider list.  ``None`` = cancel."""
-    from _alias_admin import _builtin_makes
+    from _agent_admin import _builtin_makes
     makes = _builtin_makes()
     print()
     for i, make in enumerate(makes, 1):
@@ -2140,7 +2140,7 @@ def _pick_model(make: str, current=None):
         models = get_available_models(make)
     except Exception as exc:
         print(f"  ⚠️  Live discovery unavailable ({exc}); using curated suggestions.")
-        from _alias_admin import get_recommended_models
+        from _agent_admin import get_recommended_models
         models = [
             type("M", (), {"id": mid, "is_recommended": rec, "is_default": False})
             for mid, _label, rec in get_recommended_models(make)
@@ -2170,14 +2170,14 @@ def _pick_model(make: str, current=None):
     return (True, raw)
 
 
-def _alias_wizard_add() -> None:
+def _agent_wizard_add() -> None:
     """Interactive add-agent flow."""
-    from _alias_admin import add_alias, AliasError, read_alias_file
+    from _agent_admin import add_agent, AgentError, read_agents_file
     print("\n  Add a new AI agent.")
     name = input("  Agent name (e.g. anthropic-opus, blank to cancel): ").strip()
     if not name:
         return
-    if name in read_alias_file():
+    if name in read_agents_file():
         print(f"  ⚠️  Agent {name!r} already exists — use 'Edit' to change its model.")
         return
     make = _pick_make()
@@ -2193,23 +2193,23 @@ def _alias_wizard_add() -> None:
         print("  Cancelled.")
         return
     try:
-        add_alias(name, make, model)
-    except AliasError as exc:
+        add_agent(name, make, model)
+    except AgentError as exc:
         print(f"  ✗  {exc}")
         return
     print(f"  ✓  Written to {os.path.expanduser('~/.cross_ai_models.json')}")
 
 
-def _alias_wizard_remove() -> None:
+def _agent_wizard_remove() -> None:
     """Interactive remove-agent flow.  Custom agents only."""
-    from _alias_admin import read_alias_file, remove_alias, AliasError
-    user_aliases = list(read_alias_file().keys())
-    if not user_aliases:
+    from _agent_admin import read_agents_file, remove_agent, AgentError
+    user_agents = list(read_agents_file().keys())
+    if not user_agents:
         print("\n  (no custom agents — nothing to remove)")
         return
     print("\n  Custom agents:")
-    for i, alias in enumerate(user_aliases, 1):
-        print(f"    {i}. {alias}")
+    for i, agent in enumerate(user_agents, 1):
+        print(f"    {i}. {agent}")
     raw = input("  Number to remove (or blank to cancel): ").strip()
     if not raw:
         return
@@ -2218,35 +2218,35 @@ def _alias_wizard_remove() -> None:
     except ValueError:
         print(f"  ✗  Not a number: {raw!r}")
         return
-    if not (1 <= idx <= len(user_aliases)):
+    if not (1 <= idx <= len(user_agents)):
         print(f"  ✗  Choice out of range: {idx}")
         return
-    name = user_aliases[idx - 1]
+    name = user_agents[idx - 1]
     ans = input(f"  Remove agent {name!r}? [y/N]: ").strip().lower()
     if ans != "y":
         print("  Cancelled.")
         return
     try:
-        remove_alias(name)
-    except AliasError as exc:
+        remove_agent(name)
+    except AgentError as exc:
         print(f"  ✗  {exc}")
         return
     print(f"  ✓  Removed agent {name!r}.")
 
 
-def _alias_wizard_edit() -> None:
+def _agent_wizard_edit() -> None:
     """Interactive edit-agent flow.  Changes only the model field."""
-    from _alias_admin import read_alias_file, edit_alias_model, AliasError
-    file_data = read_alias_file()
-    user_aliases = list(file_data.keys())
-    if not user_aliases:
+    from _agent_admin import read_agents_file, edit_agent_model, AgentError
+    file_data = read_agents_file()
+    user_agents = list(file_data.keys())
+    if not user_agents:
         print("\n  (no custom agents — use 'Add agent' first)")
         return
     print("\n  Custom agents:")
-    for i, alias in enumerate(user_aliases, 1):
-        spec = file_data[alias]
+    for i, agent in enumerate(user_agents, 1):
+        spec = file_data[agent]
         cur  = spec.get("model") or "<provider default>"
-        print(f"    {i}. {alias:<22} ({spec.get('make')} · {cur})")
+        print(f"    {i}. {agent:<22} ({spec.get('make')} · {cur})")
     raw = input("  Number to edit (or blank to cancel): ").strip()
     if not raw:
         return
@@ -2255,17 +2255,17 @@ def _alias_wizard_edit() -> None:
     except ValueError:
         print(f"  ✗  Not a number: {raw!r}")
         return
-    if not (1 <= idx <= len(user_aliases)):
+    if not (1 <= idx <= len(user_agents)):
         print(f"  ✗  Choice out of range: {idx}")
         return
-    name = user_aliases[idx - 1]
+    name = user_agents[idx - 1]
     spec = file_data[name]
     confirmed, model = _pick_model(spec["make"], current=spec.get("model"))
     if not confirmed:
         return
     try:
-        edit_alias_model(name, model)
-    except AliasError as exc:
+        edit_agent_model(name, model)
+    except AgentError as exc:
         print(f"  ✗  {exc}")
         return
     summary_model = model if model is not None else "<provider default>"
@@ -2394,10 +2394,10 @@ def interactive_menu() -> None:
                         # Refresh in case an agent was just added in the
                         # Manage-agents submenu.
                         from ai_handler import get_ai_list as _gal
-                        from _alias_admin import list_aliases
+                        from _agent_admin import list_agents
                         ai_list = _gal()
                         current = settings_get_default_ai()
-                        rows = {r["alias"]: r for r in list_aliases()}
+                        rows = {r["agent"]: r for r in list_agents()}
                         cur_row = rows.get(current)
                         cur_label = (
                             f"{cur_row['make']} · {cur_row['model_label']}"
@@ -2407,16 +2407,16 @@ def interactive_menu() -> None:
                         print("  Available agents (default = ships with cross-st, points at provider's recommended model):")
                         # Width-align the agent column
                         w = max(len(a) for a in ai_list)
-                        for alias in ai_list:
-                            r = rows.get(alias)
-                            marker = " ←" if alias == current else "  "
+                        for agent in ai_list:
+                            r = rows.get(agent)
+                            marker = " ←" if agent == current else "  "
                             if r:
                                 print(
-                                    f"    {alias:<{w}}  →  {r['make']:<10}  "
+                                    f"    {agent:<{w}}  →  {r['make']:<10}  "
                                     f"{r['model_label']}{marker}"
                                 )
                             else:
-                                print(f"    {alias:<{w}}{marker}")
+                                print(f"    {agent:<{w}}{marker}")
                         new_ai = input(
                             "\n  Type agent name to switch (blank = keep current): "
                         ).strip()
@@ -2428,17 +2428,17 @@ def interactive_menu() -> None:
                                 print(f"  ✗  {exc}")
 
                     case ("AI", "M") | ("Manage agents", "M"):
-                        _show_aliases_table()
+                        _show_agents_table()
 
                     # ── Manage agents (3rd-level submenu) ────────────────────
                     case ("Manage agents", "a"):
-                        _alias_wizard_add()
+                        _agent_wizard_add()
 
                     case ("Manage agents", "r"):
-                        _alias_wizard_remove()
+                        _agent_wizard_remove()
 
                     case ("Manage agents", "e"):
-                        _alias_wizard_edit()
+                        _agent_wizard_edit()
 
                     case ("Manage agents", "R"):
                         try:
@@ -2453,7 +2453,7 @@ def interactive_menu() -> None:
                                 "and its deps)\n"
                             )
                         else:
-                            from _alias_admin import _builtin_makes
+                            from _agent_admin import _builtin_makes
                             print(
                                 "\n  Refreshing model lists from each provider "
                                 "(this may take a few seconds)…"
@@ -2577,8 +2577,8 @@ def main() -> None:
             "Without flags, opens the interactive settings panel.\n\n"
             "Settings are stored in ~/.crossenv (DEFAULT_AGENT, TTS_VOICE,\n"
             "DEFAULT_TEMPLATE, EDITOR, API keys) and ~/.cross_ai_models.json\n"
-            "(agent registry — manage via the AI submenu or --add-alias /\n"
-            "--remove-alias / --list-aliases).\n\n"
+            "(agent registry — manage via the AI submenu or --add-agent /\n"
+            "--remove-agent / --list-agents).\n\n"
             "The DEFAULT_AGENT value is used by all st-* tools as the agent for\n"
             "caption / report generation whenever --agent is not explicitly passed."
         ),
@@ -2626,18 +2626,33 @@ def main() -> None:
         help="Set a per-provider model override (e.g. xai=grok-3)",
     )
     parser.add_argument(
-        "--add-alias", metavar="NAME=MAKE[:MODEL]",
-        help="Add or update an AI alias in ~/.cross_ai_models.json "
+        "--add-agent", metavar="NAME=MAKE[:MODEL]",
+        help="Add or update an AI agent in ~/.cross_ai_models.json "
              "(e.g. anthropic-opus=anthropic:claude-opus-4-5; "
              "omit :MODEL for handler default)",
     )
     parser.add_argument(
-        "--remove-alias", metavar="NAME",
-        help="Remove a user-defined alias from ~/.cross_ai_models.json",
+        "--remove-agent", metavar="NAME",
+        help="Remove a user-defined agent from ~/.cross_ai_models.json",
     )
     parser.add_argument(
-        "--list-aliases", action="store_true",
-        help="Print the alias registry (one row per loaded alias)",
+        "--list-agents", action="store_true",
+        help="Print the agent registry (one row per loaded agent)",
+    )
+    # Hidden back-compat aliases for the pre-AGT-9 flag spellings.  These
+    # share dest=add_agent / remove_agent / list_agents so existing scripts
+    # keep working unmodified for one release.  Removed in 0.12.0.
+    parser.add_argument(
+        "--add-alias", dest="add_agent", metavar="NAME=MAKE[:MODEL]",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--remove-alias", dest="remove_agent", metavar="NAME",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--list-aliases", dest="list_agents", action="store_true",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--set-tts-voice", metavar="VOICE",
@@ -2721,43 +2736,43 @@ def main() -> None:
         print(f"✓  {make.strip()} model set to: {model.strip()}")
         return
 
-    if args.add_alias:
-        from _alias_admin import add_alias, AliasError
-        if "=" not in args.add_alias:
+    if args.add_agent:
+        from _agent_admin import add_agent, AgentError
+        if "=" not in args.add_agent:
             print(
                 "✗  Format must be NAME=MAKE[:MODEL] "
                 "(e.g. anthropic-opus=anthropic:claude-opus-4-5)",
                 file=sys.stderr,
             )
             sys.exit(1)
-        name, _, target = args.add_alias.partition("=")
+        name, _, target = args.add_agent.partition("=")
         if ":" in target:
             make, _, model = target.partition(":")
             model = model.strip() or None
         else:
             make, model = target, None
         try:
-            add_alias(name.strip(), make.strip(), model)
-        except AliasError as exc:
+            add_agent(name.strip(), make.strip(), model)
+        except AgentError as exc:
             print(f"✗  {exc}", file=sys.stderr)
             sys.exit(1)
         summary_model = model if model is not None else "<provider default>"
-        print(f"✓  Alias {name.strip()!r} → {make.strip()} · {summary_model}")
+        print(f"✓  Agent {name.strip()!r} → {make.strip()} · {summary_model}")
         return
 
-    if args.remove_alias:
-        from _alias_admin import remove_alias, AliasError
+    if args.remove_agent:
+        from _agent_admin import remove_agent, AgentError
         try:
-            remove_alias(args.remove_alias)
-        except AliasError as exc:
+            remove_agent(args.remove_agent)
+        except AgentError as exc:
             print(f"✗  {exc}", file=sys.stderr)
             sys.exit(1)
-        print(f"✓  Removed alias {args.remove_alias!r}")
+        print(f"✓  Removed agent {args.remove_agent!r}")
         return
 
-    if args.list_aliases:
-        from _alias_admin import list_aliases, format_alias_table
-        print(format_alias_table(list_aliases()))
+    if args.list_agents:
+        from _agent_admin import list_agents, format_agent_table
+        print(format_agent_table(list_agents()))
         return
 
     if args.set_tts_voice:

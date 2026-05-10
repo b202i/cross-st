@@ -52,16 +52,16 @@ if str(_CROSS_AI) not in sys.path:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AGT-1 / AGT-2 — module-level alias-registry seed
+# AGT-1 / AGT-2 — module-level agent-registry seed
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # cross-ai-core 0.8.0 stopped auto-seeding built-in providers as
-# self-aliases.  On a fresh CI runner there is no ``~/.cross_ai_models.json``
+# self-agents.  On a fresh CI runner there is no ``~/.cross_ai_models.json``
 # and no API keys, so ``get_ai_list()`` returns ``[]`` at module-import
 # time of any test that captures it eagerly (e.g. tests/test_st_admin.py
 # does ``AI_LIST = get_ai_list()`` at the top).
 #
-# The autouse ``_seed_legacy_alias_registry`` fixture below runs *per-test*
+# The autouse ``_seed_legacy_agent_registry`` fixture below runs *per-test*
 # and is therefore too late to fix that import-time capture.  We replicate
 # the same seed at conftest module level — it executes once, before any
 # test module is imported, so eager AI_LIST captures see the full provider
@@ -71,21 +71,21 @@ import tempfile as _tempfile
 
 _TMP_AGENTS = Path(_tempfile.mkdtemp(prefix="cross-test-agents-")) / "cross_ai_models.json"
 # Set only the legacy env-var name.  cross-ai-core 0.8.0 reads
-# CROSS_AI_AGENTS_FILE first, then CROSS_AI_ALIASES_FILE — by setting only
+# CROSS_AI_AGENTS_FILE first, then CROSS_AI_AGENTS_FILE — by setting only
 # the legacy name we leave the new-name slot free so individual tests can
-# monkeypatch CROSS_AI_ALIASES_FILE to swap registries without our default
+# monkeypatch CROSS_AI_AGENTS_FILE to swap registries without our default
 # winning over them.
-_os.environ.setdefault("CROSS_AI_ALIASES_FILE", str(_TMP_AGENTS))
+_os.environ.setdefault("CROSS_AI_AGENTS_FILE", str(_TMP_AGENTS))
 
 try:
-    from cross_ai_core.aliases import _AI_ALIASES, AliasSpec  # type: ignore
+    from cross_ai_core.agents import _AI_ALIASES, AgentSpec  # type: ignore
     from cross_ai_core.ai_handler import AI_LIST as _BUILTIN_AI_LIST  # type: ignore
     for _make in _BUILTIN_AI_LIST:
-        _AI_ALIASES[_make] = AliasSpec(make=_make, model=None)
+        _AI_ALIASES[_make] = AgentSpec(make=_make, model=None)
 
     # Persist the same seed to disk so subprocess-based tests (test_live.py,
     # test_integration.py, --slow tier) inherit a non-empty agent registry
-    # via the CROSS_AI_ALIASES_FILE env var above.  Without this, subprocesses
+    # via the CROSS_AI_AGENTS_FILE env var above.  Without this, subprocesses
     # see an empty agents file and reject `--agent openai` with
     # `--agent {}` (no valid choices).
     import json as _json
@@ -160,44 +160,44 @@ def pytest_configure(config):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AGT-2 — session-wide alias-registry seed
+# AGT-2 — session-wide agent-registry seed
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # cross-ai-core 0.8.0 stopped auto-seeding built-in providers as
-# self-aliases (AGT-1a).  Existing cross-st tests were written against the
+# self-agents (AGT-1a).  Existing cross-st tests were written against the
 # pre-0.8.0 behaviour — many call ``process_prompt("xai", …)`` or look up
-# ``get_aliases()["anthropic"]`` directly.
+# ``get_agents()["anthropic"]`` directly.
 #
 # Rather than rewrite every legacy test, this fixture emulates the
 # Agents v2 first-run migration once at session start: it seeds one
-# self-alias per built-in provider into the in-process registry so the
+# self-agent per built-in provider into the in-process registry so the
 # legacy lookup contract still holds.
 #
 # Tests that explicitly want an empty registry override
-# ``CROSS_AI_ALIASES_FILE`` to a fresh tmp path and call
-# ``reload_aliases()`` themselves — that wipes the seed for the duration
+# ``CROSS_AI_AGENTS_FILE`` to a fresh tmp path and call
+# ``reload_agents()`` themselves — that wipes the seed for the duration
 # of the test.
 
 @pytest.fixture(autouse=True)
-def _seed_legacy_alias_registry(tmp_path_factory, monkeypatch):
-    """Pre-populate the alias registry with built-in self-aliases.
+def _seed_legacy_agent_registry(tmp_path_factory, monkeypatch):
+    """Pre-populate the agent registry with built-in self-agents.
 
     Mirrors the cross-ai-core test-suite's session fixture so the
-    pre-0.8.0 ``--ai <make>`` / ``get_aliases()[<make>]`` test patterns
+    pre-0.8.0 ``--ai <make>`` / ``get_agents()[<make>]`` test patterns
     keep working without per-test setup.
 
-    Also redirects ``CROSS_AI_ALIASES_FILE`` to a tmp path so the user's
+    Also redirects ``CROSS_AI_AGENTS_FILE`` to a tmp path so the user's
     real ``~/.cross_ai_models.json`` (which on a developer machine has
     already been seeded with explicit models like
     ``{"anthropic": {"provider": "anthropic", "model": "claude-opus-4-5"}}``)
     cannot leak its model assignments into tests that resolve the bare
     make name and expect ``model=None`` semantics.
 
-    Tests that override ``CROSS_AI_ALIASES_FILE`` themselves still win —
+    Tests that override ``CROSS_AI_AGENTS_FILE`` themselves still win —
     monkeypatch later writes to env vars take precedence.
     """
     try:
-        from cross_ai_core.aliases import _AI_ALIASES, AliasSpec
+        from cross_ai_core.agents import _AI_ALIASES, AgentSpec
         from cross_ai_core.ai_handler import AI_LIST
     except Exception:
         # cross-ai-core too old for the new symbols — let tests run as-is.
@@ -205,24 +205,24 @@ def _seed_legacy_alias_registry(tmp_path_factory, monkeypatch):
         return
 
     # Isolate from the developer's real ~/.cross_ai_models.json.
-    tmp_alias_file = tmp_path_factory.mktemp("alias_seed") / "cross_ai_models.json"
-    # Pre-seed the file with built-in self-aliases so subprocess-based
+    tmp_agent_file = tmp_path_factory.mktemp("agent_seed") / "cross_ai_models.json"
+    # Pre-seed the file with built-in self-agents so subprocess-based
     # tests (test_live.py, test_integration.py) inherit a populated
     # registry via the env var below — without this they see an empty
     # agents file and reject `--agent openai` with `(choose from , all)`.
     import json as _json_seed
-    tmp_alias_file.write_text(_json_seed.dumps({
+    tmp_agent_file.write_text(_json_seed.dumps({
         "version": 2,
         "agents": {m: {"provider": m, "model": None} for m in AI_LIST},
         "_migrated_to_agents_v2": True,
     }))
-    monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(tmp_alias_file))
+    monkeypatch.setenv("CROSS_AI_AGENTS_FILE", str(tmp_agent_file))
 
     from collections import OrderedDict
     saved = OrderedDict(_AI_ALIASES)
     _AI_ALIASES.clear()
     for make in AI_LIST:
-        _AI_ALIASES[make] = AliasSpec(make=make, model=None)
+        _AI_ALIASES[make] = AgentSpec(make=make, model=None)
     try:
         yield
     finally:

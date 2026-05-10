@@ -157,13 +157,13 @@ def _agents_with_keys() -> list[str]:
     raw = get_ai_list()
     try:
         from cross_ai_core import has_api_key
-        from cross_ai_core.aliases import get_aliases
+        from cross_ai_core.agents import get_agents
     except ImportError:
         return raw
-    aliases = get_aliases()
+    agents = get_agents()
     filtered: list[str] = []
     for name in raw:
-        spec = aliases.get(name)
+        spec = agents.get(name)
         if spec is None:
             filtered.append(name)
             continue

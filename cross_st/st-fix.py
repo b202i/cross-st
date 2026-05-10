@@ -1496,25 +1496,25 @@ Modes:
 
     # ── Resolve rewriter AI ───────────────────────────────────────────────────
     # Default to the story's own AI (same voice, better results).
-    # CST-MM-d: when the story was authored by a multi-model alias (e.g.
+    # CST-MM-d: when the story was authored by a multi-model agent (e.g.
     # ``anthropic-opus`` vs ``anthropic-sonnet``), match on (make, model) so
     # the rewriter uses the same model — not just the same make.
     # Fall back to get_default_ai() if the story's AI is not in the registry
     # (e.g. make="url" for fetched stories).
     if args.agent is None:
         ai_list_now = get_ai_list()
-        # First, try to find an alias whose resolved (make, model) matches.
-        matching_alias = None
-        for alias in ai_list_now:
+        # First, try to find an agent whose resolved (make, model) matches.
+        matching_agent = None
+        for agent in ai_list_now:
             try:
-                if (get_ai_make(alias) == primary_make
-                        and get_ai_model(alias) == primary_model):
-                    matching_alias = alias
+                if (get_ai_make(agent) == primary_make
+                        and get_ai_model(agent) == primary_model):
+                    matching_agent = agent
                     break
             except Exception:
                 continue
-        if matching_alias is not None:
-            args.agent = matching_alias
+        if matching_agent is not None:
+            args.agent = matching_agent
         elif primary_make in ai_list_now:
             args.agent = primary_make
         else:
@@ -1543,14 +1543,14 @@ Modes:
         base_model = base_story.get("model", "")
 
         # Lock the rewriter to the base story's author — single voice throughout.
-        # CST-MM-d: prefer an alias whose (make, model) matches so two
-        # same-make aliases each pick the right rewriter.
+        # CST-MM-d: prefer an agent whose (make, model) matches so two
+        # same-make agents each pick the right rewriter.
         rewriter_ai = None
-        for alias in get_ai_list():
+        for agent in get_ai_list():
             try:
-                if (get_ai_make(alias) == base_make
-                        and get_ai_model(alias) == base_model):
-                    rewriter_ai = alias
+                if (get_ai_make(agent) == base_make
+                        and get_ai_model(agent) == base_model):
+                    rewriter_ai = agent
                     break
             except Exception:
                 continue
