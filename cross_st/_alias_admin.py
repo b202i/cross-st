@@ -606,11 +606,29 @@ def env_override_for(alias: str, make: str) -> "str | None":
     return None
 
 
-def list_aliases() -> list[dict]:
+def _has_api_key_safe(make: str) -> bool:
+    """Return ``True`` iff *make* has a non-empty API key in the env.
+
+    Wrapper around :func:`cross_ai_core.has_api_key` (AGT-1c) that
+    swallows ``ImportError`` (cross-ai-core < 0.8.0) and ``ValueError``
+    (unknown provider) — both treated as "key present" so callers don't
+    accidentally hide agents on older cross-ai-core.
+    """
+    try:
+        from cross_ai_core import has_api_key
+    except ImportError:
+        return True
+    try:
+        return has_api_key(make)
+    except Exception:
+        return True
+
+
+def list_aliases(filter_by_keys: bool = False) -> list[dict]:
     """Return one row per loaded alias.
 
     Each row: ``{"alias", "make", "model_effective", "model_label",
-    "model_file", "env_override", "is_builtin"}``.
+    "model_file", "env_override", "is_builtin", "has_api_key"}``.
 
     * ``model_effective`` = what would actually be sent to the provider
       (env override → file → curated provider default → ``"<unknown>"``).
@@ -622,6 +640,14 @@ def list_aliases() -> list[dict]:
     * ``env_override``    = env var name overriding the file (or ``None``).
     * ``is_builtin``      = ``True`` for auto-seeded self-aliases (one per
       provider) — i.e. you didn't create this one yourself.
+    * ``has_api_key``     = ``True`` iff the row's ``make`` has a non-empty
+      API key in the current environment (AGT-5).
+
+    Args:
+        filter_by_keys: When ``True`` (AGT-5), drop rows whose make lacks
+            an API key.  Default ``False`` preserves the pre-AGT-5 contract
+            so existing callers (tests, ``--list-aliases`` CLI flag) keep
+            seeing every loaded alias.
     """
     from cross_ai_core.aliases import get_aliases
     try:
@@ -633,6 +659,9 @@ def list_aliases() -> list[dict]:
     builtins  = set(_builtin_makes())
     rows: list[dict] = []
     for alias, spec in get_aliases().items():
+        key_present = _has_api_key_safe(spec.make)
+        if filter_by_keys and not key_present:
+            continue
         env_var = env_override_for(alias, spec.make)
         if env_var:
             effective = os.environ[env_var]
@@ -658,8 +687,69 @@ def list_aliases() -> list[dict]:
             "model_file":      file_data.get(alias, {}).get("model"),
             "env_override":    env_var,
             "is_builtin":      alias in builtins and alias not in file_data,
+            "has_api_key":     key_present,
         })
     return rows
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGT-5 — API-key availability helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def agents_missing_keys() -> list[tuple[str, str, str]]:
+    """Return ``[(alias, make, env_var), …]`` for agents whose make lacks a key.
+
+    Used by ``st-admin`` to show "Agent X uses XAI but you have no
+    XAI_API_KEY" hints when ``M`` filters them out.
+
+    Returns an empty list when cross-ai-core is older than 0.8.0 (no
+    ``has_api_key``) or when every loaded agent has a key.
+    """
+    try:
+        from cross_ai_core import api_key_env_var, has_api_key
+        from cross_ai_core.aliases import get_aliases
+    except ImportError:
+        return []
+    out: list[tuple[str, str, str]] = []
+    for alias, spec in get_aliases().items():
+        try:
+            if has_api_key(spec.make):
+                continue
+            env_var = api_key_env_var(spec.make)
+        except Exception:
+            continue
+        out.append((alias, spec.make, env_var))
+    return out
+
+
+def providers_with_unused_keys() -> list[tuple[str, str]]:
+    """Return ``[(provider, env_var), …]`` — keys in env but no agent uses them.
+
+    Used by ``st-admin > AI > M`` to show the "you have an
+    ANTHROPIC_API_KEY but no agent uses it" empty-state hint.
+    """
+    try:
+        from cross_ai_core import (
+            PROVIDER_API_KEY_ENV, api_key_env_var, has_api_key,
+        )
+        from cross_ai_core.aliases import get_aliases
+    except ImportError:
+        return []
+    used: set[str] = {spec.make for spec in get_aliases().values()}
+    out: list[tuple[str, str]] = []
+    for provider in PROVIDER_API_KEY_ENV:
+        try:
+            if not has_api_key(provider):
+                continue
+        except Exception:
+            continue
+        if provider in used:
+            continue
+        try:
+            out.append((provider, api_key_env_var(provider)))
+        except Exception:
+            continue
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────────────

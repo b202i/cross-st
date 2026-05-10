@@ -2038,10 +2038,41 @@ def cache_cull(days: int) -> None:
 
 
 def _show_aliases_table() -> None:
-    """Print the agent table plus a short legend so the jargon is self-documenting."""
-    from _alias_admin import list_aliases, format_alias_table
+    """Print the agent table plus a short legend so the jargon is self-documenting.
+
+    AGT-5: filters out agents whose provider has no API key in the
+    environment, then prints two follow-up hints when relevant:
+
+      * One line per filtered agent ("uses XAI but XAI_API_KEY is unset").
+      * One line per provider that has a key but no agent uses it
+        ("you have ANTHROPIC_API_KEY but no agent uses it").
+    """
+    from _alias_admin import (
+        agents_missing_keys, format_alias_table, list_aliases,
+        providers_with_unused_keys,
+    )
     print()
-    print(format_alias_table(list_aliases()))
+    rows = list_aliases(filter_by_keys=True)
+    print(format_alias_table(rows))
+
+    missing = agents_missing_keys()
+    if missing:
+        print()
+        for alias, make, env_var in missing:
+            print(
+                f"  ⚠️  Agent '{alias}' uses {make} but {env_var} is unset — "
+                "hidden from the list above."
+            )
+
+    unused = providers_with_unused_keys()
+    if unused:
+        print()
+        for provider, env_var in unused:
+            print(
+                f"  Note: you have {env_var} set but no agent uses {provider}. "
+                "Run 'Add agent' to define one."
+            )
+
     print(
         "\n  Legend:\n"
         "    Provider  = the AI company (anthropic, openai, xai, gemini, perplexity)\n"

@@ -147,7 +147,35 @@ menus = {
 }
 
 # State global variables — initialized AFTER load_dotenv so DEFAULT_AI is honoured
-ai_opt = get_ai_list()
+#
+# AGT-5: filter the agent rotation list to providers with an API key set,
+# so the A-key cycle and the status-line label never offer an agent that
+# would crash on first use.  Falls back to the unfiltered list when
+# cross-ai-core is older than 0.8.0 (no has_api_key) or when no agents
+# have keys (better to show the would-fail name than an empty prompt).
+def _agents_with_keys() -> list[str]:
+    raw = get_ai_list()
+    try:
+        from cross_ai_core import has_api_key
+        from cross_ai_core.aliases import get_aliases
+    except ImportError:
+        return raw
+    aliases = get_aliases()
+    filtered: list[str] = []
+    for name in raw:
+        spec = aliases.get(name)
+        if spec is None:
+            filtered.append(name)
+            continue
+        try:
+            if has_api_key(spec.make):
+                filtered.append(name)
+        except Exception:
+            filtered.append(name)
+    return filtered or raw
+
+
+ai_opt = _agents_with_keys()
 file_json = None
 file_prefix = None
 story_sel = None

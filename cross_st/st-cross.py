@@ -431,6 +431,34 @@ def main() -> None:
     cache_flag  = "--cache" if args.cache else "--no-cache"
 
     ai_list = get_ai_list()
+    # AGT-5: drop agents whose provider has no API key in the env.  A
+    # missing key would crash the cell on first call and waste a column;
+    # better to skip with a one-line warning so the matrix only contains
+    # callable agents.  Falls open (keeps every agent) when cross-ai-core
+    # is older than 0.8.0 — preserves the pre-AGT-5 behaviour for users
+    # who haven't upgraded the core yet.
+    try:
+        from cross_ai_core import api_key_env_var, has_api_key
+        from cross_ai_core.aliases import get_aliases
+        _aliases = get_aliases()
+        _kept: list[str] = []
+        _dropped: list[tuple[str, str, str]] = []
+        for _name in ai_list:
+            _spec = _aliases.get(_name)
+            if _spec is None or has_api_key(_spec.make):
+                _kept.append(_name)
+            else:
+                _dropped.append((_name, _spec.make, api_key_env_var(_spec.make)))
+        if _dropped:
+            for _name, _make, _env in _dropped:
+                print(
+                    f"  ⚠️  Skipping agent '{_name}' ({_make}): {_env} is unset.",
+                    flush=True,
+                )
+        if _kept:
+            ai_list = _kept
+    except ImportError:
+        pass
     N       = len(ai_list)
 
     # --dry-run implies --skip-gen: we only preview the Step 2 matrix, and
