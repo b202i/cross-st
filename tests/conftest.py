@@ -82,6 +82,19 @@ try:
     from cross_ai_core.ai_handler import AI_LIST as _BUILTIN_AI_LIST  # type: ignore
     for _make in _BUILTIN_AI_LIST:
         _AI_ALIASES[_make] = AliasSpec(make=_make, model=None)
+
+    # Persist the same seed to disk so subprocess-based tests (test_live.py,
+    # test_integration.py, --slow tier) inherit a non-empty agent registry
+    # via the CROSS_AI_ALIASES_FILE env var above.  Without this, subprocesses
+    # see an empty agents file and reject `--agent openai` with
+    # `--agent {}` (no valid choices).
+    import json as _json
+    _agents_payload = {
+        "version": 2,
+        "agents": {m: {"provider": m, "model": None} for m in _BUILTIN_AI_LIST},
+        "_migrated_to_agents_v2": True,
+    }
+    _TMP_AGENTS.write_text(_json.dumps(_agents_payload, indent=2))
 except Exception:
     # cross-ai-core too old / not installed — let the per-test fixture try.
     pass
@@ -193,6 +206,16 @@ def _seed_legacy_alias_registry(tmp_path_factory, monkeypatch):
 
     # Isolate from the developer's real ~/.cross_ai_models.json.
     tmp_alias_file = tmp_path_factory.mktemp("alias_seed") / "cross_ai_models.json"
+    # Pre-seed the file with built-in self-aliases so subprocess-based
+    # tests (test_live.py, test_integration.py) inherit a populated
+    # registry via the env var below — without this they see an empty
+    # agents file and reject `--agent openai` with `(choose from , all)`.
+    import json as _json_seed
+    tmp_alias_file.write_text(_json_seed.dumps({
+        "version": 2,
+        "agents": {m: {"provider": m, "model": None} for m in AI_LIST},
+        "_migrated_to_agents_v2": True,
+    }))
     monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(tmp_alias_file))
 
     from collections import OrderedDict

@@ -109,7 +109,7 @@ class TestStGenLive:
         )
         out_json = tmp_path / "test_topic.json"
         result = _run(
-            ["st-gen", "--ai", "openai", "--cache", str(prompt)],
+            ["st-gen", "--agent", "openai", "--cache", str(prompt)],
             cwd=str(tmp_path),
         )
         _no_traceback(result)
@@ -126,7 +126,7 @@ class TestStFactLive:
     def test_fact_check_story1_openai(self, pizza):
         """Fact-check story 1 with openai, using cache."""
         result = _run(
-            ["st-fact", "--ai", "openai", "--story", "1", "--cache", str(pizza)],
+            ["st-fact", "--agent", "openai", "--story", "1", "--cache", str(pizza)],
             timeout=300,
         )
         _no_traceback(result)
@@ -218,7 +218,7 @@ class TestStAnalyzeLive:
         # Use xai (reliable, fast) with --cache so re-runs are free
         prompt = pizza.with_suffix(".prompt")
         prompt.write_text("What are the best practices in software development?")
-        result = _run(["st-analyze", "--ai", "xai", "--cache", str(pizza)])
+        result = _run(["st-analyze", "--agent", "xai", "--cache", str(pizza)])
         _no_traceback(result)
         assert result.returncode == 0, f"st-analyze failed:\n{result.stderr}"
 
