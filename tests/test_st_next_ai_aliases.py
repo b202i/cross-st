@@ -41,8 +41,20 @@ def _load_st(monkeypatch, alias_file: Path):
 
 @pytest.fixture
 def alias_file(tmp_path):
+    """Alias file with built-in self-aliases + two user aliases.
+
+    The five bare-make entries mirror what the AGT-2 first-run migration
+    would create on any install with all five provider API keys present.
+    Tests in this module assert the rotation/menu contract over the full
+    set, so we seed them explicitly post-AGT-1 (no auto-seed).
+    """
     f = tmp_path / "cross_ai_models.json"
     f.write_text(json.dumps({
+        "anthropic":        {"make": "anthropic", "model": None},
+        "openai":           {"make": "openai",    "model": None},
+        "xai":              {"make": "xai",       "model": None},
+        "gemini":           {"make": "gemini",    "model": None},
+        "perplexity":       {"make": "perplexity","model": None},
         "anthropic-opus":   {"make": "anthropic", "model": "claude-opus-4-5"},
         "anthropic-sonnet": {"make": "anthropic", "model": "claude-sonnet-4-5"},
     }))

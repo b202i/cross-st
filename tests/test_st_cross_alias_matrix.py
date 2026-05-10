@@ -39,11 +39,21 @@ def _reset_semaphore_registry(st_cross_mod):
 
 @pytest.fixture
 def alias_file(tmp_path, monkeypatch):
-    """Inject a ~/.cross_ai_models.json that defines two same-make aliases."""
+    """Inject a ~/.cross_ai_models.json that defines two same-make aliases.
+
+    Also seeds the bare ``anthropic`` and ``xai`` self-aliases that the
+    AGT-2 first-run migration would create on any real install with the
+    matching API key set.  Several tests in this module resolve the bare
+    make name (``"anthropic"``, ``"xai"``) to verify that aliases sharing
+    a make share a semaphore — that resolution requires the bare name to
+    be defined (cross-ai-core 0.8.0 stopped auto-seeding).
+    """
     path = tmp_path / "cross_ai_models.json"
     path.write_text(json.dumps({
+        "anthropic":        {"make": "anthropic", "model": None},
         "anthropic-opus":   {"make": "anthropic", "model": "claude-opus-4-5"},
         "anthropic-sonnet": {"make": "anthropic", "model": "claude-sonnet-4-5"},
+        "xai":              {"make": "xai",       "model": None},
     }))
     monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(path))
     from cross_ai_core.aliases import reload_aliases

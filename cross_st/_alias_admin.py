@@ -266,28 +266,76 @@ def run_migration_with_notice() -> None:
 # File I/O
 # ─────────────────────────────────────────────────────────────────────────────
 
-def read_alias_file() -> "OrderedDict[str, dict]":
-    """Return the raw alias map from disk, preserving declaration order.
+# Schema constants — kept locally (not imported) so this module stays
+# functional even if cross-ai-core is older than 0.8.0.  They mirror
+# ``cross_ai_core.aliases.SCHEMA_VERSION`` / ``_MIGRATION_MARKER``.
+_SCHEMA_VERSION    = 2
+_MIGRATION_MARKER  = "_migrated_to_agents_v2"
 
-    Missing / empty / malformed file → empty OrderedDict.  Callers that need
-    to *validate* should call :func:`add_alias` (validates) or trust the
-    cross-ai-core registry (validates at load time).
+
+def _read_raw_json() -> "dict | None":
+    """Return parsed JSON for the alias file, or ``None`` if absent/invalid.
+
+    Used by :func:`migrate_to_agents_v2` to inspect the on-disk envelope
+    *before* :func:`read_alias_file` flattens it back to v1 shape.
     """
     path = aliases_file_path()
     if not os.path.isfile(path):
-        return OrderedDict()
+        return None
     try:
         with open(path) as f:
             raw = json.load(f, object_pairs_hook=OrderedDict)
     except (OSError, json.JSONDecodeError):
-        return OrderedDict()
+        return None
     if not isinstance(raw, dict):
-        return OrderedDict()
+        return None
     return raw
+
+
+def _is_v2_envelope(raw: "dict | None") -> bool:
+    return (
+        isinstance(raw, dict)
+        and raw.get("version") == _SCHEMA_VERSION
+        and isinstance(raw.get("agents"), dict)
+    )
+
+
+def read_alias_file() -> "OrderedDict[str, dict]":
+    """Return the raw alias map from disk, flattened to v1 shape.
+
+    Always returns ``{name: {"make": …, "model": …}}`` regardless of
+    whether the file is v1 (legacy flat dict) or v2 (envelope with
+    ``provider``-keyed inner specs).  Existing st-admin / wizard / test
+    code is written against the flat shape, so this method preserves
+    that contract while the new envelope is the on-disk truth.
+
+    Missing / empty / malformed file → empty OrderedDict.
+    """
+    raw = _read_raw_json()
+    if raw is None:
+        return OrderedDict()
+    body = raw["agents"] if _is_v2_envelope(raw) else raw
+    if not isinstance(body, dict):
+        return OrderedDict()
+    out: "OrderedDict[str, dict]" = OrderedDict()
+    for name, spec in body.items():
+        if not isinstance(spec, dict):
+            continue
+        # Inner schema accepts either ``provider`` (v2) or ``make`` (v1);
+        # ``provider`` wins when both are present.
+        make = spec.get("provider", spec.get("make"))
+        if make is None:
+            continue
+        out[name] = {"make": make, "model": spec.get("model")}
+    return out
 
 
 def write_alias_file(data: "dict[str, dict]") -> None:
     """Atomically write *data* to ``~/.cross_ai_models.json`` and reload.
+
+    *data* is the v1 flat shape ``{name: {"make": …, "model": …}}``.
+    On disk this is wrapped in the v2 envelope (``provider`` inner key,
+    ``_migrated_to_agents_v2: True``).
 
     Atomicity: write to a sibling temp file in the same directory, then
     ``os.replace()`` — ensures readers never see a half-written file.
@@ -295,10 +343,17 @@ def write_alias_file(data: "dict[str, dict]") -> None:
     path = aliases_file_path()
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, exist_ok=True)
+    envelope: "OrderedDict[str, object]" = OrderedDict()
+    envelope["version"] = _SCHEMA_VERSION
+    envelope["agents"] = OrderedDict(
+        (name, {"provider": spec["make"], "model": spec.get("model")})
+        for name, spec in data.items()
+    )
+    envelope[_MIGRATION_MARKER] = True
     fd, tmp = tempfile.mkstemp(prefix=".cross_ai_models.", suffix=".tmp", dir=parent)
     try:
         with os.fdopen(fd, "w") as f:
-            json.dump(data, f, indent=2)
+            json.dump(envelope, f, indent=2)
             f.write("\n")
         os.replace(tmp, path)
     except Exception:
@@ -313,6 +368,133 @@ def write_alias_file(data: "dict[str, dict]") -> None:
         reload_aliases()
     except Exception:
         pass  # registry refresh is best-effort; file is already saved
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGT-2 — Agents v2 first-run migration
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Two branches:
+#
+#   1. *Existing v1 file* (cross-st ≤ 0.9.x writes flat dicts) — re-emit it
+#      in the v2 envelope.  No alias names change, no entries are dropped.
+#      Idempotent: subsequent runs see ``_migrated_to_agents_v2: true`` and
+#      do nothing.
+#
+#   2. *Fresh install* (no file at all) — for every provider with an API key
+#      present, seed one starter agent named after the provider, model from
+#      ``cross_ai_core.get_recommended_default(provider)``.  Users get a
+#      working setup on first run without touching ``st-admin``.
+#
+# Either path writes via :func:`write_alias_file`, so the v2 envelope and
+# the reload of the in-process registry happen in one place.
+
+def _migrated_v2_marker_seen() -> bool:
+    """``True`` when the on-disk file is already v2 with the migration marker."""
+    raw = _read_raw_json()
+    return _is_v2_envelope(raw) and bool(raw.get(_MIGRATION_MARKER))
+
+
+def _seed_agents_from_api_keys() -> "OrderedDict[str, dict]":
+    """Build the starter-agent map for fresh installs.
+
+    Inspects ``cross_ai_core.PROVIDER_API_KEY_ENV`` and creates one entry
+    per provider whose API key is set in the environment.  Model ids come
+    from ``get_recommended_default``; ``None`` is left in the spec when no
+    curated default exists (the provider's handler default still applies
+    at call time).
+
+    Returns an empty mapping when no API keys are present — caller
+    interprets that as "fresh install, nothing to do".
+    """
+    try:
+        from cross_ai_core import (
+            PROVIDER_API_KEY_ENV, has_api_key, get_recommended_default,
+        )
+    except ImportError:  # cross-ai-core < 0.8.0 — no Agents v2 support
+        return OrderedDict()
+    seeded: "OrderedDict[str, dict]" = OrderedDict()
+    for provider in PROVIDER_API_KEY_ENV:
+        try:
+            if not has_api_key(provider):
+                continue
+        except Exception:
+            continue
+        try:
+            model = get_recommended_default(provider)
+        except Exception:
+            model = None
+        seeded[provider] = {"make": provider, "model": model}
+    return seeded
+
+
+def migrate_to_agents_v2() -> "tuple[str, list[str]]":
+    """Idempotent first-run migration to the Agents v2 schema.
+
+    Returns ``(action, agent_names)`` where ``action`` is one of:
+
+      * ``"noop"``   — already migrated; nothing changed.
+      * ``"v1_to_v2"`` — existing v1 file re-emitted as a v2 envelope.
+      * ``"seeded"`` — fresh install with API keys; starter agents created.
+      * ``"empty"``  — fresh install, no API keys; nothing written.
+
+    ``agent_names`` lists the names defined after the call (always empty
+    for ``"noop"`` and ``"empty"`` actions).
+
+    All errors are swallowed by the public wrapper
+    :func:`run_agents_v2_migration_with_notice`; this function itself
+    only catches API-availability errors so callers writing custom flows
+    can still see programming mistakes.
+    """
+    if _migrated_v2_marker_seen():
+        return ("noop", [])
+
+    raw = _read_raw_json()
+    if raw is not None:
+        # v1 → v2 — re-emit through write_alias_file (which envelope-wraps).
+        flat = read_alias_file()
+        write_alias_file(flat)
+        return ("v1_to_v2", list(flat.keys()))
+
+    seeded = _seed_agents_from_api_keys()
+    if not seeded:
+        return ("empty", [])
+    write_alias_file(seeded)
+    return ("seeded", list(seeded.keys()))
+
+
+def run_agents_v2_migration_with_notice() -> None:
+    """Run :func:`migrate_to_agents_v2` and print a friendly one-liner.
+
+    Safe to call from ``mmd_startup.load_cross_env()`` — every failure
+    mode is swallowed and reported as a single warning line so the
+    calling ``st-*`` script never crashes mid-startup.
+    """
+    try:
+        action, names = migrate_to_agents_v2()
+    except Exception as exc:  # pragma: no cover — defensive
+        print(
+            f"  ⚠️  Could not migrate agents file to v2: {exc}",
+            flush=True,
+        )
+        return
+    if action == "noop" or action == "empty":
+        return
+    if action == "v1_to_v2":
+        print(
+            "  ✓ Upgraded ~/.cross_ai_models.json to Agents v2 schema "
+            f"({len(names)} agent{'s' if len(names) != 1 else ''} preserved).",
+            flush=True,
+        )
+        return
+    if action == "seeded":
+        agents = ", ".join(names)
+        print(
+            f"  ✓ Created {len(names)} starter agent"
+            f"{'s' if len(names) != 1 else ''} from detected API keys: "
+            f"{agents}. Manage with `st-admin` → AI menu.",
+            flush=True,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

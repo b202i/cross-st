@@ -347,6 +347,27 @@ def _migrate_legacy_ai_models_once() -> None:
         pass  # never break a real command over a one-shot migration
 
 
+def _migrate_to_agents_v2_once() -> None:
+    """AGT-2: ensure the alias file is in Agents v2 shape (best-effort).
+
+    Three paths, all idempotent:
+      * existing v1 file → re-emit as v2 envelope (no entries lost)
+      * fresh install w/ API keys → seed one starter agent per provider
+      * fresh install w/o keys → no-op (user runs ``st-admin --setup``)
+
+    Marker check (``_migrated_to_agents_v2: true`` in the envelope) makes
+    every subsequent startup a fast O(1) read.  Errors are swallowed so a
+    bad agents file cannot break startup of any ``st-*`` script.
+    """
+    try:
+        if _CROSS_ST_DIR not in sys.path:
+            sys.path.insert(0, _CROSS_ST_DIR)
+        from _alias_admin import run_agents_v2_migration_with_notice  # type: ignore
+        run_agents_v2_migration_with_notice()
+    except Exception:
+        pass  # never break a real command over a one-shot migration
+
+
 def _in_project_venv() -> bool:
     """Return True when the running Python executable lives inside _PROJECT_ROOT.
 
@@ -398,3 +419,4 @@ def load_cross_env() -> None:
     check_for_updates()
     check_shadowed_install()
     _migrate_legacy_ai_models_once()
+    _migrate_to_agents_v2_once()

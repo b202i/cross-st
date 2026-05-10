@@ -109,3 +109,65 @@ def pytest_configure(config):
     if config.getoption("--slow") or config.getoption("--live"):
         os.environ.setdefault("MPLBACKEND", "Agg")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGT-2 — session-wide alias-registry seed
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# cross-ai-core 0.8.0 stopped auto-seeding built-in providers as
+# self-aliases (AGT-1a).  Existing cross-st tests were written against the
+# pre-0.8.0 behaviour — many call ``process_prompt("xai", …)`` or look up
+# ``get_aliases()["anthropic"]`` directly.
+#
+# Rather than rewrite every legacy test, this fixture emulates the
+# Agents v2 first-run migration once at session start: it seeds one
+# self-alias per built-in provider into the in-process registry so the
+# legacy lookup contract still holds.
+#
+# Tests that explicitly want an empty registry override
+# ``CROSS_AI_ALIASES_FILE`` to a fresh tmp path and call
+# ``reload_aliases()`` themselves — that wipes the seed for the duration
+# of the test.
+
+@pytest.fixture(autouse=True)
+def _seed_legacy_alias_registry(tmp_path_factory, monkeypatch):
+    """Pre-populate the alias registry with built-in self-aliases.
+
+    Mirrors the cross-ai-core test-suite's session fixture so the
+    pre-0.8.0 ``--ai <make>`` / ``get_aliases()[<make>]`` test patterns
+    keep working without per-test setup.
+
+    Also redirects ``CROSS_AI_ALIASES_FILE`` to a tmp path so the user's
+    real ``~/.cross_ai_models.json`` (which on a developer machine has
+    already been seeded with explicit models like
+    ``{"anthropic": {"provider": "anthropic", "model": "claude-opus-4-5"}}``)
+    cannot leak its model assignments into tests that resolve the bare
+    make name and expect ``model=None`` semantics.
+
+    Tests that override ``CROSS_AI_ALIASES_FILE`` themselves still win —
+    monkeypatch later writes to env vars take precedence.
+    """
+    try:
+        from cross_ai_core.aliases import _AI_ALIASES, AliasSpec
+        from cross_ai_core.ai_handler import AI_LIST
+    except Exception:
+        # cross-ai-core too old for the new symbols — let tests run as-is.
+        yield
+        return
+
+    # Isolate from the developer's real ~/.cross_ai_models.json.
+    tmp_alias_file = tmp_path_factory.mktemp("alias_seed") / "cross_ai_models.json"
+    monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(tmp_alias_file))
+
+    from collections import OrderedDict
+    saved = OrderedDict(_AI_ALIASES)
+    _AI_ALIASES.clear()
+    for make in AI_LIST:
+        _AI_ALIASES[make] = AliasSpec(make=make, model=None)
+    try:
+        yield
+    finally:
+        _AI_ALIASES.clear()
+        _AI_ALIASES.update(saved)
+
+

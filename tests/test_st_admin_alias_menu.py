@@ -47,10 +47,21 @@ from cross_ai_core.aliases import reload_aliases, get_aliases  # noqa: E402
 
 @pytest.fixture
 def isolated_alias_file(tmp_path, monkeypatch):
-    """Redirect the alias JSON file to a temp path; reload the registry."""
+    """Redirect the alias JSON file to a temp path; reload the registry.
+
+    Post-AGT-1 the cross-ai-core registry no longer auto-seeds built-in
+    providers, so this fixture re-seeds them after ``reload_aliases()``
+    to preserve the CST-MM-i test contract (``list_aliases()`` returns
+    one row per built-in self-alias when the file is empty).
+    """
     f = tmp_path / "cross_ai_models.json"
     monkeypatch.setenv("CROSS_AI_ALIASES_FILE", str(f))
     reload_aliases()
+    # Re-seed built-ins so tests written against the pre-AGT-1 contract
+    # (where the registry always exposed every provider) keep passing.
+    from cross_ai_core.aliases import _AI_ALIASES, AliasSpec
+    for make in _alias_admin._builtin_makes():
+        _AI_ALIASES.setdefault(make, AliasSpec(make=make, model=None))
     yield f
     # Reset env var; reload so other tests aren't polluted.
     monkeypatch.delenv("CROSS_AI_ALIASES_FILE", raising=False)
@@ -209,6 +220,12 @@ class TestListAliases:
 
     def test_format_alias_table_renders(self, isolated_alias_file):
         _alias_admin.add_alias("anthropic-opus", "anthropic", "claude-opus-4-5")
+        # add_alias → write_alias_file → reload_aliases() wipes the
+        # built-in seed installed by the fixture.  Re-seed so the table
+        # exercises both the "default" and "custom" Type column branches.
+        from cross_ai_core.aliases import _AI_ALIASES, AliasSpec
+        for make in _alias_admin._builtin_makes():
+            _AI_ALIASES.setdefault(make, AliasSpec(make=make, model=None))
         text = _alias_admin.format_alias_table(_alias_admin.list_aliases())
         assert "Agent" in text and "Provider" in text and "Model" in text
         assert "Type" in text and "Env override" in text
@@ -221,10 +238,21 @@ class TestListAliases:
 # ── CLI flags — invoke st-admin as a subprocess ──────────────────────────────
 
 def _run_st_admin(*args, env_extra=None):
-    """Spawn st-admin in a child process so argparse + sys.exit work normally."""
+    """Spawn st-admin in a child process so argparse + sys.exit work normally.
+
+    Strips every provider's API-key env vars so the AGT-2 first-run
+    migration does not seed unwanted starter agents into the test's tmp
+    alias file (would shadow the asserted post-state).
+    """
     import os
     env = os.environ.copy()
     env["PATH"] = f"{_CROSS_ST}:{env['PATH']}"  # ensure module path
+    # Strip API-key env vars — keeps AGT-2 migration in "empty" branch
+    # so it never writes seeded built-ins into the test's tmp file.
+    from cross_ai_core.keys import PROVIDER_API_KEY_ENV
+    for env_names in PROVIDER_API_KEY_ENV.values():
+        for var in env_names:
+            env.pop(var, None)
     if env_extra:
         env.update(env_extra)
     proc = subprocess.run(
@@ -237,25 +265,45 @@ def _run_st_admin(*args, env_extra=None):
 class TestCliAddAlias:
     def test_happy_path(self, tmp_path):
         f = tmp_path / "aliases.json"
+        # Pre-seed an empty v2 envelope so the AGT-2 migration is a no-op
+        # in the subprocess (otherwise any stray API key reachable via
+        # ~/.crossenv would seed starter agents into the file).
+        f.write_text(json.dumps({
+            "version": 2, "agents": {}, "_migrated_to_agents_v2": True,
+        }))
         proc = _run_st_admin(
             "--add-alias", "anthropic-opus=anthropic:claude-opus-4-5",
             env_extra={"CROSS_AI_ALIASES_FILE": str(f)},
         )
         assert proc.returncode == 0, proc.stderr
         assert "anthropic-opus" in proc.stdout
-        data = json.loads(f.read_text())
+        # On-disk shape is the v2 envelope; flatten via read_alias_file.
+        import os
+        os.environ["CROSS_AI_ALIASES_FILE"] = str(f)
+        try:
+            data = _alias_admin.read_alias_file()
+        finally:
+            del os.environ["CROSS_AI_ALIASES_FILE"]
         assert data == {
             "anthropic-opus": {"make": "anthropic", "model": "claude-opus-4-5"}
         }
 
     def test_no_model_means_handler_default(self, tmp_path):
         f = tmp_path / "aliases.json"
+        f.write_text(json.dumps({
+            "version": 2, "agents": {}, "_migrated_to_agents_v2": True,
+        }))
         proc = _run_st_admin(
             "--add-alias", "fast=xai",
             env_extra={"CROSS_AI_ALIASES_FILE": str(f)},
         )
         assert proc.returncode == 0, proc.stderr
-        data = json.loads(f.read_text())
+        import os
+        os.environ["CROSS_AI_ALIASES_FILE"] = str(f)
+        try:
+            data = _alias_admin.read_alias_file()
+        finally:
+            del os.environ["CROSS_AI_ALIASES_FILE"]
         assert data == {"fast": {"make": "xai", "model": None}}
 
     def test_bad_format_exits_1(self, tmp_path):
@@ -284,12 +332,26 @@ class TestCliRemoveAlias:
             env_extra={"CROSS_AI_ALIASES_FILE": str(f)},
         )
         assert proc.returncode == 0, proc.stderr
-        assert json.loads(f.read_text()) == {}
+        import os
+        os.environ["CROSS_AI_ALIASES_FILE"] = str(f)
+        try:
+            assert _alias_admin.read_alias_file() == {}
+        finally:
+            del os.environ["CROSS_AI_ALIASES_FILE"]
 
     def test_builtin_refused(self, tmp_path):
+        # AGT-2: write an explicit (empty) v2 envelope so the migration is a
+        # no-op and the registry stays empty — otherwise on a developer
+        # machine the legacy ``anthropic`` self-alias has already been
+        # written into the test home dir by a prior test, then loaded into
+        # this subprocess via the real ``CROSS_AI_ALIASES_FILE`` resolution.
+        f = tmp_path / "empty.json"
+        f.write_text(json.dumps({
+            "version": 2, "agents": {}, "_migrated_to_agents_v2": True,
+        }))
         proc = _run_st_admin(
             "--remove-alias", "anthropic",
-            env_extra={"CROSS_AI_ALIASES_FILE": str(tmp_path / "empty.json")},
+            env_extra={"CROSS_AI_ALIASES_FILE": str(f)},
         )
         assert proc.returncode == 1
         assert "built-in" in proc.stderr
