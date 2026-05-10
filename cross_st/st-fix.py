@@ -1122,20 +1122,20 @@ def _save_result(container, file_json, args,
     The AI that produced gen_response is read from gen_response["_make"], which
     process_prompt() stamps automatically.  This means _save_result never needs
     to be told which provider was used — the response is self-describing.
-    Falls back to args.ai if _make is absent (e.g. old containers or empty responses).
+    Falls back to args.agent if _make is absent (e.g. old containers or empty responses).
     """
     container_modified = False
 
     # ── Resolve the AI that produced gen_response ─────────────────────────────
     # gen_response["_make"] is stamped by process_prompt() for all fresh calls.
-    # This separates "which AI wrote this response" from args.ai (the CLI flag),
+    # This separates "which AI wrote this response" from args.agent (the CLI flag),
     # which matters in synthesize mode where the rewriter is the best-story
     # author, not the --ai flag value.
     _gen_make = (
         gen_response.get("_make")
         if isinstance(gen_response, dict)
         else None
-    ) or args.ai
+    ) or args.agent
 
     # ── Data entry (raw generation for audit trail) ───────────────────────────
     # _gen_make must match the AI that produced gen_response — they differ when
@@ -1171,7 +1171,7 @@ def _save_result(container, file_json, args,
     story = {
         "make":     story_make,
         "model":    story_model,
-        "fixed_by": args.ai,
+        "fixed_by": args.agent,
         "fix_mode": args.mode,
         "title":    original_story.get("title", ""),
         "markdown": revised_text,
@@ -1187,7 +1187,7 @@ def _save_result(container, file_json, args,
             "mode":      args.mode,
             "source_s":  args.story,
             "source_f":  args.fact,
-            "rewriter":  args.ai,
+            "rewriter":  args.agent,
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         },
     }
@@ -1221,7 +1221,7 @@ def _save_result(container, file_json, args,
         # ── Before/after comparison ───────────────────────────────────────────
         if (not args.quiet and not skip_after_factcheck
                 and before_fact is not None and story_index is not None):
-            checker_ai = before_fact.get("make", args.ai)
+            checker_ai = before_fact.get("make", args.agent)
             with Spinner(f"  Fact-checking fixed story with {checker_ai}", quiet=False):
                 after_fact = run_after_factcheck(
                     file_json, story_index, checker_ai, args.verbose, args.cache)
@@ -1258,7 +1258,7 @@ Modes:
                         help='Fix strategy (default: iterate)')
     parser.add_argument('json_file', type=str,
                         help='Path to the JSON file', metavar='file.json')
-    parser.add_argument('-a', '--ai', type=str, choices=get_ai_list(), default=None,
+    parser.add_argument('--agent', type=str, choices=get_ai_list(), default=None,
                         help='AI to use for rewriting (default: same AI that wrote the story)')
     parser.add_argument('--checker', type=str, choices=get_ai_list(), default=None,
                         help='AI to use for inline fact-checking in iterate mode '
@@ -1501,7 +1501,7 @@ Modes:
     # the rewriter uses the same model — not just the same make.
     # Fall back to get_default_ai() if the story's AI is not in the registry
     # (e.g. make="url" for fetched stories).
-    if args.ai is None:
+    if args.agent is None:
         ai_list_now = get_ai_list()
         # First, try to find an alias whose resolved (make, model) matches.
         matching_alias = None
@@ -1514,13 +1514,13 @@ Modes:
             except Exception:
                 continue
         if matching_alias is not None:
-            args.ai = matching_alias
+            args.agent = matching_alias
         elif primary_make in ai_list_now:
-            args.ai = primary_make
+            args.agent = primary_make
         else:
-            args.ai = get_default_ai()
+            args.agent = get_default_ai()
         if not args.quiet and args.mode != "synthesize":
-            print(f"  Rewriter: {args.ai} (story author — use -a to override)")
+            print(f"  Rewriter: {args.agent} (story author — use --agent to override)")
 
     # ── Synthesize mode ───────────────────────────────────────────────────────
     if args.mode == "synthesize":
@@ -1555,8 +1555,8 @@ Modes:
             except Exception:
                 continue
         if rewriter_ai is None:
-            rewriter_ai = base_make if base_make in get_ai_list() else args.ai
-        if rewriter_ai != args.ai and not args.quiet:
+            rewriter_ai = base_make if base_make in get_ai_list() else args.agent
+        if rewriter_ai != args.agent and not args.quiet:
             print(f"  Rewriter: {rewriter_ai} (author of best story — overrides --ai)")
 
         # Build ordered list: (make, model, avg_score, text) with stable story index
@@ -1656,8 +1656,8 @@ Modes:
 
                 if is_transient and attempt < MAX_RETRIES:
                     # On first transient failure try --ai fallback before waiting
-                    if active_ai == rewriter_ai and args.ai != rewriter_ai:
-                        active_ai = args.ai
+                    if active_ai == rewriter_ai and args.agent != rewriter_ai:
+                        active_ai = args.agent
                         if not args.quiet:
                             print(f"  Falling back to --ai {active_ai}")
                     else:
@@ -1795,11 +1795,11 @@ Modes:
 
         print()
         print("─" * w)
-        print(f"  DRY RUN — mode: {args.mode}  rewriter: {args.ai}")
+        print(f"  DRY RUN — mode: {args.mode}  rewriter: {args.agent}")
 
         if args.mode == "iterate":
-            checker_ai_dry  = args.checker or fact_obj.get("make") or args.ai
-            writer_pool_dry = [args.ai] + [a for a in get_ai_list() if a != args.ai]
+            checker_ai_dry  = args.checker or fact_obj.get("make") or args.agent
+            writer_pool_dry = [args.agent] + [a for a in get_ai_list() if a != args.agent]
             print(f"  Checker: {checker_ai_dry}  "
                   f"Writers: {', '.join(writer_pool_dry)}")
         elif args.mode == "best-source" and n_stories >= 2:
@@ -1932,10 +1932,10 @@ Modes:
 
     if args.mode == "iterate":
         # Checker AI: use --checker if given, else the same AI that did the fact-check
-        checker_ai = args.checker or fact_obj.get("make") or args.ai
+        checker_ai = args.checker or fact_obj.get("make") or args.agent
 
         # Writer AI pool: --ai first, then all others
-        writer_pool = [args.ai] + [a for a in WRITER_AI_ORDER if a != args.ai]
+        writer_pool = [args.agent] + [a for a in WRITER_AI_ORDER if a != args.agent]
 
         story_before = primary_text
         revised      = primary_text
@@ -2103,7 +2103,7 @@ Modes:
                        + (f"  (batch {b_idx}/{n_batches})" if n_batches > 1 else ""))
             prompt  = get_patch_prompt(revised, batch)
             gen_payload, client, gen_response, fc_ai_model = _call_ai_with_retry(
-                label, args.ai, prompt)
+                label, args.agent, prompt)
             raw = get_content_auto(gen_response)
 
             # Parse the JSON substitution pairs the AI returned
@@ -2174,7 +2174,7 @@ Modes:
             else:
                 prompt = get_best_source_prompt(revised, batch, alternates)
             gen_payload, client, gen_response, fc_ai_model = _call_ai_with_retry(
-                label, args.ai, prompt)
+                label, args.agent, prompt)
             raw  = get_content_auto(gen_response)
             subs = _parse_substitutions(raw)
 

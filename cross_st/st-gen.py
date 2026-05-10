@@ -126,7 +126,7 @@ def main():
     # Define positional argument for prompt file
     parser.add_argument('prompt', nargs='?', type=str,
                         help='Path to the prompt file')
-    parser.add_argument('--ai', type=str, choices=get_ai_list(), default=get_default_ai(),
+    parser.add_argument('--agent', type=str, choices=get_ai_list(), default=get_default_ai(),
                         help=f'Define AI model to use, default is {get_default_ai()}')
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
                         help='Enable API cache, default: enabled')
@@ -172,14 +172,14 @@ def main():
         file_json = file_prefix + ".json"
 
     if not args.quiet:
-        print(f"Generating story from {file_prefix}.prompt, with AI: {args.ai}, outputting to {file_json}")
+        print(f"Generating story from {file_prefix}.prompt, with AI: {args.agent}, outputting to {file_json}")
 
     # Use realpath to get the actual path of the script
     load_cross_env()
 
     _paths_checked = [os.path.expanduser("~/.crossenv"),
                       os.path.join(os.getcwd(), ".env")]
-    if not check_api_key(args.ai, _paths_checked):
+    if not check_api_key(args.agent, _paths_checked):
         sys.exit(1)
 
     gen_response = ""
@@ -191,29 +191,29 @@ def main():
             prompt_from_file = infile.read()
 
         if args.verbose:
-            print(f"Submitting AI request: {args.ai}")
+            print(f"Submitting AI request: {args.agent}")
 
     except FileNotFoundError:
         print(f"Error: The file {file_prompt} was not found.", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"AI: {args.ai}, an error occurred: {e}", file=sys.stderr)
+        print(f"AI: {args.agent}, an error occurred: {e}", file=sys.stderr)
         # TODO manage an error return when called from another script, st-bang
         sys.exit(1)
 
     # Capture timing data for performance analysis
     start_time = time.time()
     try:
-        result = process_prompt(args.ai, prompt_from_file, verbose=args.verbose, use_cache=args.cache)
+        result = process_prompt(args.agent, prompt_from_file, verbose=args.verbose, use_cache=args.cache)
         # Backward-compatible unpacking
         gen_payload, client, gen_response, ai_model = result
         # Access cache status from wrapper
         was_cached = result.was_cached
     except KeyError:
-        print(f"Invalid AI: {args.ai}")
+        print(f"Invalid AI: {args.agent}")
         sys.exit(1)
     except Exception as e:
-        print(f"AI: {args.ai}, cached_response error occurred: {str(e)}")
+        print(f"AI: {args.agent}, cached_response error occurred: {str(e)}")
         sys.exit(1)
     end_time = time.time()
     elapsed_seconds = end_time - start_time
@@ -221,14 +221,14 @@ def main():
     # Guard against empty responses — these can be cached and silently replayed
     content_check = get_content_auto(gen_response)
     if not content_check or not content_check.strip():
-        print(f"Error: {args.ai} returned an empty response — nothing saved.", file=sys.stderr)
+        print(f"Error: {args.agent} returned an empty response — nothing saved.", file=sys.stderr)
         if was_cached:
             print("  This looks like a stale cache entry.  "
                   "Re-run with --no-cache to force a fresh API call.", file=sys.stderr)
         sys.exit(1)
 
     if not args.quiet:
-        print(f"AI response complete: {args.ai}")
+        print(f"AI response complete: {args.agent}")
 
     # Append the new data to the container
     if not os.path.isfile(file_json):
@@ -242,7 +242,7 @@ def main():
             print("Loaded existing container")
 
     # Extract token usage via the centralised handler (provider-agnostic)
-    usage = get_usage(args.ai, gen_response)
+    usage = get_usage(args.agent, gen_response)
     tokens_input  = usage["input_tokens"]
     tokens_output = usage["output_tokens"]
     tokens_total  = usage["total_tokens"]
@@ -264,7 +264,7 @@ def main():
     
     # Combine and restructure data
     data = {
-        "make": args.ai,
+        "make": args.agent,
         "model": ai_model,
         # VRD-10h: forward-compat hook for cross-ai-core multi-model. Read-side
         # (e.g. score_authors) currently INFERS role from container shape, so
@@ -285,12 +285,12 @@ def main():
     # the same provider+prompt — it has real timing data that would be lost.
     if was_cached:
         for index, existing_data in enumerate(main_container["data"], start=1):
-            if (existing_data.get("make") == args.ai
+            if (existing_data.get("make") == args.agent
                     and not existing_data.get("timing", {}).get("cached", False)
                     and existing_data.get("prompt", "").strip() == prompt_from_file.strip()):
                 duplicate_index = index
                 if not args.quiet:
-                    print(f"Non-cached entry already exists for {args.ai} — keeping original timing")
+                    print(f"Non-cached entry already exists for {args.agent} — keeping original timing")
                 break
 
     if duplicate_index is None:
@@ -321,9 +321,9 @@ def main():
     # otherwise use the last one on the list
     if duplicate_index is not None:
         data_select = duplicate_index
-        print(f"App complete, AI: {args.ai}, duplicate detected, no changes: {file_json}")
+        print(f"App complete, AI: {args.agent}, duplicate detected, no changes: {file_json}")
     else:
-        print(f"App complete, AI: {args.ai}, container updated: {file_json}")
+        print(f"App complete, AI: {args.agent}, container updated: {file_json}")
 
     if args.prep or args.bang >= 0:
         bang_param = ""
@@ -349,7 +349,7 @@ def main():
                 story_title = _last.get("title", "")
         except Exception:
             pass
-        _run_story_ai_content(args, story_text, story_title, args.ai)
+        _run_story_ai_content(args, story_text, story_title, args.agent)
 
 
 if __name__ == "__main__":

@@ -328,7 +328,7 @@ def main():
                         help='Path to the JSON file', metavar='file.json')
     parser.add_argument('--all', action='store_true',
                         help='Fact check all stories in container')
-    parser.add_argument('--ai', type=str, default=get_default_ai(),
+    parser.add_argument('--agent', type=str, default=get_default_ai(),
                         help=f'AI to use, or "all" to run all AIs in parallel '
                              f'(default: {get_default_ai()})')
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
@@ -389,8 +389,8 @@ def main():
 
     # ── Validate --ai choice ──────────────────────────────────────────────────
     ai_list = get_ai_list()
-    if args.ai != "all" and args.ai not in ai_list:
-        parser.error(f"argument --ai: invalid choice: '{args.ai}' "
+    if args.agent != "all" and args.agent not in ai_list:
+        parser.error(f"argument --ai: invalid choice: '{args.agent}' "
                      f"(choose from {', '.join(ai_list)}, all)")
 
     # ── --ai-review / --ai-* flags removed in cross-st 0.7.0 (VRD-5) ─────────
@@ -398,7 +398,7 @@ def main():
     # parse_args() runs (see _REMOVED_AI_FLAGS check above).
 
     # ── --ai all: spawn one st-fact per AI in parallel, show live table ───────
-    if args.ai == "all":
+    if args.agent == "all":
         _run_all_parallel(args, ai_list)
         return
 
@@ -408,7 +408,7 @@ def main():
 
     file_prefix = args.json_file.rsplit('.', 1)[0]
     file_json = file_prefix + ".json"
-    ai_tag = get_ai_tag_mini(args.ai)
+    ai_tag = get_ai_tag_mini(args.agent)
 
 
     try:
@@ -492,7 +492,7 @@ def main():
                 f"\n  Story {story_index}/{len(main_container['story'])}"
                 f" — {make} {model}"
                 f"  ·  {total_para} segment{'s' if total_para != 1 else ''}"
-                f"  ·  fact-check by {args.ai}"
+                f"  ·  fact-check by {args.agent}"
                 f"   ({_done_so_far}/{_n_to_do} this run)",
                 flush=True,
             )
@@ -503,7 +503,7 @@ def main():
         # Lives in project-root tmp/  e.g. tmp/story__shang__yubikey_2fa_s1_openai.progress
         progress_file = None
         if args.silent:
-            progress_file = str(progress_file_path(file_prefix, story_index, args.ai))
+            progress_file = str(progress_file_path(file_prefix, story_index, args.agent))
 
         overall_tally = Counter()
         structured_claims: list[dict] = []   # populated per-segment, stored in fact["claims"]
@@ -520,7 +520,7 @@ def main():
 
         # ── Step 2: iterate segments, call AI, collect structured results ─────
         for n, seg in enumerate(tqdm(segments,
-                                     desc=f"  {args.ai} fact-checking story {story_index}",
+                                     desc=f"  {args.agent} fact-checking story {story_index}",
                                      ncols=80,
                                      disable=args.silent)):
 
@@ -543,7 +543,7 @@ def main():
             try:
                 if args.timeout > 0:
                     future = _timeout_executor.submit(
-                        process_prompt, args.ai, prompt,
+                        process_prompt, args.agent, prompt,
                         verbose=args.verbose, use_cache=args.cache,
                         retry_budget=_retry_budget,
                     )
@@ -551,7 +551,7 @@ def main():
                     gen_payload, client, response, ai_model = result
                     was_cached = result.was_cached
                 else:
-                    result = process_prompt(args.ai, prompt, verbose=args.verbose, use_cache=args.cache, retry_budget=_retry_budget)
+                    result = process_prompt(args.agent, prompt, verbose=args.verbose, use_cache=args.cache, retry_budget=_retry_budget)
                     gen_payload, client, response, ai_model = result
                     was_cached = result.was_cached
                 
@@ -564,7 +564,7 @@ def main():
                 else:
                     n_fresh += 1
                     fresh_elapsed_accum += seg_elapsed
-                    seg_usage = get_usage(args.ai, response)
+                    seg_usage = get_usage(args.agent, response)
                     total_tokens_input  += seg_usage["input_tokens"]
                     total_tokens_output += seg_usage["output_tokens"]
                     total_tokens_total  += seg_usage["total_tokens"]
@@ -704,8 +704,8 @@ def main():
             "summary": report_summary,
             "counts":  fact_check_counts,
             "score":   fact_check_score,
-            "make":    get_ai_make(args.ai),
-            "model":   get_ai_model(args.ai),
+            "make":    get_ai_make(args.agent),
+            "model":   get_ai_model(args.agent),
             # VRD-10h: fact[] entries are always "evaluator" — they record
             # one AI's verdict on another AI's authored story. Read-side code
             # has historically inferred this from container shape; the

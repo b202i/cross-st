@@ -257,7 +257,7 @@ def main():
         description='Analyze cross product-data. Produce a new data item and a new story item.')
     parser.add_argument('json_file', type=str,
                         help='Path to the JSON file', metavar='file.json')
-    parser.add_argument('--ai', type=str, choices=get_ai_list(), default=get_default_ai(),
+    parser.add_argument('--agent', type=str, choices=get_ai_list(), default=get_default_ai(),
                         help=f'Define AI to use, default is {get_default_ai()}')
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
                         help='Enable API cache, default: enabled')
@@ -359,13 +359,13 @@ def main():
 
     def _run_prompt():
         try:
-            _result["value"] = process_prompt(args.ai, prompt, verbose=args.verbose, use_cache=args.cache)
+            _result["value"] = process_prompt(args.agent, prompt, verbose=args.verbose, use_cache=args.cache)
         except Exception as e:
             _exc.append(e)
 
-    ai_model_name = get_ai_model(args.ai)
+    ai_model_name = get_ai_model(args.agent)
     if not args.quiet:
-        print(f"  Generating analysis report: {args.ai} / {ai_model_name}")
+        print(f"  Generating analysis report: {args.agent} / {ai_model_name}")
 
     _thread = threading.Thread(target=_run_prompt, daemon=True)
     _t0 = time.time()
@@ -382,7 +382,7 @@ def main():
             time.sleep(0.1)
         elapsed = time.time() - _t0
         mins, secs = divmod(int(elapsed), 60)
-        print(f"\r  ✓  {mins:02d}:{secs:02d}  ({args.ai})", flush=True)
+        print(f"\r  ✓  {mins:02d}:{secs:02d}  ({args.agent})", flush=True)
     else:
         _thread.join()
 
@@ -398,8 +398,8 @@ def main():
     # Append (if unique) the data to the json container,
     # and append (if unique) the story to the json container.
     data = {
-        "make": args.ai,
-        "model": get_ai_model(args.ai),
+        "make": args.agent,
+        "model": get_ai_model(args.agent),
         "prompt": prompt,
         "gen_payload": gen_payload,
         "gen_response": response,
@@ -425,7 +425,7 @@ def main():
             print("Added new analysis data")
 
     all_raw_story_text = get_content_auto(response)
-    make = args.ai
+    make = args.agent
     model = get_ai_model(make)
 
     # Massage select raw data into a publishable story
@@ -550,7 +550,7 @@ def main():
 
     # ── AI content generation (appended after analysis) ──────────────────────
     if args.ai_title or args.ai_short or args.ai_caption or args.ai_summary or args.ai_story:
-        _run_story_ai_content(args, story.get("text", ""), story.get("title", ""), args.ai)
+        _run_story_ai_content(args, story.get("text", ""), story.get("title", ""), args.agent)
 
 
 if __name__ == "__main__":

@@ -794,7 +794,7 @@ def main():
         epilog='AI Content Options: Generate analysis in various formats (--ai-title, --ai-short, --ai-caption, --ai-summary, --ai-story)')
     parser.add_argument('json_file', type=str, nargs='+',
                         help='Path to JSON file(s)', metavar='file.json')
-    parser.add_argument('--ai', type=str, default=None,
+    parser.add_argument('--agent', type=str, default=None,
                         help='AI to use for content generation (default: auto). When used with --ai-* flags, '
                              'selects which AI generates the content but does NOT filter the performance display. '
                              'Without --ai-* flags, also filters the performance display to one provider.')
@@ -851,7 +851,7 @@ def main():
         sys.exit(1)
     
     # Get AI for content generation
-    content_ai = args.ai if args.ai else get_default_ai()
+    content_ai = args.agent if args.agent else get_default_ai()
     
     # Load .env file for API keys (same as st-gen, st-fact, etc.)
     load_cross_env()
@@ -886,7 +886,7 @@ def main():
             # When --ai is paired with an --ai-* content flag, it selects the generation
             # AI only — do NOT filter the performance display (show all providers).
             # When --ai is used alone (no content flag), it filters the display as before.
-            display_filter = args.ai if not content_types else None
+            display_filter = args.agent if not content_types else None
 
             # Generation summary (filtered for display)
             gen_summary_display = summarize_generation(gen_data, display_filter)
@@ -979,12 +979,12 @@ def main():
             print("=" * 70)
         
         # Aggregate analysis
-        gen_summary = summarize_generation(all_gen_data, args.ai)
+        gen_summary = summarize_generation(all_gen_data, args.agent)
         if gen_summary:
             print("\nAggregate Story Generation:")
             print(tabulate(gen_summary, headers="keys", tablefmt="simple"))
         
-        fact_summary = summarize_fact_checks(all_fact_data, args.ai)
+        fact_summary = summarize_fact_checks(all_fact_data, args.agent)
         if fact_summary:
             print("\nAggregate Fact-Checking:")
             print(tabulate(fact_summary, headers="keys", tablefmt="simple"))

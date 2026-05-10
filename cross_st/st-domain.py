@@ -277,7 +277,7 @@ def main():
                         help="Domain slug (snake_case, e.g. supply_chain)")
     parser.add_argument("--dir", type=str, default=DEFAULT_OUTPUT_DIR, metavar="DIR",
                         help=f"Output directory  (default: {DEFAULT_OUTPUT_DIR})")
-    parser.add_argument("--ai", type=str, default=None, metavar="NAME",
+    parser.add_argument("--agent", type=str, default=None, metavar="NAME",
                         help="AI provider for suggestions + smoke-test  "
                              f"(default: {get_default_ai()})")
     parser.add_argument("--n-claims", type=int, default=DEFAULT_N_CLAIMS,
@@ -293,7 +293,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args    = parser.parse_args()
-    ai_make = args.ai or get_default_ai()
+    ai_make = args.agent or get_default_ai()
 
     print()
     print(_clr("══ Cross-Stones Domain Creator ════════════════════════════════════", BOLD, CYAN))

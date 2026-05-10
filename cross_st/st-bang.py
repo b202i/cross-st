@@ -161,7 +161,7 @@ def main():
                     'merge results, and optionally produce a master merged story.')
     parser.add_argument('prompt', nargs='?', type=str,
                         help='Path to the prompt file (e.g. subject.prompt)')
-    parser.add_argument('--ai', type=str, choices=get_ai_list(), default=get_default_ai(),
+    parser.add_argument('--agent', type=str, choices=get_ai_list(), default=get_default_ai(),
                         help=f'AI to use for the optional merge step (default: {get_default_ai()})')
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
                         help='Enable API cache (default: enabled)')
@@ -531,8 +531,8 @@ def main():
         if not args.quiet:
             print(f"\n  Running st-merge on {file_json} ({n_stories} stories) …")
         cmd = ["st-merge"]
-        if args.ai:
-            cmd.extend(["--ai", args.ai])
+        if args.agent:
+            cmd.extend(["--agent", args.agent])
         if cache_flag:    cmd.append(cache_flag)
         if verbose_flag:  cmd.append(verbose_flag)
         if quiet_flag:    cmd.append(quiet_flag)

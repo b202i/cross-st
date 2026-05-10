@@ -264,7 +264,7 @@ def main():
 
     # AI content generation
     ai_group = parser.add_argument_group('AI content generation')
-    ai_group.add_argument('--ai', type=str, default=None,
+    ai_group.add_argument('--agent', type=str, default=None,
                           help='AI provider for content generation (default: uses DEFAULT_AI)')
     ai_group.add_argument('--ai-title', action='store_true',
                           help='Generate a short title (max 10 words) → stdout')
@@ -447,7 +447,7 @@ def main():
     elif args.ai_story:   ai_content_type = "story"
 
     if ai_content_type:
-        ai_make = args.ai or get_default_ai()
+        ai_make = args.agent or get_default_ai()
         label = {
             "title":   "Title",
             "short":   "Short Summary",

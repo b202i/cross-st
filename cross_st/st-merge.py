@@ -512,7 +512,7 @@ def main():
         description='Merge multiple stories/reports into a master story/report')
     parser.add_argument('json_file', type=str,
                         help='Path to the JSON file', metavar='file.json')
-    parser.add_argument('--ai', type=str, choices=get_ai_list(), default=get_default_ai(),
+    parser.add_argument('--agent', type=str, choices=get_ai_list(), default=get_default_ai(),
                         help=f'Synthesizer AI for simple mode. In quality mode the base '
                              f'story author is always used. Default: {get_default_ai()}')
     parser.add_argument('--cache', dest='cache', action='store_true', default=True,
@@ -706,12 +706,12 @@ def main():
         base_entry = next(s for si, s in stories_with_indices if si == base_story_i)
         base_make  = base_entry.get("make")
         if base_make and base_make in get_ai_list():
-            if args.ai != base_make and not args.quiet:
+            if args.agent != base_make and not args.quiet:
                 print(f"  Synthesizer: {base_make} (base story author — overrides --ai in quality mode)")
-            args.ai = base_make
+            args.agent = base_make
         else:
             if not args.quiet:
-                print(f"  Synthesizer: {args.ai} (base story make '{base_make}' not in AI list — using default)")
+                print(f"  Synthesizer: {args.agent} (base story make '{base_make}' not in AI list — using default)")
 
     # ── Load original prompt for context ─────────────────────────────────────
     context_prompt = ""
@@ -735,7 +735,7 @@ def main():
                 print(f"\n  Building verdict-annotated prompt (Phase 2)…")
             prompt, weak_count = get_quality_prompt_v2(
                 stories_with_indices, base_story_i,
-                context_prompt, args.ai, args.verbose, args.cache
+                context_prompt, args.agent, args.verbose, args.cache
             )
             if not args.quiet:
                 print(f"  Weak segments replaced/flagged: {weak_count}")
@@ -749,10 +749,10 @@ def main():
         merge_credit += ":simple"
 
     if not args.quiet:
-        print(f"\n  Calling {args.ai} to synthesize {len(reports)} stories…", end='', flush=True)
+        print(f"\n  Calling {args.agent} to synthesize {len(reports)} stories…", end='', flush=True)
 
     gen_payload, client, response, ai_model = (
-        process_prompt(args.ai, prompt, verbose=args.verbose, use_cache=args.cache))
+        process_prompt(args.agent, prompt, verbose=args.verbose, use_cache=args.cache))
 
     if not args.quiet:
         print(f" ✓")
@@ -760,8 +760,8 @@ def main():
 
     # ── Build data entry ──────────────────────────────────────────────────────
     data = {
-        "make": args.ai,
-        "model": get_ai_model(args.ai),
+        "make": args.agent,
+        "model": get_ai_model(args.agent),
         "prompt": prompt,
         "gen_payload": gen_payload,
         "gen_response": response,
@@ -789,7 +789,7 @@ def main():
 
     # ── Build story entry ─────────────────────────────────────────────────────
     all_raw_story_text = get_content_auto(response)
-    make = args.ai
+    make = args.agent
     model = get_ai_model(make)
 
     file_md_content = remove_story_break(all_raw_story_text)
@@ -937,7 +937,7 @@ def main():
     if args.ai_title or args.ai_short or args.ai_caption or args.ai_summary or args.ai_story:
         if container_modified:
             _run_story_ai_content(
-                args, story.get("text", ""), story.get("title", ""), args.ai)
+                args, story.get("text", ""), story.get("title", ""), args.agent)
         else:
             if not args.quiet:
                 print("  (AI content skipped — no new story was added)")

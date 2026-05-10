@@ -107,7 +107,7 @@ def main():
                         help='Template to use')
     parser.add_argument('-g', '--gen', action='store_true', default=False,
                         help='Run st-gen (+ st-prep) automatically after editing')
-    parser.add_argument('--ai', type=str, choices=get_ai_list(), default=get_default_ai(),
+    parser.add_argument('--agent', type=str, choices=get_ai_list(), default=get_default_ai(),
                         help=f'AI provider for --gen (default: {get_default_ai()})')
     parser.add_argument('-b', '--bang', action='store_true', default=False,
                         help='Start "st-bang" app after editing, render with all AI. '
@@ -172,8 +172,8 @@ def main():
 
         if args.gen:
             if not args.quiet:
-                print(f"Running st-gen --ai {args.ai} {file_prompt}")
-            subprocess.run(["st-gen", "--ai", args.ai, file_prompt])
+                print(f"Running st-gen --ai {args.agent} {file_prompt}")
+            subprocess.run(["st-gen", "--agent", args.agent, file_prompt])
             sys.exit(0)
 
         if args.st:

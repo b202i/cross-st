@@ -1023,7 +1023,7 @@ def main():
                           help='Generate a concise summary (120–200 words) → stdout')
     ai_group.add_argument('--ai-story',   action='store_true',
                           help='Generate a comprehensive story (800–1200 words) → stdout')
-    ai_group.add_argument('--ai', type=str, default=None,
+    ai_group.add_argument('--agent', type=str, default=None,
                           help=f'AI to use for content generation (default: {get_default_ai()})')
 
     lens_group = parser.add_argument_group('What-is lens (focused claim breakdown — VRD-1/3/6)')
@@ -1219,7 +1219,7 @@ def main():
 
     # ── Start AI generation in background threads ────────────────────────────
     if ai_requested:
-        content_ai = args.ai or get_default_ai()
+        content_ai = args.agent or get_default_ai()
         content_type_map = [
             (args.ai_title,   "title",   "Title"),
             (args.ai_short,   "short",   "Short Caption"),
