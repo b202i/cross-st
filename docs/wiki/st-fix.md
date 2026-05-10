@@ -8,7 +8,7 @@ exactly as the AI wrote it.
 
 **Related:** [st-fact](st-fact.md)  [st-merge](st-merge.md)  [st-post](st-post.md)  [Multi-Model](Multi-Model)
 
-> **Multi-model (0.9.0+):** when `--agent` is omitted, `st-fix` defaults the rewriter to the alias whose `(make, model)` matches the source story — an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. See [Multi-Model](Multi-Model).
+> **Multi-model (0.9.0+):** when `--agent` is omitted, `st-fix` defaults the rewriter to the agent whose `(make, model)` matches the source story — an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. See [Multi-Model](Multi-Model).
 
 ---
 

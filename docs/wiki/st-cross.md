@@ -11,7 +11,7 @@ Runs the full research pipeline in one command: generates a report from every AI
 
 **Related:** [st-bang](st-bang)  [st-fact](st-fact)  [st-heatmap](st-heatmap)  [st-verdict](st-verdict)  [Multi-Model](Multi-Model)
 
-> **Multi-model (0.9.0+):** `--agent` accepts aliases defined in `~/.cross_ai_models.json` — e.g. `--agent anthropic-opus` runs Opus alongside the bare `--agent anthropic` default. Same-make aliases share one rate-limit semaphore. See [Multi-Model](Multi-Model).
+> **Multi-model (0.9.0+):** `--agent` accepts agents defined in `~/.cross_ai_models.json` — e.g. `--agent anthropic-opus` runs Opus alongside the bare `--agent anthropic` default. Same-make agents share one rate-limit semaphore. See [Multi-Model](Multi-Model).
 
 ---
 

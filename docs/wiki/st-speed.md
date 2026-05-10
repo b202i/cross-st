@@ -7,7 +7,7 @@ fact-checking throughput, and consistency. Useful for choosing a provider when s
 
 **Related:** [st-stones](st-stones)  [st-cross](st-cross)  [st-heatmap](st-heatmap)  [Multi-Model](Multi-Model)
 
-> **Multi-model (0.9.0+):** when same-make aliases (e.g. `anthropic-opus` and `anthropic-sonnet`) appear in a container, `st-speed` shows one row per alias with `make:model` labels for disambiguation. See [Multi-Model](Multi-Model).
+> **Multi-model (0.9.0+):** when same-make agents (e.g. `anthropic-opus` and `anthropic-sonnet`) appear in a container, `st-speed` shows one row per agent with `make:model` labels for disambiguation. See [Multi-Model](Multi-Model).
 
 ---
 

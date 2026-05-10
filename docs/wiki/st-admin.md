@@ -16,10 +16,10 @@ st-admin --show                 # print current config
 st-admin --version              # print installed version
 st-admin --get-default-ai       # print current default agent
 st-admin --set-default-ai NAME  # switch default agent (e.g. gemini, anthropic-opus)
-st-admin --list-aliases         # table of every agent → provider · model
-st-admin --add-alias NAME=PROVIDER:MODEL    # e.g. anthropic-opus=anthropic:claude-opus-4-5
-st-admin --add-alias NAME=PROVIDER          # uses provider's recommended model
-st-admin --remove-alias NAME    # remove a custom agent
+st-admin --list-agents         # table of every agent → provider · model
+st-admin --add-agent NAME=PROVIDER:MODEL    # e.g. anthropic-opus=anthropic:claude-opus-4-5
+st-admin --add-agent NAME=PROVIDER          # uses provider's recommended model
+st-admin --remove-agent NAME    # remove a custom agent
 st-admin --set-tts-voice VOICE  # set TTS voice string (written to TTS_VOICE)
 st-admin --set-template NAME    # set default prompt template name
 st-admin --set-editor NAME      # set editor (written to EDITOR)
@@ -135,7 +135,7 @@ st-gen --agent anthropic my_topic.json   # one-off, doesn't change your default
 
 ---
 
-## AI providers, models and aliases — what each word means
+## AI providers, models and agents — what each word means
 
 Three terms come up everywhere in `st-admin`'s AI menu.  They are easy to mix
 up because they overlap by default:
@@ -144,27 +144,28 @@ up because they overlap by default:
 |------|-----------|---------|
 | **Provider** | The AI company hosting the model. | `anthropic`, `openai`, `xai`, `gemini`, `perplexity` |
 | **Model** | A specific LLM that provider sells. New ones ship every few months; older ones are eventually retired. | `claude-opus-4-5`, `gpt-4o`, `grok-4-1-fast-reasoning` |
-| **Alias** | A short nickname **you** type in `--agent` or that `st` cycles through. Each alias is a fixed `(provider, model)` pair. | `anthropic`, `anthropic-opus`, `gemini-fast` |
+| **Agent** | A short nickname **you** type in `--agent` or that `st` cycles through. Each agent is a fixed `(provider, model)` pair. | `anthropic`, `anthropic-opus`, `gemini-fast` |
 
-**You always get one alias per provider for free** — its name is the provider's
-name (e.g. `anthropic`) and it points at that provider's recommended model.
-These are tagged **`default`** in the alias table.  You don't have to do
-anything to use them — they appear the moment you have an API key set up.
+**One starter agent per detected API key** is created on first run by the AGT-2
+migration — its name matches the provider (e.g. `anthropic`) and it points at
+that provider's recommended model. These appear tagged **`default`** in the
+agent table. (All agents — default or custom — call the provider's API at the
+provider's regular rate; nothing here is "free".)
 
-You can **add custom aliases** when you want to pin a specific model, switch
+You can **add custom agents** when you want to pin a specific model, switch
 providers without changing your scripts, or run two models from the same
 provider side by side (e.g. `anthropic-opus` vs `anthropic-haiku`).  Custom
-aliases are tagged **`custom`** in the table and live in
+agents are tagged **`custom`** in the table and live in
 `~/.cross_ai_models.json` (one JSON file you can also edit by hand).
 
 ### Looking at what you have
 
 ```bash
-st-admin             # then press 'a' (AI)  →  'M' (View aliases)
+st-admin             # then press 'a' (AI)  →  'M' (View agents)
 ```
 
 ```
-  Alias           Provider    Model                                          Type     Env override
+  Agent           Provider    Model                                          Type     Env override
   ──────────────  ──────────  ─────────────────────────────────────────────  ───────  ────────────
   xai             xai         grok-4-1-fast-reasoning  (provider default)    default  —
   anthropic       anthropic   claude-opus-4-5  (provider default)            default  —
@@ -175,11 +176,12 @@ st-admin             # then press 'a' (AI)  →  'M' (View aliases)
   Legend:
     Provider  = the AI company (anthropic, openai, xai, gemini, perplexity)
     Model     = a specific LLM that provider hosts (e.g. claude-opus-4-5)
-    Alias     = the short name you pass to --agent or that st cycles through;
-                each alias is a (provider, model) pair.
-    Type      = 'default' means an alias you got for free (one per provider,
-                same name as the provider, uses the provider's recommended
-                model);  'custom' means an alias you added yourself.
+    Agent     = the short name you pass to --agent or that st cycles through;
+                each agent is a (provider, model) pair.
+    Type      = 'default' means a starter agent created by AGT-2 (one per
+                provider with an API key, named like the provider, pointing
+                at the provider's recommended model);  'custom' means an
+                agent you added yourself.
 
   File: /Users/you/.cross_ai_models.json
 ```
@@ -193,7 +195,7 @@ st-admin             # then 'a' (AI)  →  'd' (View / set default)
 ```
   Current default AI: [openai]  →  openai · gpt-4o  (provider default)
 
-  Available aliases (default = recommended model):
+  Available agents (default = recommended model):
     xai             →  xai         grok-4-1-fast-reasoning  (provider default)
     anthropic       →  anthropic   claude-opus-4-5  (provider default)
     openai          →  openai      gpt-4o  (provider default) ←
@@ -201,25 +203,25 @@ st-admin             # then 'a' (AI)  →  'd' (View / set default)
     gemini          →  gemini      gemini-2.5-flash  (provider default)
     anthropic-opus  →  anthropic   claude-opus-4-5
 
-  Type alias name to switch (blank = keep current):
+  Type agent name to switch (blank = keep current):
 ```
 
-The arrow ←  marks the current default.  Type any alias name to switch — the
+The arrow ←  marks the current default.  Type any agent name to switch — the
 choice is written to `DEFAULT_AGENT` in `~/.crossenv` and takes effect on the
 next command.
 
-### Adding a custom alias
+### Adding a custom agent
 
-The new-alias wizard does live model discovery against the provider's API,
+The new-agent wizard does live model discovery against the provider's API,
 so you always pick from the models your key can actually reach.
 
 ```bash
-st-admin             # then 'a' (AI)  →  'm' (Manage aliases)  →  'a' (Add)
+st-admin             # then 'a' (AI)  →  'm' (Manage agents)  →  'a' (Add)
 ```
 
 ```
-  Add a new AI alias.
-  Alias name (e.g. anthropic-opus, blank to cancel): anthropic-haiku
+  Add a new AI agent.
+  Agent name (e.g. anthropic-opus, blank to cancel): anthropic-haiku
     1. anthropic
     2. openai
     3. xai
@@ -238,7 +240,7 @@ st-admin             # then 'a' (AI)  →  'm' (Manage aliases)  →  'a' (Add)
     Or type any model id directly.
   Choice (blank to cancel): 4
 
-  Confirm: alias 'anthropic-haiku' → anthropic · claude-3-5-haiku-latest
+  Confirm: agent 'anthropic-haiku' → anthropic · claude-3-5-haiku-latest
   Save? [Y/n]: y
   ✓  Written to /Users/you/.cross_ai_models.json
 ```
@@ -250,10 +252,10 @@ preview or undocumented model names.
 Equivalent non-interactive form:
 
 ```bash
-st-admin --add-alias anthropic-haiku=anthropic:claude-3-5-haiku-latest
-st-admin --add-alias anthropic-default=anthropic         # use provider default
-st-admin --remove-alias anthropic-haiku
-st-admin --list-aliases
+st-admin --add-agent anthropic-haiku=anthropic:claude-3-5-haiku-latest
+st-admin --add-agent anthropic-default=anthropic         # use provider default
+st-admin --remove-agent anthropic-haiku
+st-admin --list-agents
 ```
 
 ### Refreshing the model list
@@ -280,16 +282,16 @@ This calls every provider's list-models endpoint and rewrites the cache:
 
 ### Per-shell model overrides (advanced)
 
-Two environment variables let you override what a given alias resolves to
+Two environment variables let you override what a given agent resolves to
 without editing the JSON file or `~/.crossenv` — useful for one-off tests
 in a single shell:
 
 | Variable | Effect |
 |----------|--------|
-| `<ALIAS_UPPER>_MODEL` (e.g. `ANTHROPIC_OPUS_MODEL=claude-opus-future`) | Overrides this one alias only. |
-| `<PROVIDER_UPPER>_MODEL` (e.g. `ANTHROPIC_MODEL=claude-3-5-haiku-latest`) | Overrides every alias that points at this provider unless the alias has its own var. |
+| `<ALIAS_UPPER>_MODEL` (e.g. `ANTHROPIC_OPUS_MODEL=claude-opus-future`) | Overrides this one agent only. |
+| `<PROVIDER_UPPER>_MODEL` (e.g. `ANTHROPIC_MODEL=claude-3-5-haiku-latest`) | Overrides every agent that points at this provider unless the agent has its own var. |
 
-When either is active, the View-aliases table shows the variable name in the
+When either is active, the View-agents table shows the variable name in the
 **Env override** column instead of `—`.
 
 ---

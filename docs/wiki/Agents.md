@@ -59,16 +59,16 @@ For backward compatibility, cross-ai-core 0.8.0+ also reads the legacy `DEFAULT_
 ### A. Two Anthropic models in the same matrix
 
 ```bash
-st-admin --add-alias anthropic-opus=anthropic:claude-opus-4-5
-st-admin --add-alias anthropic-sonnet=anthropic:claude-sonnet-4-5
+st-admin --add-agent anthropic-opus=anthropic:claude-opus-4-5
+st-admin --add-agent anthropic-sonnet=anthropic:claude-sonnet-4-5
 st-cross prompt.txt   # matrix now includes both as separate columns
 ```
 
 ### B. Personal "quick / deep" pair
 
 ```bash
-st-admin --add-alias quick=gemini:gemini-2.5-flash
-st-admin --add-alias deep=anthropic:claude-opus-4-5
+st-admin --add-agent quick=gemini:gemini-2.5-flash
+st-admin --add-agent deep=anthropic:claude-opus-4-5
 
 st-gen --agent quick blog.prompt   # cheap first draft
 st-fix --agent deep  blog.json     # high-quality rewrite
@@ -77,7 +77,7 @@ st-fix --agent deep  blog.json     # high-quality rewrite
 ### C. Listing what's configured
 
 ```bash
-st-admin --list-aliases
+st-admin --list-agents
 ```
 
 Or interactively: `st-admin` → `a` → `M`.

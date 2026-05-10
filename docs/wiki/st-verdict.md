@@ -4,7 +4,7 @@ Reads fact-check data from a container and produces two outputs: a **stacked bar
 
 **Run after:** `st-fact`  `st-cross`
 
-> **Multi-model (0.9.0+):** when same-make aliases author distinct stories in the same container, the chart and `score_authors()` rank each alias as a separate author (Opus and Sonnet rated independently). See [Multi-Model](Multi-Model).
+> **Multi-model (0.9.0+):** when same-make agents author distinct stories in the same container, the chart and `score_authors()` rank each agent as a separate author (Opus and Sonnet rated independently). See [Multi-Model](Multi-Model).
 
 ![st-verdict workflow](st-verdict-flow.svg)
 
