@@ -11,7 +11,7 @@ Usage:
     st-domain                                      # fully interactive
     st-domain --name supply_chain                  # pre-fill slug
     st-domain --dir my_domains/                    # output dir (default: cross_stones/domains/)
-    st-domain --ai anthropic                       # AI for suggestions + smoke-test
+    st-domain --agent anthropic                       # AI for suggestions + smoke-test
     st-domain --n-claims 10                        # claims per domain (default: 10)
     st-domain --no-smoketest                       # skip Phase 4 validation
     st-domain --set cross_stones/cross-stones-10.json  # add to a named benchmark set

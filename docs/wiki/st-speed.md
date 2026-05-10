@@ -15,8 +15,8 @@ fact-checking throughput, and consistency. Useful for choosing a provider when s
 
 ```
 st-speed report.json                          # Full performance summary (all AIs)
-st-speed --ai gemini report.json              # Filter display to one AI
-st-speed --ai openai --ai-caption report.json # All-AI summary + caption written by OpenAI
+st-speed --agent gemini report.json              # Filter display to one AI
+st-speed --agent openai --ai-caption report.json # All-AI summary + caption written by OpenAI
 st-speed --ai-short report.json               # All-AI summary + short caption (default AI)
 st-speed --history crypto/*.json              # Trend analysis across multiple files
 st-speed --csv report.json                    # Export raw timing data to CSV
@@ -59,11 +59,11 @@ Note: Each sample is one complete fact-check job.
 
 ### With AI-generated caption
 
-Using `--ai openai --ai-caption` generates the caption with OpenAI but still shows **all**
+Using `--agent openai --ai-caption` generates the caption with OpenAI but still shows **all**
 providers in the performance table:
 
 ```
-st-speed --ai openai --ai-caption projector_sonos_options.json
+st-speed --agent openai --ai-caption projector_sonos_options.json
 
 Performance Summary: projector_sonos_options.json
 ======================================================================
@@ -105,9 +105,9 @@ where response time is not a constraint.
 ======================================================================
 ```
 
-> **Key behaviour:** `--ai` selects *which AI writes the caption* — it does **not** filter
+> **Key behaviour:** `--agent` selects *which AI writes the caption* — it does **not** filter
 > the performance table. All providers are always shown so you get the full comparison.
-> Use `--ai` without any `--ai-*` flag if you want to filter the display to a single provider.
+> Use `--agent` without any `--ai-*` flag if you want to filter the display to a single provider.
 
 ---
 
@@ -121,11 +121,11 @@ where response time is not a constraint.
 | `--ai-summary` | Technical summary with recommendations | 120–200 words |
 | `--ai-story` | Full narrative report (saved to JSON) | 800–1200 words |
 
-Combine any content flag with `--ai <provider>` to choose who writes it:
+Combine any content flag with `--agent <provider>` to choose who writes it:
 
 ```
-st-speed --ai anthropic --ai-summary report.json
-st-speed --ai gemini --ai-story report.json
+st-speed --agent anthropic --ai-summary report.json
+st-speed --agent gemini --ai-story report.json
 ```
 
 ---
@@ -135,7 +135,7 @@ st-speed --ai gemini --ai-story report.json
 | Option | Description |
 |--------|-------------|
 | `file.json [file.json …]` | Path to one or more JSON container files |
-| `--ai AI` | AI for content generation (default: auto). When used with `--ai-*` flags, selects which AI generates the content but does **not** filter the performance display. Without `--ai-*` flags, also filters the display to one provider. |
+| `--agent AI` | AI for content generation (default: auto). When used with `--ai-*` flags, selects which AI generates the content but does **not** filter the performance display. Without `--ai-*` flags, also filters the display to one provider. |
 | `--csv CSV` | Export raw timing data to a CSV file |
 | `--history` | Analyze trends across multiple files |
 | `--cache` | Enable API response caching (default for AI content generation) |

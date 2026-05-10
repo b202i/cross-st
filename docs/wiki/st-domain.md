@@ -85,7 +85,7 @@ At the end:
 |--------|-------------|
 | `--name SLUG` | Pre-fill the domain slug (skips that prompt). Use `snake_case`, e.g. `supply_chain`. |
 | `--dir DIR` | Output directory for the `.prompt` file (default: `cross_stones/domains`). |
-| `--ai NAME` | AI provider for aspect suggestions and smoke-test (default: your configured default). |
+| `--agent NAME` | AI provider for aspect suggestions and smoke-test (default: your configured default). |
 | `--n-claims N` | Number of claims per domain (default: 10). Match the benchmark set you're adding to. |
 | `--no-smoketest` | Skip Phase 4 — save the prompt without sending it to an AI first. |
 | `--set CONFIG.JSON` | Register the new domain in a named benchmark set config after saving. |

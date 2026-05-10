@@ -103,7 +103,7 @@ The wizard prompts for API keys, sets your default provider, and writes everythi
 Or configure manually:
 
 ```bash
-st-admin --set DEFAULT_AI gemini
+st-admin --set DEFAULT_AGENT gemini
 st-admin --set GEMINI_API_KEY AIza...
 ```
 

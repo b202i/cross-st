@@ -14,12 +14,12 @@ Interactive mode (no flags):
 
 Non-interactive (scripting / shell):
   st-admin --show                 # print all settings and exit
-  st-admin --get-default-ai       # print the current default AI name
-  st-admin --set-default-ai NAME  # set default AI (writes DEFAULT_AI to .env)
+  st-admin --get-default-ai       # print the current default agent name
+  st-admin --set-default-ai NAME  # set default agent (writes DEFAULT_AGENT to .env)
   st-admin --set-ai-model MAKE=MODEL  # set the model for a provider (legacy)
-  st-admin --add-alias NAME=MAKE[:MODEL]  # add / update an alias in ~/.cross_ai_models.json
-  st-admin --remove-alias NAME    # remove a user-defined alias
-  st-admin --list-aliases         # print the alias registry table
+  st-admin --add-alias NAME=MAKE[:MODEL]  # add / update an agent in ~/.cross_ai_models.json
+  st-admin --remove-alias NAME    # remove a user-defined agent
+  st-admin --list-aliases         # print the agent registry table
   st-admin --set-tts-voice VOICE  # set TTS voice (writes TTS_VOICE to .env)
   st-admin --set-template NAME    # set default prompt template
   st-admin --set-editor NAME      # set editor (writes EDITOR to .env)
@@ -31,13 +31,13 @@ Non-interactive (scripting / shell):
   st-admin --check-tos            # check T&C acceptance; prompt re-acceptance if stale
 
 Settings are persisted in:
-  ~/.crossenv   — DEFAULT_AI, TTS_VOICE, DEFAULT_TEMPLATE, EDITOR, API keys
+  ~/.crossenv   — DEFAULT_AGENT, TTS_VOICE, DEFAULT_TEMPLATE, EDITOR, API keys
   .ai_models    — per-provider model overrides (MAKE=model, one per line)
 
-The DEFAULT_AI setting is read by ai_handler.get_default_ai() and used
-everywhere a provider is needed but not explicitly specified (captions,
+The DEFAULT_AGENT setting is read by ai_handler.get_default_ai() and used
+everywhere an agent is needed but not explicitly specified (captions,
 report writing, etc.).  Never hardcode a provider name in code — always
-call get_default_ai() or pass --ai on the CLI.
+call get_default_ai() or pass --agent on the CLI.
 
 TTS (text-to-speech) — optional, Python 3.10–3.13:
   st-admin --set-tts-voice VOICE  writes the chosen Piper voice name to
@@ -183,23 +183,33 @@ def _warn_if_shadowed(key: str) -> None:
 # ── Settings readers / writers ─────────────────────────────────────────────────
 
 def settings_get_default_ai() -> str:
-    """Return the configured default AI, or the first in AI_LIST."""
+    """Return the configured default agent, or the first in AI_LIST.
+
+    Reads ``DEFAULT_AGENT`` first; falls back to the legacy ``DEFAULT_AI``
+    so users upgrading from < 0.10.0 keep their existing default.
+    """
     ai_list   = get_ai_list()
-    configured = _env_get("DEFAULT_AI", "").strip()
+    configured = _env_get("DEFAULT_AGENT", "").strip() or _env_get("DEFAULT_AI", "").strip()
     if configured and configured in ai_list:
         return configured
     return ai_list[0]
 
 
 def settings_set_default_ai(make: str) -> None:
-    """Persist DEFAULT_AI to .env.  Raises ValueError for unknown providers."""
+    """Persist DEFAULT_AGENT to .env.  Raises ValueError for unknown agents.
+
+    Writes only ``DEFAULT_AGENT`` (the canonical key as of cross-st 0.10.0).
+    Any pre-existing ``DEFAULT_AI`` line is left in place so a downgrade
+    still has a usable value; cross-ai-core 0.8.0+ reads
+    ``DEFAULT_AGENT`` first and falls back to ``DEFAULT_AI``.
+    """
     ai_list = get_ai_list()
     if make not in ai_list:
         raise ValueError(
-            f"Unknown AI provider: {make!r}.  "
+            f"Unknown agent: {make!r}.  "
             f"Valid choices: {', '.join(ai_list)}"
         )
-    _env_set("DEFAULT_AI", make)
+    _env_set("DEFAULT_AGENT", make)
 
 
 def settings_get_ai_model(make: str) -> str:
@@ -1571,7 +1581,7 @@ def setup_wizard() -> None:
                                ("openai",     openai_key),
                                ("perplexity", perplexity_key)] if k]
 
-    cur_default = existing.get("DEFAULT_AI", "")
+    cur_default = existing.get("DEFAULT_AGENT", "") or existing.get("DEFAULT_AI", "")
     if not entered:
         print("\n  ⚠️  No API keys entered. Add them later with st-admin.")
         default_ai = cur_default or "gemini"
@@ -1580,7 +1590,7 @@ def setup_wizard() -> None:
         pre = cur_default if cur_default in entered else suggestion
         print(f"\n  Keys entered: {', '.join(entered)}")
         try:
-            val = input(f"  Default AI provider [{pre}]: ").strip()
+            val = input(f"  Default agent [{pre}]: ").strip()
         except (KeyboardInterrupt, EOFError):
             val = ""
         default_ai = val if val in entered else pre
@@ -1599,7 +1609,7 @@ def setup_wizard() -> None:
     _write("ANTHROPIC_API_KEY",  anthropic_key)
     _write("OPENAI_API_KEY",     openai_key)
     _write("PERPLEXITY_API_KEY", perplexity_key)
-    _write("DEFAULT_AI",         default_ai)
+    _write("DEFAULT_AGENT",      default_ai)
 
     print(f"  ✅  Settings written to {_TARGET_ENV}")
 
@@ -2036,13 +2046,9 @@ def _show_aliases_table() -> None:
         "\n  Legend:\n"
         "    Provider  = the AI company (anthropic, openai, xai, gemini, perplexity)\n"
         "    Model     = a specific LLM that provider hosts (e.g. claude-opus-4-5)\n"
-        "    Agent     = the short name you pass to --ai or that st cycles through;\n"
+        "    Agent     = the short name you pass to --agent or that st cycles through;\n"
         "                each agent is a (provider, model) pair.\n"
-        "    Type      = 'default' means an agent that ships with cross-st (one per\n"
-        "                provider, named after the provider, pointing at that\n"
-        "                provider's recommended model);  'custom' means an agent you\n"
-        "                added yourself.  Both types call the provider's API at the\n"
-        "                provider's published rate — neither is free.\n"
+        "\n  Every agent calls the provider's API at the provider's published rate.\n"
         f"\n  File: {os.path.expanduser('~/.cross_ai_models.json')}"
     )
 
@@ -2390,20 +2396,20 @@ def interactive_menu() -> None:
                             except ValueError as exc:
                                 print(f"  ✗  {exc}")
 
-                    case ("AI", "M") | ("Manage aliases", "M"):
+                    case ("AI", "M") | ("Manage agents", "M"):
                         _show_aliases_table()
 
-                    # ── Manage aliases (3rd-level submenu) ────────────────────
-                    case ("Manage aliases", "a"):
+                    # ── Manage agents (3rd-level submenu) ────────────────────
+                    case ("Manage agents", "a"):
                         _alias_wizard_add()
 
-                    case ("Manage aliases", "r"):
+                    case ("Manage agents", "r"):
                         _alias_wizard_remove()
 
-                    case ("Manage aliases", "e"):
+                    case ("Manage agents", "e"):
                         _alias_wizard_edit()
 
-                    case ("Manage aliases", "R"):
+                    case ("Manage agents", "R"):
                         try:
                             from cross_ai_core import get_available_models
                         except ImportError:
@@ -2538,10 +2544,10 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Without flags, opens the interactive settings panel.\n\n"
-            "Settings are stored in .env (DEFAULT_AI, TTS_VOICE, DEFAULT_TEMPLATE,\n"
+            "Settings are stored in .env (DEFAULT_AGENT, TTS_VOICE, DEFAULT_TEMPLATE,\n"
             "EDITOR) and .ai_models (per-provider model overrides).\n\n"
-            "The DEFAULT_AI value is used by all st-* tools as the provider for\n"
-            "caption / report generation whenever --ai is not explicitly passed."
+            "The DEFAULT_AGENT value is used by all st-* tools as the agent for\n"
+            "caption / report generation whenever --agent is not explicitly passed."
         ),
     )
 

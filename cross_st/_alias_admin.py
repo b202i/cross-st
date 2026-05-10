@@ -116,8 +116,8 @@ def get_recommended_models(make: str) -> list[tuple[str, str, bool]]:
 #     marker also acts as the audit trail — users can ``cat`` it to see
 #     what their old config looked like.
 #   * Print a one-line notice naming each new alias so the user knows
-#     to switch from ``--ai <make>`` (which now means handler default) to
-#     ``--ai <make>-<short>`` (which means the legacy model).
+#     to switch from ``--agent <make>`` (which now means handler default) to
+#     ``--agent <make>-<short>`` (which means the legacy model).
 #   * Any error (unreadable file, invalid line) → log to stderr and skip
 #     the offending line; never crashes the calling script.
 
@@ -256,7 +256,7 @@ def run_migration_with_notice() -> None:
     aliases = ", ".join(f"{a}" for a, _, _ in added)
     print(
         f"  ✓ Migrated legacy .ai_models → ~/.cross_ai_models.json "
-        f"(new aliases: {aliases}). Use --ai <alias> to select; original "
+        f"(new aliases: {aliases}). Use --agent <alias> to select; original "
         "file kept as .ai_models.migrated for reference.",
         flush=True,
     )
@@ -518,7 +518,7 @@ def add_alias(name: str, make: str, model: "str | None") -> None:
       * ``make`` must be a known built-in provider.
       * If ``name`` shadows a built-in make (e.g. ``"anthropic"``), the
         target make must be the same and ``model`` must be ``None`` —
-        otherwise we'd silently change what ``--ai anthropic`` means.
+        otherwise we'd silently change what ``--agent anthropic`` means.
         Raise :class:`AliasError` to refuse.
       * ``model`` may be ``None`` (= use handler default) or a non-empty string.
 

@@ -19,7 +19,7 @@ st-merge --simple subject.json                # force simple merge (ignore fact 
 st-merge --quality subject.json               # force quality merge (fail if no scores)
 st-merge --min-score 1.5 subject.json         # exclude stories below 1.5 avg score
 st-merge --no-post-check subject.json         # skip post-merge fact-check
-st-merge --ai gemini subject.json             # use Gemini as the synthesizer AI
+st-merge --agent gemini subject.json             # use Gemini as the synthesizer AI
 st-merge --ai-caption subject.json            # add AI caption after merge
 st-merge --no-cache subject.json              # bypass API cache
 ```
@@ -29,7 +29,7 @@ st-merge --no-cache subject.json              # bypass API cache
 | Option | Description |
 |--------|-------------|
 | `file.json` | Path to the JSON container |
-| `--ai {xai,…}` | Synthesizer AI for simple mode. In quality mode the base story's author AI is always used. (default: `xai`) |
+| `--agent {xai,…}` | Synthesizer AI for simple mode. In quality mode the base story's author AI is always used. (default: `xai`) |
 | `--cache` | Enable API cache (default: enabled) |
 | `--no-cache` | Disable API cache |
 | `-a`, `--all` | Merge all stories |

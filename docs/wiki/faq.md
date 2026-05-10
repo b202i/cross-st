@@ -14,7 +14,7 @@ st-admin --setup             # interactive wizard
 `--setup` walks you through:
 - Checking Python version and Homebrew (macOS)
 - Entering API keys for each provider you want to use
-- Setting your default AI provider (`DEFAULT_AI`)
+- Setting your default AI provider (`DEFAULT_AGENT`)
 - Setting your editor and TTS voice (optional)
 - Optionally joining the [crossai.dev](https://crossai.dev) community
 
@@ -65,7 +65,7 @@ Or run the full interactive menu:
 st-admin
 ```
 
-and choose **Default AI**.  The setting is written as `DEFAULT_AI=gemini` in
+and choose **Default AI**.  The setting is written as `DEFAULT_AGENT=gemini` in
 `~/.crossenv`.  You can also edit `~/.crossenv` directly in any text editor.
 
 **Available providers:**
@@ -141,7 +141,7 @@ your data or configuration:
 
 | Location | Contains | Touched by --upgrade? |
 |----------|----------|----------------------|
-| `~/.crossenv` | API keys, DEFAULT_AI, preferences | ❌ Never |
+| `~/.crossenv` | API keys, DEFAULT_AGENT, preferences | ❌ Never |
 | `~/.cross_api_cache/` | Cached AI responses | ❌ Never |
 | `~/.cross_templates/` | Prompt templates | ❌ Never |
 | `~/cross-stones/` | Benchmark domain prompts | ❌ Never |
@@ -169,7 +169,7 @@ is always readable/editable in a plain text editor.
 
 | Path | Contents |
 |------|----------|
-| `~/.crossenv` | API keys, `DEFAULT_AI`, `CROSS_STONES_DIR`, and other preferences |
+| `~/.crossenv` | API keys, `DEFAULT_AGENT`, `CROSS_STONES_DIR`, and other preferences |
 | `~/.cross_api_cache/` | MD5-keyed AI response cache (safe to delete at any time) |
 | `~/.cross_templates/` | Prompt templates used by `st-new` |
 | `~/cross-stones/` | Benchmark domain `.prompt` files (default; override with `CROSS_STONES_DIR`) |
@@ -222,7 +222,7 @@ Cross stores data in four locations under your home directory.  Remove whichever
 you want to clean up:
 
 ```bash
-rm -f  ~/.crossenv                 # API keys, DEFAULT_AI, all preferences
+rm -f  ~/.crossenv                 # API keys, DEFAULT_AGENT, all preferences
 rm -rf ~/.cross_api_cache/         # cached AI responses (safe to delete any time)
 rm -rf ~/.cross_templates/         # prompt templates seeded by st-admin
 rm -rf ~/cross-stones/             # benchmark domain prompts (if you ran st-stones)

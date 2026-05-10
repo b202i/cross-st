@@ -12,8 +12,8 @@ Darker cells = higher veracity scores. The diagonal shows self-evaluation scores
 st-heatmap --display subject.json                        # show chart on screen
 st-heatmap --file subject.json                           # save PNG to ./tmp/
 st-heatmap --display --ai-caption subject.json           # chart + AI narrative (default AI)
-st-heatmap --file --ai-caption --ai openai subject.json  # save PNG + caption via openai
-st-heatmap --file --ai-title --ai gemini subject.json    # save PNG + title via gemini
+st-heatmap --file --ai-caption --agent openai subject.json  # save PNG + caption via openai
+st-heatmap --file --ai-title --agent gemini subject.json    # save PNG + title via gemini
 st-heatmap --display --file --ai-summary subject.json    # screen + save PNG + summary
 st-heatmap --display --file --ai-story subject.json      # screen + save PNG + full story
 ```
@@ -41,14 +41,14 @@ Combine with `--file` to save the chart and generate content in one command.
 | `--ai-summary` | Concise summary | 120–200 words |
 | `--ai-story` | Comprehensive narrative | 800–1,200 words |
 
-Use `--ai NAME` to select the provider (default: your `DEFAULT_AI` setting).
+Use `--agent NAME` to select the provider (default: your `DEFAULT_AGENT` setting).
 Supported: `anthropic`, `xai`, `gemini`, `openai`, `ollama`.
 
 ### Other
 
 | Flag | Description |
 |------|-------------|
-| `--ai AI` | AI provider for content generation (default: `xai`) |
+| `--agent AI` | AI provider for content generation (default: `xai`) |
 | `--cache` | Enable API response cache (default: on) |
 | `--no-cache` | Disable API cache for this run |
 | `-v`, `--verbose` | Verbose output |
@@ -62,7 +62,7 @@ The heatmap below was generated from a pizza dough fact-checking run across 5 AI
 providers using `--file --ai-caption`:
 
 ```bash
-st-heatmap --ai openai --ai-caption --file pizza_dough.json
+st-heatmap --agent openai --ai-caption --file pizza_dough.json
 ```
 
 ![Cross-product heatmap — pizza dough domain](st-heatmap-example.png)

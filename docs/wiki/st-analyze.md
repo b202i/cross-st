@@ -10,7 +10,7 @@ Generates a narrative summary of the cross-product fact-check results — who sc
 
 ```bash
 st-analyze subject.json                 # analyze and synthesize with default AI
-st-analyze --ai gemini subject.json     # use a specific provider
+st-analyze --agent gemini subject.json     # use a specific provider
 st-analyze --no-cache subject.json      # bypass API cache
 st-analyze --ai-caption subject.json    # AI caption of analysis results
 st-analyze --ai-story subject.json      # full AI narrative from analysis
@@ -21,7 +21,7 @@ st-analyze --ai-story subject.json      # full AI narrative from analysis
 | Option | Description |
 |--------|-------------|
 | `file.json` | Path to the JSON container |
-| `--ai {xai,…}` | AI provider to use (default: `gemini`) |
+| `--agent {xai,…}` | AI provider to use (default: `gemini`) |
 | `--cache` | Enable API cache (default: enabled) |
 | `--no-cache` | Disable API cache |
 | `--site {MMD,…}` | Discourse site to use (default: `MMD`) |

@@ -115,32 +115,34 @@ class TestEnvHelpers:
 
 class TestGetDefaultAi:
     def test_no_env_var_returns_first_in_list(self, monkeypatch):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         assert settings_get_default_ai() == AI_LIST[0]
 
     def test_valid_env_var_returned(self, monkeypatch):
-        monkeypatch.setenv("DEFAULT_AI", AI_LIST[1])
+        monkeypatch.setenv("DEFAULT_AGENT", AI_LIST[1])
         assert settings_get_default_ai() == AI_LIST[1]
 
     def test_all_valid_providers_accepted(self, monkeypatch):
         for make in AI_LIST:
-            monkeypatch.setenv("DEFAULT_AI", make)
+            monkeypatch.setenv("DEFAULT_AGENT", make)
             assert settings_get_default_ai() == make
 
     def test_unknown_env_var_falls_back_to_first(self, monkeypatch):
-        monkeypatch.setenv("DEFAULT_AI", "nonexistent_make")
+        monkeypatch.setenv("DEFAULT_AGENT", "nonexistent_make")
         assert settings_get_default_ai() == AI_LIST[0]
 
     def test_empty_env_var_falls_back_to_first(self, monkeypatch):
-        monkeypatch.setenv("DEFAULT_AI", "")
+        monkeypatch.setenv("DEFAULT_AGENT", "")
+        monkeypatch.delenv("DEFAULT_AI", raising=False)
         assert settings_get_default_ai() == AI_LIST[0]
 
     def test_whitespace_only_falls_back_to_first(self, monkeypatch):
-        monkeypatch.setenv("DEFAULT_AI", "   ")
+        monkeypatch.setenv("DEFAULT_AGENT", "   ")
+        monkeypatch.delenv("DEFAULT_AI", raising=False)
         assert settings_get_default_ai() == AI_LIST[0]
 
     def test_return_value_is_always_a_known_provider(self, monkeypatch):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         result = settings_get_default_ai()
         assert result in AI_LIST
 
@@ -151,18 +153,18 @@ class TestGetDefaultAi:
 
 class TestSetDefaultAi:
     def test_valid_provider_writes_to_os_environ(self, tmp_settings, monkeypatch):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         settings_set_default_ai(AI_LIST[0])
-        assert os.environ.get("DEFAULT_AI") == AI_LIST[0]
+        assert os.environ.get("DEFAULT_AGENT") == AI_LIST[0]
 
     def test_all_providers_accepted(self, tmp_settings, monkeypatch):
         for make in AI_LIST:
-            monkeypatch.delenv("DEFAULT_AI", raising=False)
+            monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
             settings_set_default_ai(make)
-            assert os.environ.get("DEFAULT_AI") == make
+            assert os.environ.get("DEFAULT_AGENT") == make
 
     def test_invalid_provider_raises_value_error(self, tmp_settings):
-        with pytest.raises(ValueError, match="Unknown AI provider"):
+        with pytest.raises(ValueError, match="Unknown agent"):
             settings_set_default_ai("not_a_real_provider")
 
     def test_invalid_provider_error_names_the_bad_value(self, tmp_settings):
@@ -170,30 +172,30 @@ class TestSetDefaultAi:
             settings_set_default_ai("badmake")
 
     def test_invalid_provider_does_not_write_env(self, tmp_settings, monkeypatch):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         try:
             settings_set_default_ai("bad_make")
         except ValueError:
             pass
-        assert os.environ.get("DEFAULT_AI") is None
+        assert os.environ.get("DEFAULT_AGENT") is None
 
     def test_round_trip_set_then_get(self, tmp_settings, monkeypatch):
         target = AI_LIST[-1]
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         settings_set_default_ai(target)
         assert settings_get_default_ai() == target
 
     def test_overwrite_existing_value(self, tmp_settings, monkeypatch):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         settings_set_default_ai(AI_LIST[0])
         settings_set_default_ai(AI_LIST[1])
         assert settings_get_default_ai() == AI_LIST[1]
 
     def test_writes_to_env_file(self, tmp_settings, monkeypatch):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         settings_set_default_ai(AI_LIST[0])
         content = tmp_settings["env"].read_text()
-        assert "DEFAULT_AI" in content
+        assert "DEFAULT_AGENT" in content
         assert AI_LIST[0] in content
 
 
@@ -373,7 +375,7 @@ class TestSettingsShowAll:
         assert "Editor" in capsys.readouterr().out
 
     def test_current_default_ai_appears_in_output(self, tmp_settings, monkeypatch, capsys):
-        monkeypatch.setenv("DEFAULT_AI", AI_LIST[0])
+        monkeypatch.setenv("DEFAULT_AGENT", AI_LIST[0])
         settings_show_all()
         out = capsys.readouterr().out
         assert AI_LIST[0] in out
@@ -412,14 +414,14 @@ class TestCLI:
     # ── --get-default-ai ──────────────────────────────────────────────────────
 
     def test_get_default_ai_prints_a_known_provider(self, tmp_settings, monkeypatch, capsys):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         monkeypatch.setattr(sys, "argv", ["st-admin", "--get-default-ai"])
         st_admin.main()
         out = capsys.readouterr().out.strip()
         assert out in AI_LIST
 
     def test_get_default_ai_reflects_env_var(self, tmp_settings, monkeypatch, capsys):
-        monkeypatch.setenv("DEFAULT_AI", AI_LIST[1])
+        monkeypatch.setenv("DEFAULT_AGENT", AI_LIST[1])
         monkeypatch.setattr(sys, "argv", ["st-admin", "--get-default-ai"])
         st_admin.main()
         assert capsys.readouterr().out.strip() == AI_LIST[1]
@@ -427,7 +429,7 @@ class TestCLI:
     # ── --set-default-ai ─────────────────────────────────────────────────────
 
     def test_set_default_ai_valid_prints_confirmation(self, tmp_settings, monkeypatch, capsys):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         monkeypatch.setattr(sys, "argv", ["st-admin", "--set-default-ai", AI_LIST[0]])
         st_admin.main()
         out = capsys.readouterr().out
@@ -435,7 +437,7 @@ class TestCLI:
         assert AI_LIST[0] in out
 
     def test_set_default_ai_valid_persists(self, tmp_settings, monkeypatch, capsys):
-        monkeypatch.delenv("DEFAULT_AI", raising=False)
+        monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
         monkeypatch.setattr(sys, "argv", ["st-admin", "--set-default-ai", AI_LIST[0]])
         st_admin.main()
         capsys.readouterr()
@@ -456,7 +458,7 @@ class TestCLI:
 
     def test_set_default_ai_each_valid_provider(self, tmp_settings, monkeypatch, capsys):
         for make in AI_LIST:
-            monkeypatch.delenv("DEFAULT_AI", raising=False)
+            monkeypatch.delenv("DEFAULT_AGENT", raising=False); monkeypatch.delenv("DEFAULT_AI", raising=False)
             monkeypatch.setattr(sys, "argv", ["st-admin", "--set-default-ai", make])
             st_admin.main()
             capsys.readouterr()

@@ -23,7 +23,7 @@ st-bang -q subject.prompt               # suppress live progress table
 | Option | Description |
 |--------|-------------|
 | `prompt` | Path to the `.prompt` file |
-| `--ai {xai,…}` | AI to use for the optional `--merge` step (default: `xai`) |
+| `--agent {xai,…}` | AI to use for the optional `--merge` step (default: `xai`) |
 | `--cache` | Enable API cache (default: enabled) |
 | `--no-cache` | Disable API cache |
 | `-m`, `--merge` | Merge all stories into a master story via `st-merge` after generation |

@@ -4,11 +4,11 @@ st-analyze — Analyze cross-product data and synthesize a new story
 
 ```
 st-analyze subject.json                 # analyze and synthesize
-st-analyze --ai gemini subject.json     # use a specific provider
+st-analyze --agent gemini subject.json     # use a specific provider
 st-analyze --plot bar subject.json      # include a bar chart
 ```
 
-Options: --ai  --plot  --post  --no-cache  --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story  -v  -q
+Options: --agent  --plot  --post  --no-cache  --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story  -v  -q
 """
 
 import argparse

@@ -117,7 +117,7 @@ st-admin --set-ai-model anthropic=claude-sonnet-4-5
 st-admin --show
 
 # Override for a single command only
-st-gen --ai anthropic --model claude-sonnet-4-5 my_topic.prompt
+st-gen --agent anthropic --model claude-sonnet-4-5 my_topic.prompt
 ```
 
 Model overrides are stored in `.ai_models` (one `provider=model` line per entry). This file is git-ignored — safe for developer-specific settings.
@@ -126,12 +126,12 @@ Model overrides are stored in `.ai_models` (one `provider=model` line per entry)
 
 ## Using multiple providers
 
-Every command that takes `--ai` also accepts `all`:
+Every command that takes `--agent` also accepts `all`:
 
 ```bash
-st-gen --ai all my_topic.prompt       # generate once per provider (sequential)
+st-gen --agent all my_topic.prompt       # generate once per provider (sequential)
 st-bang my_topic.prompt               # generate all providers in parallel (faster)
-st-fact --ai all my_topic.json        # fact-check with every provider
+st-fact --agent all my_topic.json        # fact-check with every provider
 st-cross my_topic.json                # full N×N pipeline: generate + fact-check
 ```
 

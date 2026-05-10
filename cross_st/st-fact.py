@@ -4,7 +4,7 @@ st-fact — Fact-check stories in a container
 
 st-fact --no-cache subject.json        # bypass API cache
 st-fact --all subject.json             # fact-check all stories in the container
-st-fact --ai all subject.json          # run all AIs in parallel (one per story)
+st-fact --agent all subject.json          # run all AIs in parallel (one per story)
 st-fact --timeout 30 subject.json      # 30-second per-paragraph timeout
 ```
 
@@ -12,7 +12,7 @@ For interpretive output (digests, captions, "what is true/false/missing"),
 use **st-verdict** — see `st-verdict --help`.  st-fact is now a pure
 verifier: it produces fact-check data; st-verdict interprets it.
 
-Options: -s story  --ai  --no-cache  -v  -q
+Options: -s story  --agent  --no-cache  -v  -q
 """
 
 import argparse
@@ -136,7 +136,7 @@ def renumber_claims(text):
     return renumbered_text
 
 
-# ── Parallel --ai all dispatcher ─────────────────────────────────────────────
+# ── Parallel --agent all dispatcher ─────────────────────────────────────────────
 
 ST_PENDING  = "pending"
 ST_RUNNING  = "running"
@@ -162,7 +162,7 @@ def _run_all_parallel(args, ai_list):
 
     jobs = {}
     for ai in ai_list:
-        cmd = (["st-fact", "--silent", "--ai", ai, cache_flag]
+        cmd = (["st-fact", "--silent", "--agent", ai, cache_flag]
                + story_flag
                + [args.json_file])
         jobs[ai] = {
@@ -352,7 +352,7 @@ def main():
                         help='Suppress all output including tqdm progress bars; '
                              'used when called from st-cross as a child process.')
     parser.add_argument('--timeout', type=int, default=0,
-                        help='Timeout value: with --ai all, sets per-job limit in minutes '
+                        help='Timeout value: with --agent all, sets per-job limit in minutes '
                              '(default: 20). In single-AI mode, sets per-paragraph limit '
                              'in seconds (default: 0 = no timeout).')
     parser.add_argument('--retry-budget', type=int, default=0, metavar='SECONDS',
@@ -387,17 +387,17 @@ def main():
     # Translate 0 = unlimited -> None for cross-ai-core retry_budget kwarg.
     _retry_budget = args.retry_budget if args.retry_budget > 0 else None
 
-    # ── Validate --ai choice ──────────────────────────────────────────────────
+    # ── Validate --agent choice ──────────────────────────────────────────────────
     ai_list = get_ai_list()
     if args.agent != "all" and args.agent not in ai_list:
-        parser.error(f"argument --ai: invalid choice: '{args.agent}' "
+        parser.error(f"argument --agent: invalid choice: '{args.agent}' "
                      f"(choose from {', '.join(ai_list)}, all)")
 
     # ── --ai-review / --ai-* flags removed in cross-st 0.7.0 (VRD-5) ─────────
     # Use st-verdict for interpretive content. Removal is enforced before
     # parse_args() runs (see _REMOVED_AI_FLAGS check above).
 
-    # ── --ai all: spawn one st-fact per AI in parallel, show live table ───────
+    # ── --agent all: spawn one st-fact per AI in parallel, show live table ───────
     if args.agent == "all":
         _run_all_parallel(args, ai_list)
         return
@@ -479,7 +479,7 @@ def main():
         total_para = len(segments)
 
         # ── UX: announce which story / AI is about to run ────────────────────
-        # Without this header, multi-story runs (e.g. `st-fact --ai anthropic
+        # Without this header, multi-story runs (e.g. `st-fact --agent anthropic
         # file.json` over a 5-story container) print four anonymous tqdm bars
         # in a row with no indication of which story or which AI is which.
         # See AGENTS.md → "Progress feedback before every AI call".

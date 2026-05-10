@@ -8,10 +8,10 @@ Sends a single story to an AI and asks it to fact-check every claim, scoring eac
 
 ```bash
 st-fact subject.json                    # fact-check story 1 with default AI
-st-fact -s 2 --ai gemini subject.json  # fact-check story 2 with Gemini
+st-fact -s 2 --agent gemini subject.json  # fact-check story 2 with Gemini
 st-fact --no-cache subject.json        # bypass API cache
 st-fact --all subject.json             # fact-check all stories in the container
-st-fact --ai all subject.json          # run all AIs in parallel (one per story)
+st-fact --agent all subject.json          # run all AIs in parallel (one per story)
 st-fact --timeout 30 subject.json      # 30-second per-paragraph timeout
 st-fact --file subject.json            # also write results to a file
 st-fact --paragraph subject.json       # write paragraph segments to _paragraph_test_n.txt
@@ -23,7 +23,7 @@ st-fact --paragraph subject.json       # write paragraph segments to _paragraph_
 |--------|-------------|
 | `-s N`, `--story N` | Fact-check a single story by number (default: 1) |
 | `--all` | Fact-check every story in the container |
-| `--ai AI` | AI provider to use, or `all` to run all providers in parallel (default: `xai`) |
+| `--agent AI` | AI provider to use, or `all` to run all providers in parallel (default: `xai`) |
 | `--cache` | Enable the API response cache (default: enabled) |
 | `--no-cache` | Bypass the API response cache |
 | `--file` | Also write results to a `.txt` file alongside the container |
@@ -32,7 +32,7 @@ st-fact --paragraph subject.json       # write paragraph segments to _paragraph_
 | `--silent` | Suppress all output including progress bars; used internally by `st-cross` |
 | `-v`, `--verbose` | Verbose output |
 | `-q`, `--quiet` | Minimal output |
-| `--timeout N` | With `--ai all`: per-job limit in minutes (default: 20). Single-AI mode: per-paragraph limit in seconds (default: 0 = no limit) |
+| `--timeout N` | With `--agent all`: per-job limit in minutes (default: 20). Single-AI mode: per-paragraph limit in seconds (default: 0 = no limit) |
 | `--retry-budget SECONDS` | Total retry budget in seconds passed through to `process_prompt()` (default: 0 = unlimited). Useful for parallel `st-cross --parallel` runs where a single 105-second tail would stall the matrix. Per-call (per segment), independent of `--timeout` (per subprocess). |
 
 ## What happened to `--ai-review` / `--ai-caption` / `--ai-summary` / …?

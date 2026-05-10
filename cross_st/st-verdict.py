@@ -15,7 +15,7 @@ st-verdict --no-ai-short subject.json              # display chart only, no capt
 st-verdict --file subject.json                     # display + short caption + save PNG to ./tmp/
 st-verdict --ai-caption subject.json               # display + full caption instead of short
 st-verdict --no-display --file subject.json        # save PNG to ./tmp/ only, no screen
-st-verdict --file --ai-title --ai gemini s.json    # save PNG + title via gemini
+st-verdict --file --ai-title --agent gemini s.json    # save PNG + title via gemini
 st-verdict --what-is-false --ai-summary s.json     # focused breakdown of inaccurate claims (story 1)
 st-verdict --what-is-true  --ai-caption  s.json    # focused breakdown of verified claims (story 1)
 st-verdict --what-is-missing --ai-summary s.json   # what important aspects the report omitted (story 1)
@@ -29,7 +29,7 @@ Output: chart on screen (--display) and/or PNG saved to --path (default ./tmp/)
 Options: --display / --no-display   --file  --path
          --ai-title  --ai-short / --no-ai-short  --ai-caption  --ai-summary  --ai-story
          --what-is-false  --what-is-true  --what-is-missing  --how-to-fix
-         --ai  --cache  --no-cache  -v  -q
+         --agent  --cache  --no-cache  -v  -q
 
 See also: st-heatmap  (evaluator-vs-target score heatmap)
 """

@@ -113,7 +113,7 @@ The wizard will prompt you for each API key (press Enter to skip any), ask which
 Or configure manually:
 
 ```bash
-st-admin --set DEFAULT_AI gemini
+st-admin --set DEFAULT_AGENT gemini
 st-admin --set GEMINI_API_KEY AIza...
 ```
 
@@ -136,9 +136,9 @@ st-heatmap report.json        # visualise the fact-check score matrix
 Or step by step:
 
 ```bash
-st-gen report.json            # generate one report (uses DEFAULT_AI)
-st-gen --ai gemini report.json
-st-fact --ai anthropic report.json -s 1   # fact-check story 1 with Claude
+st-gen report.json            # generate one report (uses DEFAULT_AGENT)
+st-gen --agent gemini report.json
+st-fact --agent anthropic report.json -s 1   # fact-check story 1 with Claude
 ```
 
 ---
@@ -147,7 +147,7 @@ st-fact --ai anthropic report.json -s 1   # fact-check story 1 with Claude
 
 ```bash
 st-admin                        # show current settings
-st-admin --set DEFAULT_AI xai   # switch default provider
+st-admin --set DEFAULT_AGENT xai   # switch default provider
 st-admin --model xai grok-3     # pin a specific model for a provider
 st-admin --list-models          # show all configured model overrides
 ```

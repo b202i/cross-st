@@ -8,7 +8,7 @@ exactly as the AI wrote it.
 
 **Related:** [st-fact](st-fact.md)  [st-merge](st-merge.md)  [st-post](st-post.md)  [Multi-Model](Multi-Model)
 
-> **Multi-model (0.9.0+):** when `--ai` is omitted, `st-fix` defaults the rewriter to the alias whose `(make, model)` matches the source story — an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. See [Multi-Model](Multi-Model).
+> **Multi-model (0.9.0+):** when `--agent` is omitted, `st-fix` defaults the rewriter to the alias whose `(make, model)` matches the source story — an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. See [Multi-Model](Multi-Model).
 
 ---
 
@@ -31,7 +31,7 @@ st-fix subject.json
 st-fix -s 1 -f 1 subject.json
 
 # Use a specific AI to rewrite
-st-fix -s 1 -f 1 --ai openai subject.json
+st-fix -s 1 -f 1 --agent openai subject.json
 
 # After fixing, run st-prep automatically to refresh the title/hashtags
 st-fix subject.json --prep
@@ -64,7 +64,7 @@ st-fix --mode synthesize subject.json          # full synthesis
 | `-s N` / `--story N` | Story to fix (default: auto-select the story with the most false claims) |
 | `-f N` / `--fact N` | Fact-check to use (default: auto-select; not used in synthesize mode) |
 | `--mode <mode>` | Fix strategy: `iterate` (default), `patch`, `best-source`, `synthesize` |
-| `-a` / `--ai <name>` | AI to use for rewriting (default: same AI that wrote the story) |
+| `-a` / `--agent <name>` | AI to use for rewriting (default: same AI that wrote the story) |
 | `--checker <name>` | AI to use for inline verification in iterate mode (default: original fact-checker) |
 | `--prep` | Run `st-prep` after fixing to refresh the title and hashtags |
  `--cache`  Enable API cache (default: enabled) 

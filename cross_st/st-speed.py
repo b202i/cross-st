@@ -8,7 +8,7 @@ and consistency. Provides apples-to-apples performance comparisons.
 
 Usage:
     st-speed report.json                    # Basic performance summary
-    st-speed --ai gemini report.json        # Filter by specific AI
+    st-speed --agent gemini report.json        # Filter by specific AI
     st-speed --history crypto/*.json        # Analyze trends across files
     st-speed --csv report.json              # Export to CSV
 """
@@ -144,7 +144,7 @@ def _filter_by_alias_or_make(timing_data, ai_filter):
     resolves to an alias with an explicit model, the filter matches on
     (make, model) so two same-make aliases can be filtered individually.
     Falls back to a bare-make match when the alias has no model or cannot
-    be resolved (e.g. legacy ``--ai`` value that isn't a registered alias).
+    be resolved (e.g. legacy ``--agent`` value that isn't a registered alias).
     """
     try:
         from cross_ai_core.aliases import resolve_alias
@@ -622,7 +622,7 @@ def generate_ai_content(gen_summary, fact_summary, ai_make, content_type="captio
     except Exception as e:
         # Let the error propagate naturally from ai_handler
         print(f"  Content generation failed: {e}")
-        print(f"  Hint: Try --ai gemini or --ai anthropic")
+        print(f"  Hint: Try --agent gemini or --agent anthropic")
         if verbose:
             import traceback
             print(f"  Traceback:")
@@ -883,9 +883,9 @@ def main():
             print(f"\nPerformance Summary: {Path(file_path).name}\n")
             print("=" * 70)
             
-            # When --ai is paired with an --ai-* content flag, it selects the generation
+            # When --agent is paired with an --ai-* content flag, it selects the generation
             # AI only — do NOT filter the performance display (show all providers).
-            # When --ai is used alone (no content flag), it filters the display as before.
+            # When --agent is used alone (no content flag), it filters the display as before.
             display_filter = args.agent if not content_types else None
 
             # Generation summary (filtered for display)

@@ -47,7 +47,7 @@ Reads fact-check data from a container and produces two outputs: a **stacked bar
 | `--ai-caption` | Generate a 100–160-word detailed caption → stdout |
 | `--ai-summary` | Generate a 120–200-word summary → stdout |
 | `--ai-story` | Generate an 800–1200-word narrative → stdout |
-| `--ai AI` | AI provider for content generation (default: `xai`) |
+| `--agent AI` | AI provider for content generation (default: `xai`) |
 
 ### What-is lens — focused claim breakdown
 

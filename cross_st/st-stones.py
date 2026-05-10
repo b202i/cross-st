@@ -1194,8 +1194,8 @@ def main():
         help="Generate a comprehensive story (800–1200 words) → stdout",
     )
     ai_group.add_argument(
-        "--ai", type=str, default=None, metavar="NAME",
-        help=f"AI provider to use for content generation  (default: {get_default_ai()})",
+        "--agent", type=str, default=None, metavar="NAME",
+        help=f"Agent to use for content generation  (default: {get_default_ai()})",
     )
 
     args = parser.parse_args()
@@ -1495,7 +1495,7 @@ def main():
     elif args.ai_story:   content_type = "story"
 
     if content_type is not None:
-        ai_make = args.ai if args.ai else get_default_ai()
+        ai_make = args.agent if args.agent else get_default_ai()
         if not args.quiet:
             print(f"  Generating {content_type} with {ai_make} ...")
         prompt = build_stones_prompt(

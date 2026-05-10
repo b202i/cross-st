@@ -10,7 +10,7 @@ side-by-side** in a single matrix — for example `anthropic-opus` *and*
 
 Aliases are **opt-in and additive**. If you do nothing, every command works
 exactly as before. The moment you add a `~/.cross_ai_models.json` file, the
-new alias names become available everywhere `--ai` is accepted.
+new alias names become available everywhere `--agent` is accepted.
 
 ---
 
@@ -29,8 +29,8 @@ new alias names become available everywhere `--ai` is accepted.
 ```
 
 ```bash
-st-gen --ai anthropic-opus    prompt.json   # writes one Anthropic story
-st-gen --ai anthropic-sonnet  prompt.json   # writes a second Anthropic story
+st-gen --agent anthropic-opus    prompt.json   # writes one Anthropic story
+st-gen --agent anthropic-sonnet  prompt.json   # writes a second Anthropic story
 
 st-cross prompt.json
 # 6 authors  6 evaluators = 36 fact-check cells
@@ -55,7 +55,7 @@ byte-for-byte.
 
 Rules:
 
-- **Each top-level key is the alias name** you use with `--ai`.
+- **Each top-level key is the alias name** you use with `--agent`.
 - The five built-in make names (`anthropic`, `gemini`, `openai`, `perplexity`,
   `xai`) are always available — they're auto-seeded as self-aliases with
   `model: null`. You can override one to pin a specific model (see below).
@@ -72,7 +72,7 @@ Override the file path with the `CROSS_AI_ALIASES_FILE` environment variable
 
 ---
 
-## Resolution order for `--ai <alias> --model …`
+## Resolution order for `--agent <alias> --model …`
 
 When `cross-ai-core` resolves which model string to send to the provider,
 it walks this chain (first hit wins):
@@ -95,10 +95,10 @@ st-cross …` when a new flagship drops.
 | Tool            | Behaviour with aliases |
 |-----------------|------------------------|
 | `st-cross`      | Matrix iterates aliases; same-make aliases share **one** rate-limit semaphore so concurrency caps don't double up. Resume works per-(make, model) cell. |
-| `st-fix`        | When `--ai` is omitted, the rewriter defaults to the alias whose (make, model) matches the source story — so an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. |
+| `st-fix`        | When `--agent` is omitted, the rewriter defaults to the alias whose (make, model) matches the source story — so an Opus-authored story is rewritten by Opus, not by the bare `anthropic` handler default. |
 | `st-speed`      | Adds one row per alias when same-make aliases produce distinct timing data; labels are disambiguated as `make:model` when more than one model exists for that make. |
 | `st-verdict`    | Chart and `score_authors()` rank each alias as a separate author. Composite scoring is per-(make, model). |
-| `st-gen`, `st-bang`, `st-fact`, `st-analyze`, `st-merge`, `st-stones`, etc. | `--ai <alias>` accepted everywhere; argparse `choices=` widens to whatever aliases you've defined. |
+| `st-gen`, `st-bang`, `st-fact`, `st-analyze`, `st-merge`, `st-stones`, etc. | `--agent <alias>` accepted everywhere; argparse `choices=` widens to whatever aliases you've defined. |
 | `st.py`         | The `A` reserved key cycles through aliases (not raw makes). The list grows by however many aliases you've added. |
 
 ---

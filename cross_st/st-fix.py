@@ -409,7 +409,7 @@ def print_before_summary(primary, fact_obj, fact_checks, story_index):
 
 def run_after_factcheck(file_json, story_index, checker_ai, verbose, cache):
     """
-    Run st-fact --ai all on the fixed story for an unbiased multi-checker result.
+    Run st-fact --agent all on the fixed story for an unbiased multi-checker result.
     Displays the live st-fact progress table — no suppression.
     Returns the fact entry from checker_ai for the before/after count comparison,
     or the last fact entry added if checker_ai is not found.
@@ -418,7 +418,7 @@ def run_after_factcheck(file_json, story_index, checker_ai, verbose, cache):
     print(f"\n  Post-fix fact-check — story {story_index} (all AI, unbiased):")
     print()
     subprocess.run(
-        ["st-fact", "--ai", "all", "-s", str(story_index),
+        ["st-fact", "--agent", "all", "-s", str(story_index),
          "--timeout", "20", cache_flag, file_json],
         check=False,
     )
@@ -1130,7 +1130,7 @@ def _save_result(container, file_json, args,
     # gen_response["_make"] is stamped by process_prompt() for all fresh calls.
     # This separates "which AI wrote this response" from args.agent (the CLI flag),
     # which matters in synthesize mode where the rewriter is the best-story
-    # author, not the --ai flag value.
+    # author, not the --agent flag value.
     _gen_make = (
         gen_response.get("_make")
         if isinstance(gen_response, dict)
@@ -1446,7 +1446,7 @@ Modes:
                 print("entries went with it. To re-fact-check the originals:")
                 base = os.path.basename(file_json)
                 print(f"  st-cross {base}              # all AI × all reports")
-                print(f"  st-fact --ai all {base}      # current AI × all reports")
+                print(f"  st-fact --agent all {base}      # current AI × all reports")
                 sys.exit(0)
 
             if not args.include_fixed and n_originals == 0 and n_fixed > 0:
@@ -1557,7 +1557,7 @@ Modes:
         if rewriter_ai is None:
             rewriter_ai = base_make if base_make in get_ai_list() else args.agent
         if rewriter_ai != args.agent and not args.quiet:
-            print(f"  Rewriter: {rewriter_ai} (author of best story — overrides --ai)")
+            print(f"  Rewriter: {rewriter_ai} (author of best story — overrides --agent)")
 
         # Build ordered list: (make, model, avg_score, text) with stable story index
         stories_with_scores = []
@@ -1655,11 +1655,11 @@ Modes:
                     sys.exit(1)
 
                 if is_transient and attempt < MAX_RETRIES:
-                    # On first transient failure try --ai fallback before waiting
+                    # On first transient failure try --agent fallback before waiting
                     if active_ai == rewriter_ai and args.agent != rewriter_ai:
                         active_ai = args.agent
                         if not args.quiet:
-                            print(f"  Falling back to --ai {active_ai}")
+                            print(f"  Falling back to --agent {active_ai}")
                     else:
                         if not args.quiet:
                             print(f"  Waiting {RETRY_WAIT}s before retry…")
@@ -1670,7 +1670,7 @@ Modes:
         if last_error is not None:
             print(f"\nError: synthesize failed after {MAX_RETRIES} attempts.")
             print(f"  Last error: {last_error}")
-            print(f"  Try again later, or specify a different AI with --ai")
+            print(f"  Try again later, or specify a different AI with --agent")
             sys.exit(1)
 
         revised = get_content_auto(gen_response)
@@ -1698,7 +1698,7 @@ Modes:
             print(f"\n  Post-synthesize fact-check — story {synth_index} (all AI, unbiased):")
             print()
             subprocess.run(
-                ["st-fact", "--ai", "all", "-s", str(synth_index),
+                ["st-fact", "--agent", "all", "-s", str(synth_index),
                  "--timeout", "20", file_json],
                 check=False,
             )
@@ -1928,13 +1928,13 @@ Modes:
     #   5. If no AI improves it, leave the sentence unchanged (do no harm)
     # Final whole-doc fact-check is skipped — only the changed sentences were touched.
 
-    WRITER_AI_ORDER = get_ai_list()   # try all 5 AI as writers, starting with --ai
+    WRITER_AI_ORDER = get_ai_list()   # try all 5 AI as writers, starting with --agent
 
     if args.mode == "iterate":
         # Checker AI: use --checker if given, else the same AI that did the fact-check
         checker_ai = args.checker or fact_obj.get("make") or args.agent
 
-        # Writer AI pool: --ai first, then all others
+        # Writer AI pool: --agent first, then all others
         writer_pool = [args.agent] + [a for a in WRITER_AI_ORDER if a != args.agent]
 
         story_before = primary_text

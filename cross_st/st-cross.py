@@ -500,7 +500,7 @@ def main() -> None:
         # Launch all generation jobs — each writes to its own _N.json
         for j in gen_jobs:
             cmd = ["st-gen", "--bang", str(j["index"]),
-                   "--ai", j["ai_key"], cache_flag, "--quiet", file_prompt]
+                   "--agent", j["ai_key"], cache_flag, "--quiet", file_prompt]
             try:
                 proc = subprocess.Popen(cmd,
                                         stdout=subprocess.DEVNULL,
@@ -912,7 +912,7 @@ def main() -> None:
         cmd = [
             "st-fact",
             "--silent",
-            "--ai", fc_alias,
+            "--agent", fc_alias,
             "--story", str(si + 1),
             "--timeout", str(args.timeout),
             "--retry-budget", str(args.retry_budget),

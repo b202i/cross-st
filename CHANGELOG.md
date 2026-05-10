@@ -9,6 +9,45 @@ Cross uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **AGT-3 — `--ai` flag fully retired; `--agent` everywhere.** Across all
+  14 affected scripts (`st.py`, `st-stones`, plus the 12 already-renamed
+  in the AGT-1 cut), every remaining `--ai` reference — argparse
+  registration, internal subprocess invocation, module docstring,
+  help-text, and run-time hint string — now reads `--agent`. The bare
+  `--ai` flag is gone with no deprecation alias. Subprocess pipelines
+  (`st-cross` → `st-gen`/`st-fact`, `st-fix` → `st-fact`,
+  `st-merge` → `st-fact`) updated in lock-step so the matrix executes
+  end-to-end on the new flag.
+- **AGT-3 — `DEFAULT_AGENT` is the canonical env var.** `st-admin
+  --set-default-ai NAME` now writes `DEFAULT_AGENT=NAME` to
+  `~/.crossenv`. Read path: `DEFAULT_AGENT` → legacy `DEFAULT_AI` →
+  first registered agent. Existing `DEFAULT_AI` lines are left in place,
+  so a downgrade keeps working; a fresh write never re-emits the legacy
+  key. Pairs with cross-ai-core 0.8.0's matching read order
+  (`get_default_ai()` already prefers `DEFAULT_AGENT`).
+- **AGT-3 — `st`'s status line says `agent:`.** The bottom-left
+  selector hint in the `st` interactive menu changed from
+  `st ai:openai s:1 f:1 …>` to `st agent:openai s:1 f:1 …>`.
+  Function names (`next_ai()`, `ai_opt`, `ai_select`) are unchanged —
+  internal-code rename is deferred to AGT-9.
+- **AGT-4 — `st-admin` agent menu rewrite.** The `Type` column is gone
+  from the agent table (every agent calls the provider's API at the
+  provider's published rate — there is no "free" tier), the legend
+  drops the "default vs custom" paragraph, and the dead
+  `("Manage aliases", …)` `match` arms are renamed to
+  `("Manage agents", …)` to match the menu label they were always
+  paired with. CLI flags (`--add-alias`, `--remove-alias`,
+  `--list-aliases`) keep their names for backward compatibility per
+  AGENTS.md.
+- **AGT-6 — Wiki `--agent` sweep + new `Agents.md`.** All 28 wiki pages
+  carrying `--ai` references are rewritten to `--agent`; the new
+  `docs/wiki/Agents.md` concept page documents agent naming rules,
+  resolution order, the `DEFAULT_AGENT` env var, four worked examples,
+  and the migration story. Linked from `Home.md`. `DEFAULT_AI`
+  references in wiki copy now read `DEFAULT_AGENT`.
+
 ---
 
 ## [0.9.1] — 2026-04-30

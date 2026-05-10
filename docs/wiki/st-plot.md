@@ -17,7 +17,7 @@ st-plot --csv subject.json                             # export data as CSV
 st-plot --json subject.json                            # save data as JSON
 st-plot --markdown subject.json                        # save data as Markdown
 st-plot --ai-caption subject.json                      # AI caption of score patterns
-st-plot --ai-title --ai gemini subject.json            # AI title using Gemini
+st-plot --ai-title --agent gemini subject.json            # AI title using Gemini
 st-plot --ai-short subject.json                        # short AI summary
 st-plot --ai-summary subject.json                      # concise AI summary
 st-plot --ai-story subject.json                        # full AI narrative
@@ -46,7 +46,7 @@ st-plot --no-cache subject.json                        # bypass cache for AI con
 
 | Option | Description |
 |--------|-------------|
-| `--ai AI` | AI provider for content generation (default: `DEFAULT_AI`) |
+| `--agent AI` | AI provider for content generation (default: `DEFAULT_AGENT`) |
 | `--ai-title` | Generate a ≤10-word title → stdout |
 | `--ai-short` | Generate a ≤80-word summary → stdout |
 | `--ai-caption` | Generate a 100–160-word caption → stdout |

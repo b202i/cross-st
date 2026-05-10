@@ -65,7 +65,7 @@ st-stones --ai-caption cross_stones/cross-stones-10.json       # AI caption of l
 | `--ai-caption` | Generate a 100–160-word two-paragraph caption → stdout |
 | `--ai-summary` | Generate a 120–200-word summary → stdout |
 | `--ai-story` | Generate an 800–1200-word narrative → stdout |
-| `--ai NAME` | AI provider for content generation (default: `xai`) |
+| `--agent NAME` | AI provider for content generation (default: `xai`) |
 
 ---
 

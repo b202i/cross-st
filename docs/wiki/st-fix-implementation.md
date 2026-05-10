@@ -55,7 +55,7 @@ For each non-True claim:
 6. If no writer improves the sentence, leave it unchanged ("do no harm" rule).
 7. Skip the final whole-document fact-check pass — only changed sentences were touched.
 
-The writer pool defaults to all configured AI providers. `--ai` overrides the pool to a single provider. `--checker` overrides the inline verifier.
+The writer pool defaults to all configured AI providers. `--agent` overrides the pool to a single provider. `--checker` overrides the inline verifier.
 
 ---
 
@@ -77,7 +77,7 @@ Same batching logic as patch, but the prompt also includes the text of every oth
 
 Passes all stories and their average fact-check scores to a single rewriter AI with the instruction to produce the best possible story by drawing on whichever AI got each section most accurate. Uses `get_synthesize_prompt()` which includes the scored story list and an optional per-segment scorecard (available after `st-cross`).
 
-The rewriter AI defaults to the author of the highest-scoring story; `--ai` overrides. A fallback AI is tried on transient 503/429 errors before full retry.
+The rewriter AI defaults to the author of the highest-scoring story; `--agent` overrides. A fallback AI is tried on transient 503/429 errors before full retry.
 
 ---
 

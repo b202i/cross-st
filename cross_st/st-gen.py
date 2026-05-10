@@ -13,12 +13,12 @@ Run before: st-ls    (review what was generated)
 
 ```
 st-gen subject.prompt                   # generate with default AI (runs st-prep automatically)
-st-gen --ai gemini subject.prompt       # use a specific provider
+st-gen --agent gemini subject.prompt       # use a specific provider
 st-gen --no-cache subject.prompt        # bypass API cache
 st-gen --no-prep subject.prompt         # store raw data only, skip st-prep
 ```
 
-Options: --ai  --no-cache  --no-prep  --bang  --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story  -v  -q
+Options: --agent  --no-cache  --no-prep  --bang  --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story  -v  -q
 """
 import argparse
 import hashlib

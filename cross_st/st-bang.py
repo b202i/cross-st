@@ -7,11 +7,11 @@ then merges all responses into the container.
 
 ```
 st-bang subject.prompt                  # run all providers in parallel
-st-bang --ai all subject.prompt         # explicit: all providers
+st-bang --agent all subject.prompt         # explicit: all providers
 st-bang --no-cache subject.prompt       # bypass API cache
 ```
 
-Options: --ai  --no-cache  --merge  -v  -q
+Options: --agent  --no-cache  --merge  -v  -q
 """
 import argparse
 import json
@@ -46,14 +46,14 @@ The JSON file contains two top-level arrays:
 Generate a story from each AI using the same prompt, into separate .json files.
 st-bang starts the story generation for each AI while monitoring results:
 ```bash
-st-bang --ai all subject.prompt
+st-bang --agent all subject.prompt
 ```
 Launches:
-    st-gen --ai xai       subject.prompt --bang 0  → tmp/subject_0.json
-    st-gen --ai anthropic subject.prompt --bang 1  → tmp/subject_1.json
-    st-gen --ai openai    subject.prompt --bang 2  → tmp/subject_2.json
-    st-gen --ai perplexity subject.prompt --bang 3 → tmp/subject_3.json
-    st-gen --ai gemini    subject.prompt --bang 4  → tmp/subject_4.json
+    st-gen --agent xai       subject.prompt --bang 0  → tmp/subject_0.json
+    st-gen --agent anthropic subject.prompt --bang 1  → tmp/subject_1.json
+    st-gen --agent openai    subject.prompt --bang 2  → tmp/subject_2.json
+    st-gen --agent perplexity subject.prompt --bang 3 → tmp/subject_3.json
+    st-gen --agent gemini    subject.prompt --bang 4  → tmp/subject_4.json
 
 A block file is created for each st-gen process:
     tmp/subject_0.json.block  ... tmp/subject_4.json.block
@@ -287,7 +287,7 @@ def main():
             continue
         cmd = [
             "st-gen",
-            "--ai", j["ai_key"],
+            "--agent", j["ai_key"],
             "--bang", str(j["index"]),
         ]
         if cache_flag:   cmd.append(cache_flag)

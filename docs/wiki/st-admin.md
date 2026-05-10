@@ -50,7 +50,7 @@ st-admin --setup
 ```
 
 The wizard checks your environment, collects API keys for the providers you want,
-sets `DEFAULT_AI`, configures your editor and optional TTS voice, and offers to join
+sets `DEFAULT_AGENT`, configures your editor and optional TTS voice, and offers to join
 the crossai.dev community.  Everything is saved to `~/.crossenv`.
 
 Once setup is complete, run any command.  A good first test:
@@ -124,13 +124,13 @@ Or use the interactive menu:
 st-admin           # choose "Default AI" from the menu
 ```
 
-The change is written as `DEFAULT_AI=gemini` to `~/.crossenv` and takes effect
+The change is written as `DEFAULT_AGENT=gemini` to `~/.crossenv` and takes effect
 immediately.  You can also edit `~/.crossenv` directly.
 
-Per-call overrides are always available with `--ai`:
+Per-call overrides are always available with `--agent`:
 
 ```bash
-st-gen --ai anthropic my_topic.json   # one-off, doesn't change your default
+st-gen --agent anthropic my_topic.json   # one-off, doesn't change your default
 ```
 
 ---
@@ -144,7 +144,7 @@ up because they overlap by default:
 |------|-----------|---------|
 | **Provider** | The AI company hosting the model. | `anthropic`, `openai`, `xai`, `gemini`, `perplexity` |
 | **Model** | A specific LLM that provider sells. New ones ship every few months; older ones are eventually retired. | `claude-opus-4-5`, `gpt-4o`, `grok-4-1-fast-reasoning` |
-| **Alias** | A short nickname **you** type in `--ai` or that `st` cycles through. Each alias is a fixed `(provider, model)` pair. | `anthropic`, `anthropic-opus`, `gemini-fast` |
+| **Alias** | A short nickname **you** type in `--agent` or that `st` cycles through. Each alias is a fixed `(provider, model)` pair. | `anthropic`, `anthropic-opus`, `gemini-fast` |
 
 **You always get one alias per provider for free** — its name is the provider's
 name (e.g. `anthropic`) and it points at that provider's recommended model.
@@ -175,7 +175,7 @@ st-admin             # then press 'a' (AI)  →  'M' (View aliases)
   Legend:
     Provider  = the AI company (anthropic, openai, xai, gemini, perplexity)
     Model     = a specific LLM that provider hosts (e.g. claude-opus-4-5)
-    Alias     = the short name you pass to --ai or that st cycles through;
+    Alias     = the short name you pass to --agent or that st cycles through;
                 each alias is a (provider, model) pair.
     Type      = 'default' means an alias you got for free (one per provider,
                 same name as the provider, uses the provider's recommended
@@ -205,7 +205,7 @@ st-admin             # then 'a' (AI)  →  'd' (View / set default)
 ```
 
 The arrow ←  marks the current default.  Type any alias name to switch — the
-choice is written to `DEFAULT_AI` in `~/.crossenv` and takes effect on the
+choice is written to `DEFAULT_AGENT` in `~/.crossenv` and takes effect on the
 next command.
 
 ### Adding a custom alias
@@ -339,7 +339,7 @@ What `--upgrade` never touches:
 
 | Location | Contains |
 |----------|----------|
-| `~/.crossenv` | API keys, DEFAULT_AI, all preferences |
+| `~/.crossenv` | API keys, DEFAULT_AGENT, all preferences |
 | `~/.cross_api_cache/` | Cached AI responses |
 | `~/.cross_templates/` | Prompt templates |
 | `~/cross-stones/` | Benchmark domain prompts |

@@ -48,7 +48,7 @@ For simply undoing a mis-selected menu item (before pressing RETURN), use **`Ctr
 |--------|-------------|
 | `file.json / file.prompt` | Path to the story container or prompt file (auto-detected if only one exists in CWD) |
 | `--site {MMD,DIYRV,Shang}` | Discourse site to use for posting; overrides `DISCOURSE_SITE` in config |
-| `-a`, `--ai {xai,anthropic,openai,perplexity,gemini}` | AI provider to start with; overrides `DEFAULT_AI` |
+| `-a`, `--agent {xai,anthropic,openai,perplexity,gemini}` | AI provider to start with; overrides `DEFAULT_AGENT` |
 | `-b`, `--bang` | Start the parallel generator (`st-bang`) instead of single-AI generation |
 | `-q`, `--quiet` | Minimal output |
 | `-v`, `--verbose` | Verbose output |

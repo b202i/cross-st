@@ -17,7 +17,7 @@ New user? Start here: **[Onboarding](Onboarding)** — set up your API keys and 
 | Command | Description |
 |---------|-------------|
 | [st](st) | Interactive menu — launch any command from a numbered list |
-| [st-admin](st-admin) | Settings manager: DEFAULT_AI, model overrides, TTS voice, editor |
+| [st-admin](st-admin) | Settings manager: DEFAULT_AGENT, model overrides, TTS voice, editor |
 | [st-analyze](st-analyze) | AI-powered analysis of cross-product fact-check data |
 | [st-bang](st-bang) | Parallel report generation — run all AIs at once |
 | [st-cat](st-cat) | Print story fields to stdout (pipe-friendly) |
@@ -56,6 +56,7 @@ New user? Start here: **[Onboarding](Onboarding)** — set up your API keys and 
 - [Container Format](Container-Format) — anatomy of `subject.json`: `data[]`, `story[]`, `fact[]`, timing
 - [AI Providers](ai-providers) — all 5 providers, models, free vs paid tiers
 - [Multi-Model](Multi-Model) — run more than one model per provider via aliases (`anthropic-opus` + `anthropic-sonnet` side-by-side)
+- [Agents](Agents) — what an agent is, naming rules, resolution order, and the `--agent` flag (cross-st 0.10.0+)
 - [Cross-Stones Benchmark](cross-stones) — benchmark suite: scoring, domains, leaderboard
 - [FAQ](faq) — common questions and troubleshooting
 

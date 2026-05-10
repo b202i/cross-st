@@ -10,7 +10,7 @@ Run st-cross first to populate the fact-check matrix.
 st-heatmap --display subject.json                  # show chart on screen
 st-heatmap --file subject.json                     # save PNG to ./tmp/
 st-heatmap --display --ai-caption subject.json     # chart on screen + AI narrative
-st-heatmap --file --ai-title --ai gemini s.json    # save PNG to ./tmp/ + title via gemini
+st-heatmap --file --ai-title --agent gemini s.json    # save PNG to ./tmp/ + title via gemini
 st-heatmap --display --file --ai-caption s.json    # screen + save PNG + caption
 ```
 
@@ -19,7 +19,7 @@ Output: chart on screen (--display) and/or PNG saved to --path (default ./tmp/)
 
 Options: --file  --path  --display
          --ai-title  --ai-short  --ai-caption  --ai-summary  --ai-story
-         --ai  --cache  --no-cache  -v  -q
+         --agent  --cache  --no-cache  -v  -q
 
 See also: st-verdict  (verdict category bar chart)
           st-plot --plot evaluator_v_target  (same heatmap via st-plot)

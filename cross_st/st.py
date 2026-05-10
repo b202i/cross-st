@@ -238,7 +238,7 @@ def display_menu(menu, menu_name):
 def get_prompt(menu_names):
     """Generate the dynamic command prompt including state variables and menu names."""
     menu_path = ">".join(menu_names)
-    return f"st ai:{ai_opt[ai_select]} s:{story_sel} f:{fact_sel} {menu_path}> "
+    return f"st agent:{ai_opt[ai_select]} s:{story_sel} f:{fact_sel} {menu_path}> "
 
 
 def execute_menu(menu_name, choice):
@@ -256,7 +256,7 @@ def execute_menu(menu_name, choice):
         case "Generate":
             match choice:
                 case "g":
-                    cmd = f"st-gen --ai {ai} {file_prefix + '.prompt'}"
+                    cmd = f"st-gen --agent {ai} {file_prefix + '.prompt'}"
                 case "e":
                     cmd = f"vi {file_prefix + '.prompt'}"
                 case "s":
@@ -264,9 +264,9 @@ def execute_menu(menu_name, choice):
                 case "b":
                     cmd = f"st-bang {file_json}"
                 case "B":
-                    cmd = f"st-bang --merge --ai {ai} {file_json}"
+                    cmd = f"st-bang --merge --agent {ai} {file_json}"
                 case "m":
-                    cmd = f"st-merge --ai {ai} --stories 1 2 3 4 5 -- {file_json}"
+                    cmd = f"st-merge --agent {ai} --stories 1 2 3 4 5 -- {file_json}"
 
         case "Edit":
             match choice:
@@ -285,7 +285,7 @@ def execute_menu(menu_name, choice):
                 case "f":
                     cmd = f"st-edit -s {story_sel} -f {fact_sel} {file_json}"
                 case "x":
-                    cmd = f"st-fix --ai {ai} -s {story_sel} -f {fact_sel} {file_json}"
+                    cmd = f"st-fix --agent {ai} -s {story_sel} -f {fact_sel} {file_json}"
                 case "g":
                     cmd = f"st-merge --quality --no-post-check {file_json}"
                 case _:
@@ -311,15 +311,15 @@ def execute_menu(menu_name, choice):
         case "Analyze":
             match choice:
                 case "f":
-                    cmd = f"st-fact --ai {ai} -s {story_sel} {file_json}"
+                    cmd = f"st-fact --agent {ai} -s {story_sel} {file_json}"
                 case "a":
-                    cmd = f"st-fact --ai {ai} {file_json}"
+                    cmd = f"st-fact --agent {ai} {file_json}"
                 case "@":
-                    cmd = f"st-fact --ai all -s {story_sel} {file_json}"
+                    cmd = f"st-fact --agent all -s {story_sel} {file_json}"
                 case "c":
                     cmd = f"st-cross {file_json}"
                 case "C":
-                    cmd = f"st-analyze --ai {ai} {file_json}"
+                    cmd = f"st-analyze --agent {ai} {file_json}"
                 case "s":
                     cmd = "st-stones --domain cross_stones/"
                 case "v":
@@ -417,8 +417,8 @@ def main():
                         help='Path to the .json or .prompt file', metavar='file.json | file.prompt')
     parser.add_argument('--site', type=str, choices=slugs, default=slugs[0],
                         help=f"Define Discourse site to use, default is {slugs[0]}")
-    parser.add_argument('-a', '--ai', type=str, choices=ai_opt, default=get_default_ai(),
-                        help=f'AI model to start with, default is {get_default_ai()}')
+    parser.add_argument('-a', '--agent', type=str, choices=ai_opt, default=get_default_ai(),
+                        help=f'Agent to start with, default is {get_default_ai()}')
     parser.add_argument('-b', '--bang', action='store_true',
                         help='Submit prompt to each AI in parallel (bang!), default: no bang')
     parser.add_argument('-q', '--quiet', action='store_true',
@@ -438,7 +438,7 @@ def main():
         if args.bang:
             cmd = f"st-bang {file_prompt}".split()
         else:
-            cmd = f"st-gen --ai {args.ai} {file_prompt}".split()
+            cmd = f"st-gen --agent {args.agent} {file_prompt}".split()
         result = subprocess.run(cmd)
         cmd = ""
         if result.returncode != 0:

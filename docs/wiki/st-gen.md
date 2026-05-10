@@ -14,7 +14,7 @@ Sends your prompt file to an AI provider and saves the raw response into a `.jso
 
 ```bash
 st-gen subject.prompt                   # generate with default AI (runs st-prep automatically)
-st-gen --ai gemini subject.prompt       # use a specific provider
+st-gen --agent gemini subject.prompt       # use a specific provider
 st-gen --no-cache subject.prompt        # bypass API cache
 st-gen --no-prep subject.prompt         # store raw data only, skip st-prep
 ```
@@ -24,7 +24,7 @@ st-gen --no-prep subject.prompt         # store raw data only, skip st-prep
 | Option | Description |
 |--------|-------------|
 | `file.prompt` | Path to the `.prompt` file |
-| `--ai NAME` | AI provider to use (default: your configured default) |
+| `--agent NAME` | AI provider to use (default: your configured default) |
 | `--cache` | Enable API cache (default: enabled) |
 | `--no-cache` | Bypass API cache — always call the AI live |
 | `--no-prep` | Store raw AI data only; skip the automatic `st-prep` call |

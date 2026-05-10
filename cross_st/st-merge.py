@@ -18,7 +18,7 @@ Two modes are selected automatically based on available data:
 The mode is chosen automatically. Use --simple or --quality to override.
 
 In quality mode the synthesizer AI is always the author of the base story.
-Use --ai only to override the synthesizer in simple mode, or use --base to
+Use --agent only to override the synthesizer in simple mode, or use --base to
 change which story (and therefore which AI) anchors the quality rewrite.
 
 Usage:
@@ -28,7 +28,7 @@ Usage:
   st-merge --all file.json                  # merge all stories including derived
   st-merge --simple file.json               # force simple mode
   st-merge --quality file.json              # force quality mode (fails if no data)
-  st-merge --ai anthropic file.json         # synthesizer AI for simple mode only
+  st-merge --agent anthropic file.json         # synthesizer AI for simple mode only
   st-merge --base 3 file.json               # use story 3 as base (its AI rewrites)
   st-merge --ai-caption file.json           # merge + generate short caption
   st-merge --ai-title file.json             # merge + generate title
@@ -707,7 +707,7 @@ def main():
         base_make  = base_entry.get("make")
         if base_make and base_make in get_ai_list():
             if args.agent != base_make and not args.quiet:
-                print(f"  Synthesizer: {base_make} (base story author — overrides --ai in quality mode)")
+                print(f"  Synthesizer: {base_make} (base story author — overrides --agent in quality mode)")
             args.agent = base_make
         else:
             if not args.quiet:
@@ -860,7 +860,7 @@ def main():
         before_avg  = sum(source_scores) / len(source_scores) if source_scores else None
         before_best = max(source_scores) if source_scores else None
 
-        # Run st-fact --ai all with full output so the user sees the live
+        # Run st-fact --agent all with full output so the user sees the live
         # progress table during the 5-10 minute fact-check.
         # --silent is intentionally NOT used — that's the whole point.
         if not args.quiet:
@@ -868,7 +868,7 @@ def main():
             print()
         try:
             subprocess.run(
-                ["st-fact", "--ai", "all", "-s", str(story_num),
+                ["st-fact", "--agent", "all", "-s", str(story_num),
                  "--timeout", "20", file_json],
                 check=False,
             )

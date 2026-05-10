@@ -11,12 +11,12 @@ Run before: st-gen   (generate a report from one AI provider)
 ```
 st-new subject                          # create prompt, open editor
 st-new -g subject                       # create, edit, then run st-gen + st-prep automatically
-st-new -g --ai gemini subject           # same, using a specific AI provider
+st-new -g --agent gemini subject           # same, using a specific AI provider
 st-new --template custom subject        # use a named template
 st-new --bang subject                   # edit then run st-bang (all AIs)
 ```
 
-Options: --template  -g/--gen  --ai  --bang  --st  --no-spell  -v  -q
+Options: --template  -g/--gen  --agent  --bang  --st  --no-spell  -v  -q
 """
 import argparse
 import os
@@ -172,7 +172,7 @@ def main():
 
         if args.gen:
             if not args.quiet:
-                print(f"Running st-gen --ai {args.agent} {file_prompt}")
+                print(f"Running st-gen --agent {args.agent} {file_prompt}")
             subprocess.run(["st-gen", "--agent", args.agent, file_prompt])
             sys.exit(0)
 

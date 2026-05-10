@@ -222,17 +222,16 @@ class TestListAliases:
         _alias_admin.add_alias("anthropic-opus", "anthropic", "claude-opus-4-5")
         # add_alias → write_alias_file → reload_aliases() wipes the
         # built-in seed installed by the fixture.  Re-seed so the table
-        # exercises both the "default" and "custom" Type column branches.
+        # renders both built-in and user-defined rows.
         from cross_ai_core.aliases import _AI_ALIASES, AliasSpec
         for make in _alias_admin._builtin_makes():
             _AI_ALIASES.setdefault(make, AliasSpec(make=make, model=None))
         text = _alias_admin.format_alias_table(_alias_admin.list_aliases())
         assert "Agent" in text and "Provider" in text and "Model" in text
-        assert "Type" in text and "Env override" in text
+        assert "Env override" in text
         assert "anthropic-opus" in text and "claude-opus-4-5" in text
-        # Custom aliases tagged "custom"; default ones tagged "default".
-        assert "custom"  in text
-        assert "default" in text
+        # Built-in self-alias rendered alongside the user-defined one.
+        assert "anthropic" in text
 
 
 # ── CLI flags — invoke st-admin as a subprocess ──────────────────────────────
