@@ -29,7 +29,7 @@ import sys
 import time
 from mmd_startup import require_config, load_cross_env
 
-from ai_handler import process_prompt, get_ai_list, get_default_ai, get_usage, check_api_key, get_content_auto
+from ai_handler import process_prompt, get_ai_list, get_ai_model, get_default_ai, get_usage, check_api_key, get_content_auto
 
 from mmd_util import create_block_file, tmp_safe_name, get_tmp_dir
 
@@ -171,8 +171,16 @@ def main():
     else:
         file_json = file_prefix + ".json"
 
+    # Resolve the model up-front so progress messages can name it.
+    # get_ai_model() handles agent-name resolution (alias → make/model).
+    try:
+        _model_label = get_ai_model(args.agent)
+    except Exception:
+        _model_label = ""
+    _agent_desc = f"{args.agent} {_model_label}".strip()
+
     if not args.quiet:
-        print(f"Generating story from {file_prefix}.prompt, with AI: {args.agent}, outputting to {file_json}")
+        print(f"Generating story from {file_prefix}.prompt, with agent: {_agent_desc}, outputting to {file_json}", flush=True)
 
     # Use realpath to get the actual path of the script
     load_cross_env()
@@ -227,8 +235,13 @@ def main():
                   "Re-run with --no-cache to force a fresh API call.", file=sys.stderr)
         sys.exit(1)
 
+    # Refresh agent description with the model actually returned by the call —
+    # may differ from get_ai_model() when an alias resolves dynamically or the
+    # provider substitutes a model.
+    _agent_desc = f"{args.agent} {ai_model}".strip() if ai_model else args.agent
+
     if not args.quiet:
-        print(f"AI response complete: {args.agent}")
+        print(f"AI response complete: {_agent_desc}")
 
     # Append the new data to the container
     if not os.path.isfile(file_json):
@@ -321,9 +334,9 @@ def main():
     # otherwise use the last one on the list
     if duplicate_index is not None:
         data_select = duplicate_index
-        print(f"App complete, AI: {args.agent}, duplicate detected, no changes: {file_json}")
+        print(f"App complete, agent: {_agent_desc}, duplicate detected, no changes: {file_json}")
     else:
-        print(f"App complete, AI: {args.agent}, container updated: {file_json}")
+        print(f"App complete, agent: {_agent_desc}, container updated: {file_json}")
 
     if args.prep or args.bang >= 0:
         bang_param = ""
